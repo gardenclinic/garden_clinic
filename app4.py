@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import hashlib
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG
@@ -122,7 +122,7 @@ section[data-testid="stSidebarNav"] {
 }
 .card .big-num {
     font-family: 'DM Mono', monospace;
-    font-size: 2rem;
+    font-size: 1.8rem;
     font-weight: 500;
     margin: 0;
 }
@@ -486,7 +486,7 @@ def page_header(title, desc=""):
     st.markdown(f'<div class="page-header"><h1>{title}</h1><p>{desc}</p></div>', unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# FINANCIALS
+# FINANCIALS & TIME WINDOW PROFITS
 # ─────────────────────────────────────────────
 def get_financials(start=None, end=None):
     q_income = "SELECT SUM(net_paid) as t FROM visits"
@@ -503,7 +503,12 @@ def get_financials(start=None, end=None):
     expenses_row = fetch_one(q_expenses, params)
     exp = expenses_row["t"] if expenses_row and expenses_row["t"] else 0.0
     
-    all_visits = fetch_all("SELECT d.name, d.comm_type, d.fixed_rate, v.net_paid FROM visits v JOIN doctors d ON v.doctor_id = d.id")
+    # Target all doctor commissions tied to those specific dates
+    q_visits = "SELECT d.name, d.comm_type, d.fixed_rate, v.net_paid FROM visits v JOIN doctors d ON v.doctor_id = d.id"
+    if start and end:
+        q_visits += " WHERE v.visit_date BETWEEN ? AND ?"
+    all_visits = fetch_all(q_visits, params)
+    
     doc_visits = {}
     for vr in all_visits:
         doc_visits.setdefault(vr["name"], {"visits": [], "comm_type": vr["comm_type"], "fixed_rate": vr["fixed_rate"]})
@@ -523,15 +528,24 @@ def get_financials(start=None, end=None):
     total_out = exp + commissions
     return gross, exp, commissions, total_out, gross - total_out, doc_visits
 
+# All time values
 gross_income, base_expenses, total_commissions, total_outflows, net_profit, doc_visits = get_financials()
 
-# Today's numbers
+# Time ranges calculations
 today_str = date.today().isoformat()
+yesterday_str = (date.today() - timedelta(days=1)).isoformat()
+start_of_week_str = (date.today() - timedelta(days=date.today().weekday())).isoformat()
+start_of_month_str = date.today().replace(day=1).isoformat()
+
+# Period breakdowns
+_, _, _, _, day_profit, _ = get_financials(today_str, today_str)
+_, _, _, _, week_profit, _ = get_financials(start_of_week_str, today_str)
+_, _, _, _, month_profit, _ = get_financials(start_of_month_str, today_str)
+
+# Today's context metrics
 today_row = fetch_one("SELECT SUM(net_paid) as t, COUNT(*) as c FROM visits WHERE visit_date = ?", (today_str,))
 today_revenue = today_row["t"] if today_row and today_row["t"] else 0.0
 today_visits = today_row["c"] if today_row else 0
-
-# Patient count
 patient_count = fetch_one("SELECT COUNT(*) as c FROM patients")["c"]
 
 # ─────────────────────────────────────────────
@@ -615,23 +629,35 @@ if st.sidebar.button("Sign Out", use_container_width=True):
 # MODULE: DASHBOARD
 # ─────────────────────────────────────────────
 if selected == "📈 Dashboard":
-    page_header("Executive Dashboard", f"Showing all-time clinic performance · Today is {date.today().strftime('%A, %B %d %Y')}")
+    page_header("Executive Dashboard", f"Showing clinic performance · Today is {date.today().strftime('%A, %B %d %Y')}")
     
     pulse_bar([
         ("Today's Revenue", f"${today_revenue:,.0f}"),
         ("Visits Today", str(today_visits)),
         ("Total Patients", str(patient_count)),
         ("All-Time Revenue", f"${gross_income:,.0f}"),
-        ("Net Profit", f"${net_profit:,.0f}"),
+        ("Net Profit (All-Time)", f"${net_profit:,.0f}"),
     ])
     
+    # Period Breakdown Profit Row
+    section_label("Profit Timeline Breakdown")
+    p_col1, p_col2, p_col3 = st.columns(3)
+    with p_col1:
+        st.markdown(card("Daily Profit (Today)", f"${day_profit:,.2f}", "green" if day_profit >= 0 else "red", "Net today"), unsafe_allow_html=True)
+    with p_col2:
+        st.markdown(card("Weekly Profit (MTD)", f"${week_profit:,.2f}", "green" if week_profit >= 0 else "red", "Running calendar week"), unsafe_allow_html=True)
+    with p_col3:
+        st.markdown(card("Monthly Profit", f"${month_profit:,.2f}", "dark" if month_profit >= 0 else "red", f"Current month: {date.today().strftime('%B')}"), unsafe_allow_html=True)
+
+    st.markdown("---")
+    section_label("All-Time High-Level Totals")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(card("Gross Revenue", f"${gross_income:,.2f}", "green", "All collected payments"), unsafe_allow_html=True)
     with col2:
         st.markdown(card("Total Expenses", f"${total_outflows:,.2f}", "red", "Bills + payroll + commissions"), unsafe_allow_html=True)
     with col3:
-        st.markdown(card("Net Profit", f"${net_profit:,.2f}", "dark", "Revenue minus all costs"), unsafe_allow_html=True)
+        st.markdown(card("Net Profit (Total)", f"${net_profit:,.2f}", "dark", "Revenue minus all costs"), unsafe_allow_html=True)
     with col4:
         st.markdown(card("Doctor Commissions", f"${total_commissions:,.2f}", "dark", "Total owed to doctors"), unsafe_allow_html=True)
         
@@ -650,7 +676,7 @@ if selected == "📈 Dashboard":
             
     with col_b:
         section_label("Doctor performance")
-        all_docs = fetch_all("SELECT name, comm_type, fixed_rate")
+        all_docs = fetch_all("SELECT name, comm_type, fixed_rate FROM doctors")
         rows = []
         for d in all_docs:
             info = doc_visits.get(d["name"], {"visits": [], "comm_type": d["comm_type"], "fixed_rate": d["fixed_rate"]})
@@ -770,6 +796,7 @@ elif selected == "🖥️ Reception":
                         "method": payment_method,
                         "date": today_str
                     }
+                    st.rerun()
                     
         if "rcpt" in st.session_state:
             r = st.session_state.rcpt
@@ -827,6 +854,7 @@ elif selected == "🖥️ Reception":
             if p_name.strip():
                 if execute_write("INSERT INTO patients (name, phone, date_of_birth, gender, notes, created_at) VALUES (?,?,?,?,?,?)", (p_name.strip(), p_phone.strip(), p_dob.strip(), p_gender, p_notes.strip(), today_str)):
                     st.success(f"Patient '{p_name}' registered.")
+                    st.rerun()
                 else:
                     st.error("A patient with that name already exists.")
             else:
