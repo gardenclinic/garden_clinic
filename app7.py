@@ -2,713 +2,785 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import hashlib
-from datetime import datetime, date, timedelta
+from datetime import datetime
 
-# ─────────────────────────────────────────────
-# PAGE CONFIG
-# ─────────────────────────────────────────────
-st.set_page_config(
-    page_title="Garden Clinic",
-    page_icon="🌿",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# ----------------------------------------------------
+# 1. PREMIUM 2026 SAAS PALETTE & CSS ENGINE
+# ----------------------------------------------------
+st.set_page_config(page_title="Garden Clinic OS", page_icon="🌿", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
-/* ── GLOBAL ── */
-*, *::before, *::after {
-    box-sizing: border-box;
-}
-html, body, .stApp {
-    background: #F0F4F2 !important;
-    color: #1A2E23 !important;
-    font-family: 'DM Sans', system-ui, sans-serif !important;
-}
-
-/* ── SIDEBAR ── */
-[data-testid="stSidebar"] {
-    background: #0D3D2B !important;
-    border-right: none !important;
-    min-width: 230px !important;
-}
-[data-testid="stSidebar"] * {
-    color: #E8F0EB !important;
-}
-[data-testid="stSidebar"] .stRadio label {
-    font-size: 0.9rem !important;
-}
-[data-testid="stSidebar"] hr {
-    border-color: rgba(255,255,255,0.1) !important;
-}
-section[data-testid="stSidebarNav"] {
-    display: none;
-}
-
-/* ── PULSE BAR ── */
-.pulse-bar {
-    background: linear-gradient(90deg, #0D3D2B 0%, #1A5C3E 100%);
-    border-radius: 14px;
-    padding: 16px 24px;
-    display: flex;
-    gap: 32px;
-    flex-wrap: wrap;
-    align-items: center;
-    margin-bottom: 24px;
-    box-shadow: 0 4px 20px rgba(13,61,43,0.12);
-}
-.pulse-stat {
-    display: flex;
-    flex-direction: column;
-}
-.pulse-label {
-    font-size: 0.72rem;
-    color: #6FCF97;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-.pulse-value {
-    font-family: 'DM Mono', monospace;
-    font-size: 1.35rem;
-    font-weight: 500;
-    color: #FFFFFF;
-    margin-top: 2px;
-}
-.pulse-divider {
-    width: 1px;
-    background: rgba(255,255,255,0.15);
-    height: 36px;
-    align-self: center;
-}
-
-/* ── PAGE HEADER ── */
-.page-header {
-    margin-bottom: 28px;
-}
-.page-header h1 {
-    font-size: 1.7rem !important;
-    font-weight: 700 !important;
-    color: #0D3D2B !important;
-    margin: 0 0 4px 0 !important;
-}
-.page-header p {
-    font-size: 0.9rem;
-    color: #5A7A65;
-    margin: 0;
-}
-
-/* ── CARDS ── */
-.card {
-    background: #FFFFFF;
-    border-radius: 14px;
-    padding: 22px 24px;
-    border: 1px solid #DDE8E1;
-    margin-bottom: 18px;
-    transition: box-shadow 0.2s;
-}
-.card:hover {
-    box-shadow: 0 6px 24px rgba(0,0,0,0.06);
-}
-.card h3 {
-    margin: 0 0 4px 0;
-    font-size: 0.8rem;
-    color: #5A7A65;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-.card .big-num {
-    font-family: 'DM Mono', monospace;
-    font-size: 1.6rem;
-    font-weight: 500;
-    margin: 0;
-}
-.card .big-num.green { color: #0D7A4E; }
-.card .big-num.red { color: #C0392B; }
-.card .big-num.dark { color: #0D3D2B; }
-
-/* ── TABS ── */
-.stTabs [data-baseweb="tab-list"] {
-    background: transparent !important;
-    gap: 4px !important;
-    border-bottom: 2px solid #DDE8E1 !important;
-    padding-bottom: 0 !important;
-}
-.stTabs button[data-baseweb="tab"] {
-    background: transparent !important;
-    border: none !important;
-    color: #5A7A65 !important;
-    font-size: 0.88rem !important;
-    font-weight: 500 !important;
-    padding: 8px 16px 10px !important;
-    border-radius: 0 !important;
-    font-family: 'DM Sans', sans-serif !important;
-}
-.stTabs button[aria-selected="true"] {
-    color: #0D3D2B !important;
-    font-weight: 700 !important;
-    border-bottom: 2px solid #0D3D2B !important;
-    margin-bottom: -2px !important;
-}
-
-/* ── SYSTEM INVOICE RECEIPT BOX ── */
-.receipt-box {
-    background: #FFFFFF;
-    border-left: 5px solid #0D3D2B;
-    border-radius: 8px;
-    padding: 20px;
-    margin: 15px 0;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-
-/* ── BUTTONS ── */
-.stButton > button {
-    background: #0D3D2B !important;
-    color: #FFFFFF !important;
-    border: none !important;
-    border-radius: 9px !important;
-    font-weight: 600 !important;
-    font-size: 0.88rem !important;
-    padding: 10px 20px !important;
-    font-family: 'DM Sans', sans-serif !important;
-    transition: background 0.15s, transform 0.1s !important;
-}
-.stButton > button:hover {
-    background: #1A5C3E !important;
-    transform: translateY(-1px) !important;
-}
-button[data-testid="baseButton-primary"] {
-    background: #C0392B !important;
-}
-button[data-testid="baseButton-primary"]:hover {
-    background: #A93226 !important;
-}
-
-/* ── FIXED BOTTOM FOOTER ── */
-.sidebar-footer-text {
-    font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.4);
-    font-family: 'DM Sans', sans-serif;
-    text-align: left;
-    padding-left: 16px;
-    margin-top: auto;
-    padding-top: 30px;
-    padding-bottom: 15px;
-}
-</style>
+    <style>
+    /* Professional Color Palette & Global Resets */
+    .stApp {
+        background-color: #F8FAF9 !important;
+        color: #111827 !important;
+        font-family: 'Inter', system-ui, sans-serif;
+    }
+    
+    /* Modern Gradient Sidebar */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #081C15 0%, #0B291B 50%, #123524 100%) !important;
+        border-right: 1px solid rgba(255,255,255,0.1);
+    }
+    [data-testid="stSidebar"] * {
+        color: #FFFFFF !important;
+    }
+    
+    /* Premium Glassmorphism Card Design */
+    .feature-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        border-radius: 18px;
+        padding: 25px;
+        border: 1px solid rgba(220, 229, 221, 0.7);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.6);
+        transition: all .25s ease;
+        animation: fadeUp .4s ease;
+        margin-bottom: 20px;
+    }
+    .feature-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.08);
+    }
+    
+    /* Keyframe Animations */
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* SaaS Style Custom DataFrames */
+    [data-testid="stDataFrame"] {
+        border-radius: 15px !important;
+        overflow: hidden !important;
+        border: 1px solid #DCE5DD !important;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.03) !important;
+    }
+    
+    /* Form Inputs Overrides */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stNumberInput>div>div>input {
+        border-radius: 10px !important;
+        border: 1px solid #DCE5DD !important;
+        background-color: #FFFFFF !important;
+        color: #111827 !important;
+    }
+    
+    /* Premium Mint/Green Action Buttons */
+    .stButton>button {
+        background: linear-gradient(135deg, #2ECC71 0%, #10B981 100%) !important;
+        color: white !important;
+        border: none !important;
+        font-weight: 600 !important;
+        border-radius: 10px !important;
+        padding: 12px 24px !important;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2) !important;
+        transition: all 0.2s ease;
+    }
+    .stButton>button:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35) !important;
+    }
+    
+    /* Red Alert Deletion Buttons */
+    button[data-testid="baseButton-primary"] {
+        background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%) !important;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2) !important;
+    }
+    
+    /* Premium Tab Styling */
+    button[data-baseweb="tab"] {
+        font-weight: 600 !important;
+        color: #557A61 !important;
+    }
+    button[aria-selected="true"] {
+        color: #0B291B !important;
+        border-bottom-color: #10B981 !important;
+    }
+    </style>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-# DATABASE INTERACTION MATRIX
-# ─────────────────────────────────────────────
-DB_FILE = "garden_clinic_v8.db"
+# ----------------------------------------------------
+# 2. CORE STORAGE ENGINE (DATABASE ENGINE)
+# ----------------------------------------------------
+DB_FILE = "garden_clinic_v7.db"
 
-def hash_password(pw):
-    return hashlib.sha256(pw.encode()).hexdigest()
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
-def get_db():
+def get_db_connection():
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
-def fetch_all(q, p=()):
-    db = get_db()
-    res = db.execute(q, p).fetchall()
+def init_db():
+    ctx = get_db_connection()
+    with ctx:
+        ctx.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL)")
+        ctx.execute("CREATE TABLE IF NOT EXISTS patients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, phone TEXT)")
+        ctx.execute("CREATE TABLE IF NOT EXISTS doctors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, comm_type TEXT NOT NULL, fixed_rate REAL DEFAULT 0.0)")
+        ctx.execute("CREATE TABLE IF NOT EXISTS employees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, role TEXT NOT NULL, salary REAL NOT NULL)")
+        ctx.execute("CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, price REAL NOT NULL)")
+        ctx.execute("CREATE TABLE IF NOT EXISTS bundles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, price REAL NOT NULL)")
+        ctx.execute("""
+            CREATE TABLE IF NOT EXISTS visits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, doctor_id INTEGER, service_id INTEGER, bundle_id INTEGER,
+                visit_date TEXT, base_price REAL, discount_amount REAL, net_paid REAL
+            )
+        """)
+        ctx.execute("CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL)")
+        ctx.execute("""
+            CREATE TABLE IF NOT EXISTS appointments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, doctor_id INTEGER, 
+                app_date TEXT, app_time TEXT, status TEXT DEFAULT 'Scheduled'
+            )
+        """)
+        
+        # Inject standard master boss profile if database cluster runs fresh
+        master_check = ctx.execute("SELECT * FROM users WHERE username = 'admin'").fetchone()
+        if not master_check:
+            ctx.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", ('admin', hash_password('1011'), 'Boss'))
+    ctx.close()
+
+init_db()
+
+def fetch_all(query, params=()):
+    db = get_db_connection()
+    res = db.execute(query, params).fetchall()
     db.close()
     return res
 
-def fetch_one(q, p=()):
-    db = get_db()
-    res = db.execute(q, p).fetchone()
-    db.close()
-    return res
-
-def execute_write(q, p=()):
-    db = get_db()
+def execute_write(query, params=()):
+    db = get_db_connection()
     try:
         with db:
-            db.execute(q, p)
+            db.execute(query, params)
         return True
     except sqlite3.IntegrityError:
         return False
     finally:
         db.close()
 
-def init_db():
-    db = get_db()
-    with db:
-        db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL, plaintext_password TEXT DEFAULT '')")
-        db.execute("CREATE TABLE IF NOT EXISTS patients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, phone TEXT, date_of_birth TEXT, gender TEXT, notes TEXT, created_at TEXT)")
-        
-        db.execute("""CREATE TABLE IF NOT EXISTS doctors (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            name TEXT NOT NULL UNIQUE, 
-            specialty TEXT, 
-            manual_visitors_target INTEGER DEFAULT 0,
-            manual_commission_payout REAL DEFAULT 0.0
-        )""")
-        
-        db.execute("""CREATE TABLE IF NOT EXISTS reklams (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            commission_percent REAL DEFAULT 0.0,
-            notes TEXT
-        )""")
-        
-        db.execute("CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, category TEXT, price REAL NOT NULL, active INTEGER DEFAULT 1)")
-        db.execute("CREATE TABLE IF NOT EXISTS bundles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, price REAL NOT NULL, description TEXT)")
-        
-        db.execute("""CREATE TABLE IF NOT EXISTS visits (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id INTEGER,
-            doctor_id INTEGER,
-            service_id INTEGER,
-            bundle_id INTEGER,
-            visit_date TEXT,
-            base_price REAL,
-            discount_amount REAL,
-            net_paid REAL,
-            payment_method TEXT DEFAULT 'Cash',
-            source_type TEXT DEFAULT 'Direct Walk-in',
-            reklam_id INTEGER DEFAULT NULL,
-            notes TEXT
-        )""")
-        
-        db.execute("CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT NOT NULL, category TEXT DEFAULT 'General', amount REAL NOT NULL, date TEXT NOT NULL)")
-        db.execute("CREATE TABLE IF NOT EXISTS appointments (id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, doctor_id INTEGER, appt_date TEXT, appt_time TEXT, reason TEXT, status TEXT DEFAULT 'Scheduled')")
-        db.execute("CREATE TABLE IF NOT EXISTS system_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user TEXT, action TEXT, timestamp TEXT)")
-        
-        # New Feature Schema Strategy: Yoga Subscription Registries Matrix
-        db.execute("""CREATE TABLE IF NOT EXISTS yoga_payments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id INTEGER,
-            amount_paid REAL NOT NULL,
-            payment_date TEXT NOT NULL,
-            expiry_date TEXT NOT NULL,
-            notes TEXT
-        )""")
-    db.close()
-
-init_db()
-
-# ─────────────────────────────────────────────
-# AUDIT LOGGER
-# ─────────────────────────────────────────────
-def log_activity(action_text):
-    current_user = st.session_state.get("username", "System")
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    execute_write("INSERT INTO system_logs (user, action, timestamp) VALUES (?, ?, ?)", (current_user, action_text, now_str))
-
-# ─────────────────────────────────────────────
-# UI COMPONENTS
-# ─────────────────────────────────────────────
-def card(title, value, css_class="dark"):
-    return f"""<div class="card">
-        <h3>{title}</h3>
-        <p class="big-num {css_class}">{value}</p>
-    </div>"""
-
-def section_label(text):
-    st.markdown(f'<p style="font-weight:700; color:#0D3D2B; font-size:1.1rem; margin-top:10px; margin-bottom:12px;">{text}</p>', unsafe_allow_html=True)
-
-def pulse_bar(stats):
-    items = ""
-    for i, (label, value) in enumerate(stats):
-        if i > 0:
-            items += '<div class="pulse-divider"></div>'
-        items += f'<div class="pulse-stat"><span class="pulse-label">{label}</span><span class="pulse-value">{value}</span></div>'
-    st.markdown(f'<div class="pulse-bar">{items}</div>', unsafe_allow_html=True)
-
-def page_header(title, desc=""):
-    st.markdown(f'<div class="page-header"><h1>{title}</h1><p>{desc}</p></div>', unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────
-# ENGINE REVENUE BALANCES
-# ─────────────────────────────────────────────
-def get_financials():
-    gross = fetch_one("SELECT SUM(net_paid) as t FROM visits")["t"] or 0.0
-    yoga_gross = fetch_one("SELECT SUM(amount_paid) as t FROM yoga_payments")["t"] or 0.0
-    total_gross = gross + yoga_gross
+# ----------------------------------------------------
+# AUTOMATED FIRST-OF-THE-MONTH PAYROLL ENGINE
+# ----------------------------------------------------
+def auto_process_monthly_payroll():
+    current_month = datetime.now().strftime("%Y-%m")
+    desc_tag = f"Automated Monthly Payroll Outflow: {current_month}"
     
-    exp = fetch_one("SELECT SUM(amount) as t FROM expenses")["t"] or 0.0
-    
-    docs = fetch_all("SELECT manual_commission_payout FROM doctors")
-    total_doc_commissions = sum(d["manual_commission_payout"] for d in docs) if docs else 0.0
-    
-    reklam_visits = fetch_all("SELECT v.net_paid, r.commission_percent FROM visits v JOIN reklams r ON v.reklam_id = r.id")
-    total_reklam_commissions = sum((v["net_paid"] * (v["commission_percent"] / 100.0)) for v in reklam_visits) if reklam_visits else 0.0
-    
-    total_outflows = exp + total_doc_commissions + total_reklam_commissions
-    return total_gross, exp, total_doc_commissions, total_reklam_commissions, total_gross - total_outflows
+    already_paid = fetch_all("SELECT id FROM expenses WHERE description = ?", (desc_tag,))
+    if not already_paid:
+        staff_salary_row = fetch_all("SELECT SUM(salary) as total FROM employees")
+        payroll_burden = staff_salary_row[0]["total"] if staff_salary_row and staff_salary_row[0]["total"] else 0.0
+        
+        if payroll_burden > 0:
+            execute_write(
+                "INSERT INTO expenses (description, amount, date) VALUES (?, ?, ?)",
+                (desc_tag, payroll_burden, f"{current_month}-01")
+            )
 
-gross_income, base_expenses, total_commissions, total_reklam_out, net_profit = get_financials()
-today_str = date.today().isoformat()
-patient_count = fetch_one("SELECT COUNT(*) as c FROM patients")["c"]
+auto_process_monthly_payroll()
 
-# ─────────────────────────────────────────────
-# SECURITY LOGIN ENFORCEMENT
-# ─────────────────────────────────────────────
+# ----------------------------------------------------
+# 3. PREMIUM LOGIN CARD GATEWAY
+# ----------------------------------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+    st.session_state.username = ""
+    st.session_state.role = ""
 
 if not st.session_state.logged_in:
-    st.markdown("<div style='text-align:center; padding:30px;'><h1>🌿 Garden Clinic Portal</h1></div>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1.2, 1])
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("""
+        <div style="background:white; padding:40px; border-radius:20px; max-width:550px; margin:auto; box-shadow:0 15px 40px rgba(0,0,0,.06); border: 1px solid #ECEFF1;">
+            <h1 style="text-align:center; margin:0; color:#0B291B; font-weight:800;">🌿 Garden Clinic</h1>
+            <p style="text-align:center; color:#6B7280; margin-top:5px; margin-bottom:25px;">Professional Clinic Workspace Platform</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1.4, 1])
     with col2:
-        u = st.text_input("Username")
-        p = st.text_input("Password", type="password")
-        if st.button("Sign In Matrix", use_container_width=True):
-            rec = fetch_all("SELECT * FROM users WHERE username = ? AND password_hash = ?", (u.strip(), hash_password(p)))
-            if rec:
-                st.session_state.logged_in = True
-                st.session_state.username = rec[0]["username"]
-                st.session_state.role = rec[0]["role"]
-                st.rerun()
-            else:
-                st.error("Invalid credentials.")
+        tab1, tab2 = st.tabs(["🔑 Staff Authentication", "📝 Provision Access Configuration"])
+        
+        with tab1:
+            log_user = st.text_input("Username Key", key="log_uid")
+            log_pass = st.text_input("Security Keypass", type="password", key="log_pwd")
+            if st.button("Unlock Dashboard Console 🔓", use_container_width=True):
+                user_record = fetch_all("SELECT * FROM users WHERE username = ? AND password_hash = ?", (log_user.strip(), hash_password(log_pass)))
+                if user_record:
+                    st.session_state.logged_in = True
+                    st.session_state.username = user_record[0]["username"]
+                    st.session_state.role = user_record[0]["role"]
+                    st.rerun()
+                else:
+                    st.error("Authentication credentials verified invalid.")
+        
+        with tab2:
+            reg_user = st.text_input("New Identity User String")
+            reg_pass = st.text_input("New Account Passcode", type="password")
+            reg_role = st.selectbox("Operational Clear Tier", ["Boss", "Accounting", "Reception", "Reception & Accounting"])
+            admin_code = st.text_input("Master System Override Admin Code", type="password")
+            
+            if st.button("Commit Node Profile ✅", use_container_width=True):
+                if admin_code != "1011":
+                    st.error("Invalid Administrative Master Code. Transaction dropped.")
+                elif reg_user and reg_pass:
+                    if execute_write("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", (reg_user.strip(), hash_password(reg_pass), reg_role)):
+                        st.success("Account initialized. Please authenticate via Login tab.")
+                    else:
+                        st.error("Profile identity conflict found.")
     st.stop()
 
-# ─────────────────────────────────────────────
-# CONTROL SIDEBAR
-# ─────────────────────────────────────────────
-role = st.session_state.role
-username = st.session_state.username
-
-st.sidebar.markdown(f"""
-    <div style="padding: 16px;">
-        <div style="font-size:1.3rem; font-weight:800; color:#FFFFFF;">🌿 Garden Clinic</div>
-        <div style="font-size:0.8rem; color:#6FCF97;">User: {username} ({role})</div>
-    </div>
+# ----------------------------------------------------
+# 4. SAAS GRADIENT SIDEBAR & BRANDING
+# ----------------------------------------------------
+st.sidebar.markdown("""
+<div style='text-align:center; padding:15px 10px 5px 10px; margin-bottom:10px;'>
+    <h2 style='color:#FFFFFF !important; margin:0; font-weight:800; letter-spacing:0.5px;'>🌿 Garden Clinic</h2>
+    <p style='color:#34D399 !important; font-size:0.9rem; margin-top:4px; font-weight:500;'>Management OS v7.0</p>
+</div>
 """, unsafe_allow_html=True)
 
-menu_map = {
-    "Boss": ["📈 Dashboard", "🖥️ Reception", "📊 Accounting", "📅 Appointments", "⚙️ Settings"],
-    "Reception & Accounting": ["🖥️ Reception", "📊 Accounting", "📅 Appointments"],
-    "Accounting": ["📊 Accounting"],
-    "Reception": ["🖥️ Reception", "📅 Appointments"],
-}
-selected = st.sidebar.radio("Navigation Engine", menu_map.get(role, []), label_visibility="collapsed")
+st.sidebar.markdown(f"""
+<div style='background:rgba(255,255,255,0.08); padding:12px; border-radius:12px; margin:0 10px 20px 10px; text-align:center;'>
+    <span style='color:#D1D5DB !important; font-size:0.85rem;'>Current Active Session:</span><br>
+    <strong style='color:#FFFFFF !important; font-size:1rem;'>{st.session_state.username}</strong><br>
+    <span style='background:#10B981; color:white; padding:2px 8px; border-radius:20px; font-size:0.75rem; font-weight:bold; display:inline-block; margin-top:5px;'>{st.session_state.role}</span>
+</div>
+""", unsafe_allow_html=True)
 
-if st.sidebar.button("Sign Out Session", use_container_width=True):
+if st.sidebar.button("Secure Logout 🚪", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
-st.sidebar.markdown('<div class="sidebar-footer-text">(crate it by haryad)</div>', unsafe_allow_html=True)
+st.sidebar.markdown("<br>", unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-# CORE VIEWPORT CONTROLLERS
-# ─────────────────────────────────────────────
-if selected == "📈 Dashboard":
-    page_header("Executive Clinic Dashboard")
-    pulse_bar([
-        ("Total Gross Income", f"{gross_income:,.0f} IQD"),
-        ("System Registered Patients", str(patient_count)),
-        ("Net Operating Profit", f"{net_profit:,.0f} IQD"),
+menus = []
+if st.session_state.role == "Boss":
+    menus = ["📈 Boss Command Center", "🖥️ Reception Terminal", "📊 Accounting Control Desk", "⚙️ System Configuration", "🔐 Security Settings Cluster"]
+elif st.session_state.role == "Reception & Accounting":
+    menus = ["🖥️ Reception Terminal", "📊 Accounting Control Desk", "🔐 Security Settings Cluster"]
+elif st.session_state.role == "Accounting":
+    menus = ["📊 Accounting Control Desk", "🔐 Security Settings Cluster"]
+elif st.session_state.role == "Reception":
+    menus = ["🖥️ Reception Terminal", "🔐 Security Settings Cluster"]
+
+selected_menu = st.sidebar.radio("Console Navigation Matrix:", menus)
+
+def render_dashboard_header(title, subtitle):
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #0B291B, #1F5E3B); padding:30px; border-radius:20px; color:white; margin-bottom:25px; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
+        <h1 style="margin:0; color:#FFFFFF !important; font-weight:800; font-size:2.2rem;">{title}</h1>
+        <p style="margin:8px 0 0 0; color:#34D399; font-size:1.05rem; font-weight:500;">{subtitle}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Global Metrics Engine Aggregations
+gross_in_row = fetch_all("SELECT SUM(net_paid) as total FROM visits")
+gross_income = gross_in_row[0]["total"] if gross_in_row and gross_in_row[0]["total"] else 0.0
+
+expenses_row = fetch_all("SELECT SUM(amount) as total FROM expenses")
+base_expenses = expenses_row[0]["total"] if expenses_row and expenses_row[0]["total"] else 0.0
+
+staff_salary_row = fetch_all("SELECT SUM(salary) as total FROM employees")
+payroll_burden = staff_salary_row[0]["total"] if staff_salary_row and staff_salary_row[0]["total"] else 0.0
+
+all_visits_raw = fetch_all("SELECT d.name, d.comm_type, d.fixed_rate, v.net_paid FROM visits v JOIN doctors d ON v.doctor_id = d.id")
+doc_payroll_totals = {}
+total_commission_burden = 0.0
+for vr in all_visits_raw:
+    doc_payroll_totals[vr["name"]] = doc_payroll_totals.get(vr["name"], []) + [vr["net_paid"]]
+    
+all_docs_configs = fetch_all("SELECT name, comm_type, fixed_rate FROM doctors")
+for dc in all_docs_configs:
+    v_list = doc_payroll_totals.get(dc["name"], [])
+    if dc["comm_type"] == "fixed":
+        total_commission_burden += sum(v_list) * (dc["fixed_rate"] / 100.0)
+    else:
+        if len(v_list) >= 20: total_commission_burden += sum(v_list) * 0.05
+        elif len(v_list) >= 10: total_commission_burden += sum(v_list) * 0.03
+
+total_outflows = base_expenses + payroll_burden + total_commission_burden
+net_profit = gross_income - total_outflows
+
+# ----------------------------------------------------
+# MODULE A: CROWN EXECUTIVE DASHBOARD (THE BOSS)
+# ----------------------------------------------------
+if selected_menu == "📈 Boss Command Center":
+    st.markdown(f"""
+    <div style="background:linear-gradient(135deg, #0B291B, #2ECC71); padding:35px; border-radius:20px; color:white; box-shadow: 0 12px 30px rgba(11,41,27,0.15); margin-bottom:25px;">
+        <h1 style="margin:0; color:white !important; font-weight:800; font-size:2.4rem;">👑 Executive Dashboard</h1>
+        <h2 style="margin:10px 0 5px 0; color:#34D399 !important; font-weight:700; font-family:monospace;">Today's Clinic Profit: ${net_profit:,.2f}</h2>
+        <p style="margin:5px 0 0 0; opacity:0.9; font-size:1rem;">Real-time automated analytics tracking clinic revenue profiles, operational payroll liabilities, and practitioner performance logs.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f'<div class="feature-card"><h3>📈 Gross Revenue</h3><h1 style="color:#0B291B; margin:10px 0 0 0; font-weight:800;">${gross_income:,.2f}</h1></div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(f'<div class="feature-card"><h3>📉 Operational Outflow</h3><h1 style="color:#EF4444; margin:10px 0 0 0; font-weight:800;">${total_outflows:,.2f}</h1></div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown(f'<div class="feature-card"><h3>💰 Net Surplus Margin</h3><h1 style="color:#10B981; margin:10px 0 0 0; font-weight:800;">${net_profit:,.2f}</h1></div>', unsafe_allow_html=True)
+
+    # USER ACCOUNTS VISIBILITY PANEL FOR THE BOSS
+    st.markdown("### 👥 System Provisioned User Profiles Matrix")
+    users_list = fetch_all("SELECT id, username, role FROM users")
+    
+    boss_acc_col1, boss_acc_col2 = st.columns([1, 3])
+    with boss_acc_col1:
+        st.markdown(f"""
+        <div class="feature-card" style="text-align:center; background:#E8F8F5;">
+            <h4 style="margin:0; color:#0B291B;">Total Users Made</h4>
+            <h1 style="color:#10B981; font-size:3.5rem; margin:10px 0 0 0; font-weight:800;">{len(users_list)}</h1>
+        </div>
+        """, unsafe_allow_html=True)
+    with boss_acc_col2:
+        if users_list:
+            st.dataframe(pd.DataFrame([dict(u) for u in users_list]), use_container_width=True)
+
+    st.markdown("### 🩺 Practitioner Yield & Performance Matrix")
+    payout_table = []
+    for d_conf in all_docs_configs:
+        name = d_conf["name"]
+        ctype = d_conf["comm_type"]
+        frate = d_conf["fixed_rate"]
+        sessions = doc_payroll_totals.get(name, [])
+        volume = len(sessions)
+        gross_gen = sum(sessions)
+        
+        if ctype == "fixed":
+            applied_strategy = f"Custom Fixed Take-Home ({frate}%)"
+            payout_cash = gross_gen * (frate / 100.0)
+        else:
+            if volume >= 20: applied_strategy = "Tiered Matrix Strategy (5%)"; payout_cash = gross_gen * 0.05
+            elif len(sessions) >= 10: applied_strategy = "Tiered Matrix Strategy (3%)"; payout_cash = gross_gen * 0.03
+            else: applied_strategy = "Tiered Matrix Strategy (0%)"; payout_cash = 0.0
+                
+        payout_table.append({"Medical Specialist": name, "Assigned Model Framework": applied_strategy, "Case Volumes": volume, "Gross Revenue Contribution": f"${gross_gen:,.2f}", "Calculated Payroll Due": f"${payout_cash:,.2f}"})
+    
+    if payout_table:
+        st.dataframe(pd.DataFrame(payout_table), use_container_width=True)
+    else:
+        st.info("No active medical specialist data sets recorded inside the local cluster.")
+
+# ----------------------------------------------------
+# MODULE B: RECEPTION DESK MODULE (APPOINTMENTS INCLUDED)
+# ----------------------------------------------------
+elif selected_menu == "🖥️ Reception Terminal":
+    render_dashboard_header("🖥️ Smart Front Desk Workspace", "Patient intake registers, modern calendar appointment scheduling, and invoice processing logs.")
+    
+    rt_0, rt_1, rt_2, rt_3, rt_4 = st.tabs([
+        "📅 Appointment Scheduler Desk",
+        "⚡ Run Checkout Session & Print Receipt", 
+        "👥 Patient Central Index Records", 
+        "➕ Create New Patient Profile",
+        "📜 Live Ledger Audit Log"
     ])
     
-    col1, col2, col3, col4 = st.columns(4)
-    with col1: st.markdown(card("Gross Revenue Flow", f"{gross_income:,.0f} IQD", "green"), unsafe_allow_html=True)
-    with col2: st.markdown(card("Expenses Logged", f"{base_expenses:,.0f} IQD", "red"), unsafe_allow_html=True)
-    with col3: st.markdown(card("Doctor Commissions", f"{total_commissions:,.0f} IQD", "dark"), unsafe_allow_html=True)
-    with col4: st.markdown(card("Reklam Commissions", f"{total_reklam_out:,.0f} IQD", "dark"), unsafe_allow_html=True)
-
-elif selected == "🖥️ Reception":
-    page_header("Reception Desk Hub")
-    t1, t2, t3, t4 = st.tabs(["Checkout Processing Desk", "Patient Directory Profiles", "Add New Profile", "Visit Records History"])
-    
-    with t1:
-        section_label("Patient Visit Invoice Checkout Processing")
-        patients_db = fetch_all("SELECT id, name FROM patients ORDER BY name")
-        docs_db = fetch_all("SELECT id, name FROM doctors ORDER BY name")
-        services_db = fetch_all("SELECT id, name, price FROM services WHERE active = 1 ORDER BY name")
-        bundles_db = fetch_all("SELECT id, name, price FROM bundles ORDER BY name")
-        reklams_db = fetch_all("SELECT id, name FROM reklams ORDER BY name")
+    # NEW APPOINTMENT FEATURE TAB
+    with rt_0:
+        st.subheader("📅 Book New Clinic Appointment Session")
+        patients_db = fetch_all("SELECT id, name FROM patients")
+        docs_db = fetch_all("SELECT id, name FROM doctors")
         
-        p_map = {p["name"]: p["id"] for p in patients_db}
-        d_map = {d["name"]: d["id"] for d in docs_db}
-        r_map = {r["name"]: r["id"] for r in reklams_db}
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            target_p = st.selectbox("Select Patient Profile *", ["— select —"] + list(p_map.keys()))
-            chosen_doc = st.selectbox("Assigning Clinic Physician", list(d_map.keys()))
-            payment_method = st.selectbox("Payment Gateway Type", ["Cash", "Card", "Insurance", "Transfer"])
-            selected_source = st.selectbox("Marketing Stream Source", ["Direct Walk-in", "Social Media", "Friend Referral", "Video Content Creator / Reklam Partner"])
+        if not patients_db or not docs_db:
+            st.warning("Prerequisite Missing: Please verify at least one active Patient Profile and Practitioner Node exist in the database.")
+        else:
+            p_opts = {p["name"]: p["id"] for p in patients_db}
+            d_opts = {d["name"]: d["id"] for d in docs_db}
             
-            chosen_reklam_id = None
-            if selected_source == "Video Content Creator / Reklam Partner" and reklams_db:
-                selected_reklam_name = st.selectbox("Select Associated Reklam Partner", list(r_map.keys()))
-                chosen_reklam_id = r_map[selected_reklam_name]
+            col_ap1, col_ap2, col_ap3, col_ap4 = st.columns(4)
+            with col_ap1:
+                ap_p = st.selectbox("Target Patient Identity", list(p_opts.keys()), key="ap_p_sel")
+            with col_ap2:
+                ap_d = st.selectbox("Assign Consulting Doctor", list(d_opts.keys()), key="ap_d_sel")
+            with col_ap3:
+                ap_date = st.text_input("Appointment Date (YYYY-MM-DD)", str(datetime.now().strftime("%Y-%m-%d")))
+            with col_ap4:
+                ap_time = st.text_input("Appointment Time Slot (e.g., 10:30 AM)", "11:00 AM")
                 
-        with col2:
-            item_type = st.radio("Treatment Base", ["Service", "Bundle"], horizontal=True)
+            if st.button("Secure Session Booking Row", use_container_width=True):
+                if ap_p and ap_d:
+                    execute_write(
+                        "INSERT INTO appointments (patient_id, doctor_id, app_date, app_time) VALUES (?, ?, ?, ?)",
+                        (p_opts[ap_p], d_opts[ap_d], ap_date.strip(), ap_time.strip())
+                    )
+                    st.success(f"Appointment mapped successfully for {ap_p} on {ap_date} at {ap_time}!")
+                    st.rerun()
+
+        st.markdown("---")
+        st.subheader("📋 Active Operations Appointment Calendar Queue")
+        
+        active_apps = fetch_all("""
+            SELECT a.id, a.app_date as Date, a.app_time as Time, p.name as Patient, d.name as Doctor, a.status as Status 
+            FROM appointments a
+            JOIN patients p ON a.patient_id = p.id
+            JOIN doctors d ON a.doctor_id = d.id
+            ORDER BY a.app_date ASC, a.app_time ASC
+        """)
+        
+        if active_apps:
+            df_apps = pd.DataFrame([dict(x) for x in active_apps])
+            st.dataframe(df_apps, use_container_width=True)
+            
+            st.markdown("#### ⚙️ Fast State Update Matrix")
+            col_up1, col_up2 = st.columns(2)
+            with col_up1:
+                target_ap_id = st.number_input("Target Appointment Reference ID Key", min_value=1, step=1)
+            with col_up2:
+                new_status = st.selectbox("Target Operation Status Flag", ["Scheduled", "Completed", "Cancelled"])
+                
+            if st.button("Commit Status Update Flag"):
+                execute_write("UPDATE appointments SET status = ? WHERE id = ?", (new_status, target_ap_id))
+                st.success(f"Appointment record flag updated to '{new_status}' successfully.")
+                st.rerun()
+        else:
+            st.info("No future scheduled patient appointments located inside tracking cells.")
+
+    with rt_3:
+        st.subheader("Onboard New Patient Registry Node")
+        p_name = st.text_input("Patient Full Legal Name")
+        p_phone = st.text_input("Primary Contact Phone Link")
+        if st.button("Commit Base Profile File"):
+            if p_name.strip() and execute_write("INSERT INTO patients (name, phone) VALUES (?, ?)", (p_name.strip(), p_phone.strip())):
+                st.success(f"Successfully processed profile setup for: {p_name}.")
+                st.rerun()
+            else:
+                st.error("Validation Error: Profile string cannot be null or duplicate key matches exist.")
+
+    with rt_2:
+        st.subheader("Active Medical Database Profile Index")
+        all_p = fetch_all("SELECT * FROM patients ORDER BY name ASC")
+        if all_p:
+            st.dataframe(pd.DataFrame([dict(x) for x in all_p]), use_container_width=True)
+            st.markdown("---")
+            st.markdown("#### 🚨 Safe Purging Registry Operations")
+            del_target = st.selectbox("Select Target Client Record to Drop Permanently", [""] + [x["name"] for x in all_p])
+            if st.button("Execute Complete Registry Purge", type="primary"):
+                if del_target:
+                    execute_write("DELETE FROM patients WHERE name = ?", (del_target,))
+                    st.success(f"System purged patient file associated with target string ID: '{del_target}'.")
+                    st.rerun()
+        else:
+            st.info("No patient registries currently stored inside local DB storage chains.")
+
+    with rt_1:
+        st.subheader("Generate Real-time Client Checkout Log")
+        patients_db = fetch_all("SELECT id, name FROM patients")
+        docs_db = fetch_all("SELECT id, name FROM doctors")
+        services_db = fetch_all("SELECT id, name, price FROM services")
+        bundles_db = fetch_all("SELECT id, name, price FROM bundles")
+        
+        if not docs_db or (not services_db and not bundles_db):
+            st.warning("Action Required: Please navigate to global setup and initialize active catalog services, bundles, and doctor configurations.")
+        else:
+            p_map = {p["name"]: p["id"] for p in patients_db}
+            d_map = {d["name"]: d["id"] for d in docs_db}
+            
+            target_p = st.selectbox("Lookup Base Client Node File", [""] + list(p_map.keys()))
+            chosen_doc = st.selectbox("Assign Consulting Practitioner on Duty", list(d_map.keys()))
+            
+            item_classification = st.radio("Item Matrix Classification", ["Standard Service SKU Line", "Custom Built Package Bundle"], horizontal=True)
+            
+            srv_id = None
+            bnd_id = None
             base_price = 0.0
-            srv_id = bnd_id = None
             chosen_item_name = ""
             
-            if item_type == "Service" and services_db:
-                s_map = {f"{s['name']} — {s['price']:,.0f} IQD": (s["id"], s["price"], s["name"]) for s in services_db}
-                chosen_s = st.selectbox("Select Catalog Service", list(s_map.keys()))
-                srv_id, base_price, chosen_item_name = s_map[chosen_s]
-            elif item_type == "Bundle" and bundles_db:
-                b_map = {f"{b['name']} — {b['price']:,.0f} IQD": (b["id"], b["price"], b["name"]) for b in bundles_db}
-                chosen_b = st.selectbox("Select Package Bundle", list(b_map.keys()))
-                bnd_id, base_price, chosen_item_name = b_map[chosen_b]
-                
-            disc_val = st.number_input("Discount Value Value Deduction (IQD)", min_value=0.0, step=500.0)
-            final_due = max(0.0, base_price - disc_val)
-            visit_notes = st.text_area("Internal Checkout Memo Notes", height=60)
-
-        st.markdown(f"### Total Invoice Amount Due: **{final_due:,.0f} IQD**")
-        
-        # ── RECEIPT BUG FIX SOLUTION: PERSIST RECEIPT VIEW UPON SUCCESSFUL WRITE ──
-        if st.button("Complete Payment Receipt Ledger Entry", use_container_width=True):
-            if target_p == "— select —":
-                st.error("Please pick a valid patient profile designation.")
+            if item_classification == "Standard Service SKU Line":
+                if services_db:
+                    s_map = {f"✨ {s['name']} (${s['price']})": (s["id"], s["price"], s["name"]) for s in services_db}
+                    chosen_srv_str = st.selectbox("Select Performed Formulation SKU Line", list(s_map.keys()))
+                    if chosen_srv_str:
+                        srv_id, base_price, chosen_item_name = s_map[chosen_srv_str]
+                else:
+                    st.error("No individual service lines configured inside catalog metrics.")
             else:
-                disc_amt = base_price - final_due
-                success = execute_write("""
-                    INSERT INTO visits (patient_id, doctor_id, service_id, bundle_id, visit_date, base_price, discount_amount, net_paid, payment_method, source_type, reklam_id, notes)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-                """, (p_map[target_p], d_map[chosen_doc], srv_id, bnd_id, today_str, base_price, disc_amt, final_due, payment_method, selected_source, chosen_reklam_id, visit_notes))
+                if bundles_db:
+                    b_map = {f"🎁 {b['name']} (${b['price']})": (b["id"], b["price"], b["name"]) for b in bundles_db}
+                    chosen_bnd_str = st.selectbox("Select Target Active Package Bundle", list(b_map.keys()))
+                    if chosen_bnd_str:
+                        bnd_id, base_price, chosen_item_name = b_map[chosen_bnd_str]
+                else:
+                    st.error("No multi-tier custom bundles designed inside catalog data sets.")
+            
+            st.markdown("⚙️ **Dynamic Checkout Invoice Deduction Overrides**")
+            disc_type = st.radio("Deduction Type Framework", ["None Adjustment", "Flat Nominal Cash Override ($)", "Relative Percentage Shift (%)"], horizontal=True)
+            disc_val = st.number_input("Deduction Factor Quantity", min_value=0.0, step=1.0)
+            
+            final_due = base_price
+            if disc_type == "Flat Nominal Cash Override ($)":
+                final_due = max(0.0, base_price - disc_val)
+            elif disc_type == "Relative Percentage Shift (%)":
+                final_due = max(0.0, base_price - (base_price * (disc_val / 100.0)))
                 
-                if success:
-                    log_activity(f"Generated invoice visit check out ledger profile: {target_p}")
-                    st.markdown(f"""
-                    <div class="receipt-box">
-                        <h4 style="color:#0D3D2B; margin-top:0;">📄 GARDEN CLINIC OFFICIAL RECEIPT</h4>
-                        <p><b>Patient Name:</b> {target_p}<br>
-                        <b>Attending Doctor:</b> {chosen_doc}<br>
-                        <b>Treatment Charged:</b> {chosen_item_name}<br>
-                        <b>Base Price:</b> {base_price:,.0f} IQD | <b>Discount Allowed:</b> {disc_amt:,.0f} IQD<br>
-                        <span style="font-size:1.2rem; color:#0D7A4E;"><b>Total Amount Net Paid:</b> {final_due:,.0f} IQD ({payment_method})</span></p>
-                        <p style="font-size:0.8rem; color:#8EA898; margin-bottom:0;">Transaction logged safely on {today_str}.</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    st.toast("Invoice receipt compiled and rendered below.", icon="✅")
+            st.markdown(f"### Total Balance Outstanding: **${final_due:,.2f}**")
+            
+            if st.button("Log Ledger Settlement & Display Receipt", use_container_width=True):
+                if not target_p:
+                    st.error("Operation Aborted: Target recipient profile cannot be initialized empty.")
+                elif base_price == 0.0:
+                    st.error("Operation Aborted: Cannot invoice an empty item structure configuration line.")
+                else:
+                    deducted = base_price - final_due
+                    execute_write("""
+                        INSERT INTO visits (patient_id, doctor_id, service_id, bundle_id, visit_date, base_price, discount_amount, net_paid)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (p_map[target_p], d_map[chosen_doc], srv_id, bnd_id, str(datetime.now().strftime("%Y-%m-%d")), base_price, deducted, final_due))
+                    
+                    st.success("Ledger verification completed successfully.")
+                    
+                    st.session_state.receipt_ready = True
+                    st.session_state.rcpt_patient = target_p
+                    st.session_state.rcpt_doc = chosen_doc
+                    st.session_state.rcpt_srv = chosen_item_name
+                    st.session_state.rcpt_base = base_price
+                    st.session_state.rcpt_disc = deducted
+                    st.session_state.rcpt_net = final_due
 
-    with t2:
-        section_label("Registered Clinical Patient Roster Index")
-        all_p = fetch_all("SELECT * FROM patients ORDER BY name ASC")
-        if all_p: st.dataframe(pd.DataFrame([dict(p) for p in all_p]), use_container_width=True, hide_index=True)
+            if "receipt_ready" in st.session_state and st.session_state.receipt_ready:
+                st.markdown("---")
+                st.markdown("### 🖨️ Formatted Invoice Receipt Node")
+                
+                receipt_html = f"""
+                <div id="print-area" style="background:#FFFFFF; color:#111827; padding:25px; border:2px dashed #0B291B; border-radius:14px; font-family:'Courier New', monospace; max-width:420px; margin:0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                    <h2 style="text-align:center; margin:0 0 5px 0; color:#0B291B; font-weight:800;">🌿 GARDEN CLINIC</h2>
+                    <p style="text-align:center; margin:0; font-size:13px; color:#4B5563;">Premium Healthcare Services Ledger</p>
+                    <p style="text-align:center; margin:4px 0 0 0; font-size:11px; color:#6B7280;">Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+                    <hr style="border-top:1px dashed #DCE5DD; margin:15px 0;">
+                    <p style="margin:5px 0;"><b>Patient Identity:</b> {st.session_state.rcpt_patient}</p>
+                    <p style="margin:5px 0;"><b>Practitioner:</b> {st.session_state.rcpt_doc}</p>
+                    <p style="margin:5px 0;"><b>Charged Item:</b> {st.session_state.rcpt_srv}</p>
+                    <hr style="border-top:1px dashed #DCE5DD; margin:15px 0;">
+                    <p style="margin:5px 0; color:#4B5563;">Standard Base Rate: <span style="float:right;">${st.session_state.rcpt_base:,.2f}</span></p>
+                    <p style="margin:5px 0; color:#EF4444;">Adjustments Deducted: <span style="float:right;">-${st.session_state.rcpt_disc:,.2f}</span></p>
+                    <h3 style="margin:15px 0 0 0; color:#10B981; font-weight:800; font-size:1.3rem;">NET PAID: <span style="float:right;">${st.session_state.rcpt_net:,.2f}</span></h3>
+                    <hr style="border-top:1px dashed #DCE5DD; margin:15px 0;">
+                    <p style="text-align:center; font-size:12px; color:#6B7280; margin:0; font-style:italic;">Operational Validation Verification Log Complete</p>
+                </div>
+                """
+                st.markdown(receipt_html, unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.button("Print Document Receipt 🖨️", on_click=lambda: st.markdown("<script>window.print();</script>", unsafe_allow_html=True), use_container_width=True)
 
-    with t3:
-        section_label("Instantiate Patient File Record Profile")
-        p_name = st.text_input("Patient Full Identification Label Name *")
-        p_phone = st.text_input("Active Target Contact Line Matrix")
-        if st.button("Save New Patient Identity Folder"):
-            if p_name.strip() and execute_write("INSERT INTO patients (name, phone, created_at) VALUES (?,?,?)", (p_name.strip(), p_phone.strip(), today_str)):
-                st.success("New structural patient profile registered.")
+    with rt_4:
+        st.subheader("🛠️ Transaction Ledger Management Control Console")
+        st.markdown("Review running logs of patient sessions processed inside the clinic ecosystem. Use this sector to drop mistyped session invoices.")
+        
+        audit_raw_logs = fetch_all("""
+            SELECT v.id, v.visit_date as Date, p.name as Patient, d.name as Doctor, 
+                   COALESCE(s.name, '[Bundle Pack] ' || b.name) as ChargedItem, v.net_paid as Paid
+            FROM visits v
+            JOIN patients p ON v.patient_id = p.id
+            JOIN doctors d ON v.doctor_id = d.id
+            LEFT JOIN services s ON v.service_id = s.id
+            LEFT JOIN bundles b ON v.bundle_id = b.id
+            ORDER BY v.id DESC
+        """)
+        
+        if audit_raw_logs:
+            df_audit = pd.DataFrame([dict(x) for x in audit_raw_logs])
+            st.dataframe(df_audit, use_container_width=True)
+            
+            st.markdown("---")
+            st.markdown("#### 🚨 Reverse Session Verification Invoice")
+            target_void_id = st.number_input("Input Target Row Identification Index Key (ID Number)", min_value=1, step=1)
+            if st.button("Void and Expunge Selected Invoice Node", type="primary"):
+                execute_write("DELETE FROM visits WHERE id = ?", (target_void_id,))
+                st.success(f"Successfully deleted and reversed transaction rows corresponding to row reference matrix '{target_void_id}'.")
+                st.rerun()
+        else:
+            st.info("No transactional checkout logs captured inside storage nodes yet.")
+
+# ----------------------------------------------------
+# MODULE C: UNDERSTANDABLE ACCOUNTING LAYOUT (NATIVE CHARTS)
+# ----------------------------------------------------
+elif selected_menu == "📊 Accounting Control Desk":
+    render_dashboard_header("📊 Financial Health & Asset Balance Suite", "Granular revenue flow tracing, balance analysis, and resource expenditure allocation management tools.")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f"""
+        <div class="feature-card">
+            <h3>🟢 Net Cash Inflow</h3>
+            <h1 style="color:#10B981; margin:5px 0 0 0; font-weight:800;">${gross_income:,.2f}</h1>
+            <p style="color:#6B7280; font-size:0.85rem; margin-top:5px;">Gross collected sales pipeline turnover metrics.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"""
+        <div class="feature-card">
+            <h3>🔴 Net Cost Outflows</h3>
+            <h1 style="color:#EF4444; margin:5px 0 0 0; font-weight:800;">${total_outflows:,.2f}</h1>
+            <p style="color:#6B7280; font-size:0.85rem; margin-top:5px;">Operating costs + automated monthly salaries + commissions.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col3:
+        st.markdown(f"""
+        <div class="feature-card">
+            <h3>💰 Executive Profit Margin</h3>
+            <h1 style="color:#0B291B; margin:5px 0 0 0; font-weight:800;">${net_profit:,.2f}</h1>
+            <p style="color:#6B7280; font-size:0.85rem; margin-top:5px;">Net remaining operational capital surplus.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    st.markdown("---")
+    
+    st.subheader("📊 Operational Analytics (Native Rendering Engine)")
+    chart_col1, chart_col2 = st.columns(2)
+    
+    with chart_col1:
+        st.markdown("#### Corporate Resource Expenditure Outflow Breakdown")
+        if total_outflows > 0:
+            df_exp = pd.DataFrame({
+                "Expense Stream": ["Operating Bills", "Automated Salaries", "Specialist Commissions"],
+                "Total Allocated ($)": [base_expenses, payroll_burden, total_commission_burden]
+            }).set_index("Expense Stream")
+            st.bar_chart(df_exp, y="Total Allocated ($)", color="#EF4444")
+        else:
+            st.info("Awaiting structural expenditure entries to map out data models.")
+            
+    with chart_col2:
+        st.markdown("#### Retrospective Inflow Growth Velocity Track")
+        visit_logs_raw = fetch_all("SELECT v.visit_date as Date, v.net_paid as Collected FROM visits v ORDER BY v.id ASC")
+        if visit_logs_raw:
+            df_rev = pd.DataFrame([dict(vl) for vl in visit_logs_raw])
+            df_line = df_rev.groupby("Date", as_index=False).sum().set_index("Date")
+            st.line_chart(df_line, y="Collected", color="#10B981")
+        else:
+            st.info("Awaiting historical transaction inputs to map acceleration matrix vectors.")
+            
+    st.markdown("---")
+    
+    acc_split_1, acc_split_2 = st.columns(2)
+    with acc_split_1:
+        st.subheader("📥 General Expense Matrix Adjustments Log")
+        all_exps_listed = fetch_all("SELECT id, date as Date, description as Label, amount as Cost FROM expenses ORDER BY id DESC")
+        if all_exps_listed:
+            st.dataframe(pd.DataFrame([dict(x) for x in all_exps_listed]), use_container_width=True)
+        else:
+            st.info("No custom business operation expenditures locked into history.")
+            
+    with acc_split_2:
+        st.subheader("📤 Record New General Expenditure Liability")
+        with st.form("exp_form_saas"):
+            e_desc = st.text_input("Cost Allocation Tag / Label (e.g. Infrastructure Rent, Bio Supplies)")
+            e_amt = st.number_input("Disbursement Net Capital Volatility ($)", min_value=0.0, step=25.0)
+            if st.form_submit_button("Authorize Outflow Asset Allocation"):
+                if e_desc and e_amt > 0:
+                    execute_write("INSERT INTO expenses (description, amount, date) VALUES (?, ?, ?)", (e_desc, e_amt, str(datetime.now().strftime("%Y-%m-%d"))))
+                    st.success("Expense added successfully.")
+                    st.rerun()
+
+# ----------------------------------------------------
+# MODULE D: SYSTEM CONFIGURATION
+# ----------------------------------------------------
+elif selected_menu == "⚙️ System Configuration":
+    render_dashboard_header("⚙️ Global Setup Console Suite", "Modify, expand, and structure active practitioners, standard clinical support wages, and therapeutic pricing lists.")
+    
+    set1, set2, set3, set4 = st.tabs([
+        "👨‍⚕️ Map Medical Specialist Structures", 
+        "👥 Configure General Support Payrolls", 
+        "💆‍♂️ Deploy Treatment Catalog Items",
+        "🎁 Create Multi-Service Bundles"
+    ])
+    
+    with set1:
+        st.subheader("Configure New Medical Specialist Framework Node")
+        d_name = st.text_input("Specialist Professional Title Name")
+        c_mode = st.selectbox("Select Target Payout Allocation Method", ["Tiered Volume Analytics Metrics Matrix (3%/5%)", "Customized Fixed Percentage Take Home Model"])
+        
+        f_percentage = 0.0
+        db_comm_type = "tiered"
+        if c_mode == "Customized Fixed Percentage Take Home Model":
+            db_comm_type = "fixed"
+            f_percentage = st.number_input("Assigned Static Base Percentage Take Split Per Case (%)", min_value=0.0, max_value=100.0, value=50.0)
+            
+        if st.button("Onboard Practitioner Structure Model"):
+            if d_name.strip() and execute_write("INSERT INTO doctors (name, comm_type, fixed_rate) VALUES (?, ?, ?)", (d_name.strip(), db_comm_type, f_percentage)):
+                st.success(f"Practitioner profile for '{d_name}' verified and successfully written onto configuration registers.")
+                st.rerun()
+                
+    with set2:
+        st.subheader("Onboard Support Staff Base Salary Wage File")
+        st.markdown("ℹ️ *Note: The total sum configuration written below automatically bills the system as an operational expenditure on the 1st of every month.*")
+        emp_name = st.text_input("Employee Complete Identity Label")
+        emp_role = st.text_input("Operational Structural Title Role")
+        emp_salary = st.number_input("Agreed Static Monthly Remuneration ($)", min_value=0.0, step=100.0)
+        if st.button("Save Wage Configuration Profile"):
+            if emp_name and emp_role and execute_write("INSERT INTO employees (name, role, salary) VALUES (?, ?, ?)", (emp_name.strip(), emp_role.strip(), emp_salary)):
+                st.success(f"Salary parameters structured successfully for: {emp_name}.")
                 st.rerun()
 
-    with t4:
-        section_label("Historical Invoice Archive Ledger Sheet")
-        v_history = fetch_all("""
-            SELECT v.id as [Receipt ID], v.visit_date as Date, p.name as Patient, d.name as Doctor, v.net_paid as [Net Paid], v.source_type as [Source Channel]
-            FROM visits v JOIN patients p ON v.patient_id = p.id JOIN doctors d ON v.doctor_id = d.id ORDER BY v.id DESC
-        """)
-        if v_history:
-            st.dataframe(pd.DataFrame([dict(vh) for vh in v_history]), use_container_width=True, hide_index=True)
-            st.markdown("---")
-            receipt_map = {f"Receipt ID: {vh['Receipt ID']} — {vh['Patient']} ({vh['Net Paid']:,.0f} IQD)": vh['Receipt ID'] for vh in v_history}
-            target_del_receipt = st.selectbox("Select error receipt entry to purge", ["— select —"] + list(receipt_map.keys()))
-            if st.button("Purge Erroneous Receipt Profile Permanently", type="primary"):
-                if target_del_receipt != "— select —":
-                    execute_write("DELETE FROM visits WHERE id = ?", (receipt_map[target_del_receipt],))
-                    st.success("Receipt row wiped out securely.")
-                    st.rerun()
+    with set3:
+        st.subheader("Deploy New Therapeutic Action Items Catalog Line")
+        s_name = st.text_input("Formulation / Treatment Identification Naming")
+        s_price = st.number_input("Retail Valuation Frame Base Pricing ($)", min_value=0.0, step=10.0)
+        if st.button("Publish Service SKU to Main Grid"):
+            if s_name.strip() and execute_write("INSERT INTO services (name, price) VALUES (?, ?)", (s_name.strip(), s_price)):
+                st.success(f"Service formulation line item '{s_name}' indexed successfully at ${s_price:,.2f}.")
+                st.rerun()
 
-elif selected == "📊 Accounting":
-    page_header("Accounting Department Ledger Sheet")
-    
-    # ── YOGA MONTHLY SUBSCRIPTION TAB AND GENERAL LOGS EXPENSES ──
-    acc_tabs = st.tabs(["💸 General Outflow Expenses", "🧘 Monthly Yoga Memberships & Subscriptions"])
-    
-    with acc_tabs[0]:
-        col1, col2 = st.columns(2)
-        with col1:
-            section_label("Add Operational Costs Expense Line")
-            with st.form("exp_f"):
-                e_desc = st.text_input("Expense Allocation Tag Context Description Line")
-                e_amt = st.number_input("Total Disbursed Sum Amount (IQD)", min_value=0.0, step=1000.0)
-                if st.form_submit_button("Log Outflow"):
-                    if e_desc and e_amt > 0 and execute_write("INSERT INTO expenses (description, category, amount, date) VALUES (?, 'General', ?, ?)", (e_desc, e_amt, today_str)):
-                        st.success("Expense registered.")
-                        st.rerun()
-        with col2:
-            section_label("Current Monthly Expenses Sheet Records")
-            all_exp = fetch_all("SELECT id, date as Date, description as Description, amount as Amount FROM expenses ORDER BY id DESC")
-            if all_exp:
-                st.dataframe(pd.DataFrame([{"Date": x["Date"], "Description": x["Description"], "Amount": f"{x['Amount']:,.0f} IQD"} for x in all_exp]), use_container_width=True, hide_index=True)
-                st.markdown("---")
-                exp_map = {f"{x['Date']} — {x['Description']} ({x['Amount']:,.0f} IQD)": x["id"] for x in all_exp}
-                target_del_exp = st.selectbox("Select mistaken expense item row to delete", ["— select —"] + list(exp_map.keys()))
-                if st.button("Delete Selected Expense", type="primary"):
-                    if target_del_exp != "— select —":
-                        execute_write("DELETE FROM expenses WHERE id = ?", (exp_map[target_del_exp],))
-                        st.success("Expense log line purged.")
-                        st.rerun()
-                        
-    with acc_tabs[1]:
-        section_label("🧘 Monthly Subscription Management Panel (Yoga Studio)")
-        st.info("Log patients paying recurring flat-rate fees for monthly yoga programs. These track cycles independently from basic direct checkouts.")
+    with set4:
+        st.subheader("🎁 Engineer Multi-tier Product Bundles")
+        st.markdown("Create high-value medical product combinations or specialty care treatment packages with custom package-level pricing options.")
         
-        y_col1, y_col2 = st.columns([1, 1.6])
-        with y_col1:
-            st.markdown("##### Log New Monthly Membership Payment")
-            patients_db = fetch_all("SELECT id, name FROM patients ORDER BY name")
-            yoga_p_map = {p["name"]: p["id"] for p in patients_db}
-            
-            chosen_yoga_p = st.selectbox("Select Subscribed Yoga Student", ["— select —"] + list(yoga_p_map.keys()))
-            yoga_fee = st.number_input("Monthly Fee Paid (IQD)", min_value=0.0, step=5000.0, value=50000.0)
-            
-            start_d = st.date_input("Membership Activation Date", value=date.today())
-            end_d = st.date_input("Subscription Expiry Renewable Date", value=date.today() + timedelta(days=30))
-            yoga_notes = st.text_input("Class Allocation/Timing Notes")
-            
-            if st.button("Authorize Yoga Monthly Entry Slot"):
-                if chosen_yoga_p == "— select —":
-                    st.error("Please pick an active patient row identifier.")
+        b_name = st.text_input("Bundle / Treatment Package Title Name (e.g., Bundle 2 Executive Pack)")
+        b_price = st.number_input("Set Package Vault Base Retail Price ($)", min_value=0.0, step=25.0)
+        
+        if st.button("Launch Custom Pack SKU to Catalog"):
+            if b_name.strip() and b_price > 0:
+                if execute_write("INSERT INTO bundles (name, price) VALUES (?, ?)", (b_name.strip(), b_price)):
+                    st.success(f"Successfully engineered package configuration matrix entry for '{b_name}' locked at ${b_price:,.2f}.")
+                    st.rerun()
                 else:
-                    success_yoga = execute_write("""
-                        INSERT INTO yoga_payments (patient_id, amount_paid, payment_date, expiry_date, notes)
-                        VALUES (?, ?, ?, ?, ?)
-                    """, (yoga_p_map[chosen_yoga_p], yoga_fee, str(start_d), str(end_d), yoga_notes))
-                    if success_yoga:
-                        log_activity(f"Registered monthly yoga membership payment for {chosen_yoga_p}")
-                        st.success(f"Subscription confirmed for {chosen_yoga_p} until {end_d}!")
-                        st.rerun()
-                        
-        with y_col2:
-            st.markdown("##### Active Subscriptions & Renewable Sheets Ledger")
-            yoga_history = fetch_all("""
-                SELECT y.id, p.name as Student, y.amount_paid as [Fee Paid], y.payment_date as [Start Date], y.expiry_date as [Expiry Date], y.notes as [Class Notes]
-                FROM yoga_payments y JOIN patients p ON y.patient_id = p.id ORDER BY y.id DESC
-            """)
-            if yoga_history:
-                yoga_rows_clean = []
-                for yh in yoga_history:
-                    # Color check helper flag context tracking validation for expiration tags
-                    expiry_parsed = datetime.strptime(yh["Expiry Date"], "%Y-%m-%d").date()
-                    status_flag = "🟢 Active" if expiry_parsed >= date.today() else "🔴 Expired / Needs Renewal"
+                    st.error("Operation Denied: A package bundle with that precise string name already occupies active catalog cells.")
+            else:
+                st.error("Validation Dropped: Bundle name configuration values cannot register empty.")
+
+# ----------------------------------------------------
+# MODULE E: SECURITY PROFILE VAULT (PASSWORD MODIFICATIONS)
+# ----------------------------------------------------
+elif selected_menu == "🔐 Security Settings Cluster":
+    render_dashboard_header("🔐 Security & Authentication Access Panel", "Change your session keys or execute administrative password override parameters.")
+    
+    sec_tab1, sec_tab2 = st.tabs(["🔒 Change My Own Account Password", "👑 Administrative Override Console"])
+    
+    with sec_tab1:
+        st.subheader("Update Current Active Keys")
+        old_pass = st.text_input("Current Key Passcode", type="password", key="sec_old_p")
+        new_pass = st.text_input("New Target Key Passcode", type="password", key="sec_new_p")
+        confirm_pass = st.text_input("Verify New Key Passcode", type="password", key="sec_conf_p")
+        
+        if st.button("Authorize Key Mutation"):
+            if new_pass != confirm_pass:
+                st.error("Verification Conflict: New passcodes do not match.")
+            elif not new_pass.strip():
+                st.error("Invalid Target: Passcode string cannot evaluate empty.")
+            else:
+                # Verify identity check
+                identity_match = fetch_all("SELECT * FROM users WHERE username = ? AND password_hash = ?", (st.session_state.username, hash_password(old_pass)))
+                if identity_match:
+                    execute_write("UPDATE users SET password_hash = ? WHERE username = ?", (hash_password(new_pass), st.session_state.username))
+                    st.success("Security keys successfully synchronized! Your credentials are updated.")
+                else:
+                    st.error("Authentication Refused: Current Key Passcode is incorrect.")
                     
-                    yoga_rows_clean.append({
-                        "Payment ID": yh["id"],
-                        "Yoga Member Student": yh["Student"],
-                        "Monthly Fee Paid": f"{yh['Fee Paid']:,.0f} IQD",
-                        "Cycle Start": yh["Start Date"],
-                        "Renewal Expiry Boundary": yh["Expiry Date"],
-                        "Current Status": status_flag,
-                        "Class Notes": yh["Class Notes"]
-                    })
-                st.dataframe(pd.DataFrame(yoga_rows_clean), use_container_width=True, hide_index=True)
-                
-                st.markdown("---")
-                yoga_del_map = {f"ID: {y['Payment ID']} — Student: {y['Yoga Member Student']}": y['Payment ID'] for y in yoga_rows_clean}
-                target_del_yoga = st.selectbox("Select error membership log row to delete", ["— select —"] + list(yoga_del_map.keys()))
-                if st.button("Delete Subscription Entry Log Row", type="primary"):
-                    if target_del_yoga != "— select —":
-                        execute_write("DELETE FROM yoga_payments WHERE id = ?", (yoga_del_map[target_del_yoga],))
-                        st.success("Subscription ledger row deleted.")
-                        st.rerun()
-
-elif selected == "📅 Appointments":
-    page_header("Appointments Matrix Hub")
-    all_ap = fetch_all("""
-        SELECT a.appt_date as Date, a.appt_time as Time, p.name as Patient, d.name as Doctor, a.reason as Reason FROM appointments a 
-        JOIN patients p ON a.patient_id = p.id JOIN doctors d ON a.doctor_id = d.id
-    """)
-    if all_ap: st.dataframe(pd.DataFrame([dict(x) for x in all_ap]), use_container_width=True, hide_index=True)
-
-elif selected == "⚙️ Settings":
-    page_header("Clinical System Controls & Setup Configuration Settings")
-    
-    set_tabs_list = ["Physician Roster", "📢 Marketing Reklam Creators", "Service Catalog Config", "Treatment Bundles Catalog"]
-    s_tabs = st.tabs(set_tabs_list)
-    
-    with s_tabs[0]:
-        section_label("Configure Clinic Doctor Commission Overrides")
-        with st.form("doc_f"):
-            dn = st.text_input("Physician Full Name *")
-            ds = st.text_input("Specialty Designation")
-            if st.form_submit_button("Save Doctor Profile Line"):
-                if dn.strip() and execute_write("INSERT INTO doctors (name, specialty) VALUES (?,?)", (dn.strip(), ds.strip())):
-                    st.success("Doctor saved.")
-                    st.rerun()
-
-    with s_tabs[1]:
-        section_label("📢 Marketing Reklam Video Creators Configuration Profile")
-        col_rek1, col_rek2 = st.columns([1, 1.5])
-        with col_rek1:
-            st.markdown("##### Add New Content Creator Row")
-            rek_name_in = st.text_input("Partner Profile Name Identity Identifier *")
-            rek_comm_per = st.number_input("Commission Share Rate Percentage (%)", min_value=0.0, max_value=100.0, step=0.5, value=10.0)
-            rek_notes_in = st.text_input("Platform Handle Campaign Notes (e.g. Instagram campaign)")
-            if st.button("Commit Marketing Asset Link"):
-                if rek_name_in.strip() and execute_write("INSERT INTO reklams (name, commission_percent, notes) VALUES (?,?,?)", (rek_name_in.strip(), rek_comm_per, rek_notes_in.strip())):
-                    st.success("Reklam partner added safely.")
-                    st.rerun()
-        with col_rek2:
-            st.markdown("##### Current Registered Marketing Reklam Channels")
-            all_reklams_listed = fetch_all("SELECT id, name, commission_percent, notes FROM reklams ORDER BY name")
-            if all_reklams_listed:
-                st.dataframe(pd.DataFrame([{"ID": r["id"], "Name Handle": r["name"], "Percentage Rate": f"{r['commission_percent']}%", "Notes": r["notes"]} for r in all_reklams_listed]), use_container_width=True, hide_index=True)
-
-    with s_tabs[2]:
-        section_label("Add Base Catalog Services Options")
-        with st.form("svc_f"):
-            sn = st.text_input("Treatment Description Text Label Name")
-            sp = st.number_input("Catalog Base Rate (IQD)", min_value=0.0, step=5000.0)
-            if st.form_submit_button("Save Service Asset Entry"):
-                if sn.strip() and execute_write("INSERT INTO services (name, price) VALUES (?,?)", (sn.strip(), sp)):
-                    st.success("Service added.")
-                    st.rerun()
-
-    with s_tabs[3]:
-        section_label("Configure Bundles Options")
-        with st.form("bnd_f"):
-            bn = st.text_input("Care Package Group Title Label")
-            bp = st.number_input("Bundle Allotted Rate Fee (IQD)", min_value=0.0, step=5000.0)
-            if st.form_submit_button("Save Care Package Bundle"):
-                if bn.strip() and execute_write("INSERT INTO bundles (name, price) VALUES (?,?)", (bn.strip(), bp)):
-                    st.success("Package bundle added.")
-                    st.rerun()
-
-    # ─────────────────────────────────────────────
-    # ── REQUESTED SECTION: BELOW SETTINGS REKLAM PERFORMANCE BROUGHT OVERVIEW ──
-    # ─────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("<h3 style='color:#0D3D2B; margin-top:20px;'>📊 Reklam Partners Customer Acquisition & Performance Sheet</h3>", unsafe_allow_html=True)
-    st.markdown("This tracker visualizes exactly **which person brought in how many people** to the clinic, as well as the total accumulated commission payout owed to them.")
-    
-    all_reklams_performance = fetch_all("SELECT id, name, commission_percent, notes FROM reklams ORDER BY name")
-    if all_reklams_performance:
-        perf_rows = []
-        for rk in all_reklams_performance:
-            # Query the precise customer visits driven by this individual's promotional channels
-            referred_visits = fetch_all("""
-                SELECT v.id, p.name as PatientName, v.net_paid, v.visit_date 
-                FROM visits v 
-                JOIN patients p ON v.patient_id = p.id 
-                WHERE v.reklam_id = ?
-            """, (rk["id"],))
+    with sec_tab2:
+        st.subheader("👑 Corporate Admin Override Interface")
+        st.markdown("Allows administrative accounts to reset lost keys or passwords for active operators inside the cluster.")
+        
+        if st.session_state.role != "Boss":
+            st.warning("Access Restricted: This system sector requires high executive clearance ('Boss' tier).")
+        else:
+            all_accounts = fetch_all("SELECT username FROM users")
+            target_user = st.selectbox("Select Target User Account", [a["username"] for a in all_accounts])
+            forced_new_pass = st.text_input("Assign Administrative Master Reset Password", type="password")
             
-            total_people_brought = len(referred_visits)
-            total_revenue_from_partner = sum(v["net_paid"] for v in referred_visits)
-            accrued_payout_owed = sum(v["net_paid"] * (rk["commission_percent"] / 100.0) for v in referred_visits)
-            
-            perf_rows.append({
-                "Partner Name Handle": rk["name"],
-                "Commission Rate Set": f"{rk['commission_percent']}%",
-                "Total People Brought In": f"{total_people_brought} patients",
-                "Total Clinic Revenue Driven": f"{total_revenue_from_partner:,.0f} IQD",
-                "Total Commission Accumulated Owed": f"{accrued_payout_owed:,.0f} IQD",
-                "Campaign Platform Memo": rk["notes"]
-            })
-            
-        st.dataframe(pd.DataFrame(perf_rows), use_container_width=True, hide_index=True)
-    else:
-        st.info("No reklam marketing handles registered or tracking active profiles.")
+            if st.button("Execute Administrative Hard Override Reset", type="primary"):
+                if forced_new_pass.strip():
+                    execute_write("UPDATE users SET password_hash = ? WHERE username = ?", (hash_password(forced_new_pass), target_user))
+                    st.success(f"System Matrix Override: Password keys updated for user node '{target_user}'.")
+                else:
+                    st.error("Aborted: Reset password field cannot be left blank.")
