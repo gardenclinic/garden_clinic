@@ -249,7 +249,6 @@ def init_db():
         db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL, plaintext_password TEXT DEFAULT '')")
         db.execute("CREATE TABLE IF NOT EXISTS patients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, phone TEXT, date_of_birth TEXT, gender TEXT, notes TEXT, created_at TEXT)")
         
-        # Updated doctors table with manual metric fields
         db.execute("""CREATE TABLE IF NOT EXISTS doctors (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
             name TEXT NOT NULL UNIQUE, 
@@ -260,11 +259,10 @@ def init_db():
             manual_commission_payout REAL DEFAULT 0.0
         )""")
         
-        # New table for marketing / video creators (reklams)
         db.execute("""CREATE TABLE IF NOT EXISTS reklams (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
-            commission_per_visit REAL DEFAULT 0.0,
+            commission_percent REAL DEFAULT 0.0,
             notes TEXT
         )""")
         
@@ -272,7 +270,6 @@ def init_db():
         db.execute("CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, category TEXT, price REAL NOT NULL, active INTEGER DEFAULT 1)")
         db.execute("CREATE TABLE IF NOT EXISTS bundles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, price REAL NOT NULL, description TEXT)")
         
-        # Visits updated to include lead source configuration
         db.execute("""CREATE TABLE IF NOT EXISTS visits (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             patient_id INTEGER,
@@ -293,18 +290,10 @@ def init_db():
         db.execute("CREATE TABLE IF NOT EXISTS appointments (id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, doctor_id INTEGER, appt_date TEXT, appt_time TEXT, reason TEXT, status TEXT DEFAULT 'Scheduled')")
         db.execute("CREATE TABLE IF NOT EXISTS system_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user TEXT, action TEXT, timestamp TEXT)")
         
-        # Safe migration logic executions
-        migrations = [
-            ("source_type TEXT", "ALTER TABLE visits ADD COLUMN source_type TEXT DEFAULT 'Direct Walk-in'"),
-            ("reklam_id INTEGER", "ALTER TABLE visits ADD COLUMN reklam_id INTEGER DEFAULT NULL"),
-            ("manual_visitors_target", "ALTER TABLE doctors ADD COLUMN manual_visitors_target INTEGER DEFAULT 0"),
-            ("manual_commission_payout", "ALTER TABLE doctors ADD COLUMN manual_commission_payout REAL DEFAULT 0.0"),
-        ]
-        for col, definition in migrations:
-            try:
-                db.execute(definition)
-            except:
-                pass
+        try:
+            db.execute("ALTER TABLE reklams ADD COLUMN commission_percent REAL DEFAULT 0.0")
+        except:
+            pass
     db.close()
 
 init_db()
@@ -359,22 +348,20 @@ def get_financials(start=None, end=None):
     expenses_row = fetch_one(q_expenses, params)
     exp = expenses_row["t"] if expenses_row and expenses_row["t"] else 0.0
     
-    # Calculate Doctor commissions based on their configured manual settings
     docs = fetch_all("SELECT name, manual_commission_payout FROM doctors")
     total_doc_commissions = sum(d["manual_commission_payout"] for d in docs) if docs else 0.0
     
-    # Calculate Reklam dynamic commissions accrued
-    reklam_totals = fetch_one("""
-        SELECT SUM(r.commission_per_visit) as t 
+    reklam_visits = fetch_all("""
+        SELECT v.net_paid, r.commission_percent 
         FROM visits v 
         JOIN reklams r ON v.reklam_id = r.id
     """)
-    total_reklam_commissions = reklam_totals["t"] if reklam_totals and reklam_totals["t"] else 0.0
+    total_reklam_commissions = sum((v["net_paid"] * (v["commission_percent"] / 100.0)) for v in reklam_visits) if reklam_visits else 0.0
     
     total_out = exp + total_doc_commissions + total_reklam_commissions
     return gross, exp, total_doc_commissions, total_reklam_commissions, total_out, gross - total_out
 
-# Financial execution pulls
+# Financial calculations execution
 gross_income, base_expenses, total_commissions, total_reklam_out, total_outflows, net_profit = get_financials()
 
 today_str = date.today().isoformat()
@@ -487,7 +474,6 @@ if selected == "📈 Dashboard":
     with col4:
         st.markdown(card("Reklam Marketing Owed", f"{total_reklam_out:,.0f} IQD", "dark"), unsafe_allow_html=True)
 
-    # Manual Target Overview & Payouts for Doctors
     st.markdown("---")
     st.subheader("👨‍⚕️ Manual Doctor Commision Control Panel")
     all_docs_metrics = fetch_all("SELECT id, name, specialty, manual_visitors_target, manual_commission_payout FROM doctors")
@@ -543,7 +529,6 @@ elif selected == "🖥️ Reception":
                 chosen_doc = st.selectbox("Assigning Doctor", list(d_map.keys()))
                 payment_method = st.selectbox("Payment Gateway Method", ["Cash", "Card", "Insurance", "Transfer"])
                 
-                # Dynamic Question Integration: Where did you find us?
                 st.markdown("##### 🔍 Marketing Referral Channel")
                 source_options = ["Direct Walk-in", "Social Media (Organic)", "Friend Referral", "Video Content Creator / Reklam Partner"]
                 selected_source = st.selectbox("Where did you find us?", source_options)
@@ -636,7 +621,7 @@ elif selected == "🖥️ Reception":
             else:
                 st.error("Identification full name string parameter field cannot remain completely blank.")
 
-    # ── VISIT HISTORY ──
+    # ── VISIT HISTORY (WITH DELETE RECEIPT FUNCTION) ──
     with t4:
         section_label("Visit Records Ledger Historical Overview")
         v_history = fetch_all("""
@@ -649,6 +634,19 @@ elif selected == "🖥️ Reception":
         """)
         if v_history:
             st.dataframe(pd.DataFrame([dict(vh) for vh in v_history]), use_container_width=True, hide_index=True)
+            
+            st.markdown("---")
+            st.markdown("##### 🗑️ Delete Mistaken Visit Receipt Record")
+            receipt_map = {f"ID: {vh['Visit ID']} — Patient: {vh['Patient']} — Paid: {vh['Net Paid']:,.0f} IQD": vh['Visit ID'] for vh in v_history}
+            target_del_receipt = st.selectbox("Select visit receipt configuration row to delete", ["— select —"] + list(receipt_map.keys()))
+            
+            if st.button("Purge Visit Receipt Record Permanently", type="primary"):
+                if target_del_receipt != "— select —":
+                    selected_receipt_id = receipt_map[target_del_receipt]
+                    execute_write("DELETE FROM visits WHERE id = ?", (selected_receipt_id,))
+                    log_activity(f"Permanently deleted mistaken patient visit checkout entry ID: {selected_receipt_id}")
+                    st.success(f"Receipt record row index {selected_receipt_id} erased successfully.")
+                    st.rerun()
 
 # ─────────────────────────────────────────────
 # MODULE: APPOINTMENTS
@@ -688,7 +686,7 @@ elif selected == "📅 Appointments":
             st.dataframe(pd.DataFrame([dict(x) for x in all_ap]), use_container_width=True, hide_index=True)
 
 # ─────────────────────────────────────────────
-# MODULE: ACCOUNTING
+# MODULE: ACCOUNTING (WITH DELETE EXPENSE FUNCTION)
 # ─────────────────────────────────────────────
 elif selected == "📊 Accounting":
     page_header("Accounting Department", "Comprehensive business ledger monitoring and cost audits.")
@@ -708,9 +706,24 @@ elif selected == "📊 Accounting":
                     st.rerun()
     with col2:
         section_label("Comprehensive Operational Outflow Sheet Log")
-        all_exp = fetch_all("SELECT date as Date, category as Category, description as Description, amount as Amount FROM expenses ORDER BY date DESC")
+        all_exp = fetch_all("SELECT id, date as Date, category as Category, description as Description, amount as Amount FROM expenses ORDER BY date DESC")
         if all_exp:
-            st.dataframe(pd.DataFrame([dict(ex) for ex in all_exp]), use_container_width=True, hide_index=True)
+            # Render cleaner preview frame for presentation without exposing the raw tracking ID
+            clean_df = pd.DataFrame([{"Date": ex["Date"], "Category": ex["Category"], "Description": ex["Description"], "Amount": f"{ex['Amount']:,.0f} IQD"} for ex in all_exp])
+            st.dataframe(clean_df, use_container_width=True, hide_index=True)
+            
+            st.markdown("---")
+            st.markdown("##### 🗑️ Delete Mistaken Operational Expense Line")
+            exp_map = {f"Date: {ex['Date']} — {ex['Description']} ({ex['Amount']:,.0f} IQD)": ex["id"] for ex in all_exp}
+            target_del_exp = st.selectbox("Select expense item row to delete", ["— select —"] + list(exp_map.keys()))
+            
+            if st.button("Delete Expense From Ledger Records", type="primary"):
+                if target_del_exp != "— select —":
+                    selected_exp_id = exp_map[target_del_exp]
+                    execute_write("DELETE FROM expenses WHERE id = ?", (selected_exp_id,))
+                    log_activity(f"Permanently removed mistaken expense row log entry reference ID: {selected_exp_id}")
+                    st.success("Operational cost expense row removed from database ledger safely.")
+                    st.rerun()
 
 # ─────────────────────────────────────────────
 # MODULE: SETTINGS
@@ -770,22 +783,22 @@ elif selected == "⚙️ Settings":
                     st.success("Target context file erased safely.")
                     st.rerun()
 
-    # ── NEW TAB: REKLAMS / VIDEO CREATORS MARKETING COMMISSION ENGINE ──
+    # ── MARKETING REKLAMS PERCENTAGE COMMISSION ENGINE ──
     with s_tabs[1]:
         section_label("📢 Video Content Creators & Marketing Reklam Partners Registry")
-        st.info("Configure social media marketing creators or promo handles. Every patient referral recorded under checkout will log commission payments due for them.")
+        st.info("Configure advertising video creators with percentage targets. Commission liabilities will scale based on the specific total patient paid checkout value.")
         
         col_rek1, col_rek2 = st.columns([1, 1.5])
         with col_rek1:
             st.markdown("##### Add New Promotional Reklam Profile")
             rek_name_in = st.text_input("Content Creator / Reklam Partner Name Identity Identifier")
-            rek_comm_per = st.number_input("Flat Commission Settled Due Per Referred Patient Visit (IQD)", min_value=0.0, step=500.0, value=0.0)
+            rek_comm_per = st.number_input("Commission Rate Percentage (%)", min_value=0.0, max_value=100.0, step=0.5, value=10.0)
             rek_notes_in = st.text_input("Social Handle Profile / Notes Reference (e.g., TikTok Video campaign)")
             
             if st.button("Register Marketing Asset"):
                 if rek_name_in.strip():
-                    if execute_write("INSERT INTO reklams (name, commission_per_visit, notes) VALUES (?,?,?)", (rek_name_in.strip(), rek_comm_per, rek_notes_in.strip())):
-                        log_activity(f"Created advertising promotional partner profile: '{rek_name_in.strip()}' paying {rek_comm_per:,.0f} IQD per patient checkout track.")
+                    if execute_write("INSERT INTO reklams (name, commission_percent, notes) VALUES (?,?,?)", (rek_name_in.strip(), rek_comm_per, rek_notes_in.strip())):
+                        log_activity(f"Created reklam partner: '{rek_name_in.strip()}' earning {rek_comm_per}% commission per patient.")
                         st.success("Marketing promotional handle registered.")
                         st.rerun()
                 else:
@@ -793,18 +806,20 @@ elif selected == "⚙️ Settings":
                     
         with col_rek2:
             st.markdown("##### Current Advertising Partners & Accumulating Commission Metrics Sheets")
-            all_reklams_listed = fetch_all("SELECT id, name, commission_per_visit, notes FROM reklams ORDER BY name")
+            all_reklams_listed = fetch_all("SELECT id, name, commission_percent, notes FROM reklams ORDER BY name")
             if all_reklams_listed:
                 rek_rows_view = []
                 for rk in all_reklams_listed:
-                    referral_count = fetch_one("SELECT COUNT(*) as c FROM visits WHERE reklam_id = ?", (rk["id"],))["c"]
-                    total_owed_accrued = referral_count * rk["commission_per_visit"]
+                    referred_visits = fetch_all("SELECT net_paid FROM visits WHERE reklam_id = ?", (rk["id"],))
+                    referral_count = len(referred_visits)
+                    total_owed_accrued = sum(v["net_paid"] * (rk["commission_percent"] / 100.0) for v in referred_visits)
+                    
                     rek_rows_view.append({
                         "Partner ID": rk["id"],
                         "Partner Name Handle": rk["name"],
-                        "Commission / Lead Visit": f"{rk['commission_per_visit']:,.0f} IQD",
-                        "Total Checked Visits Referred": referral_count,
-                        "Accumulated Total Commissions Owed": f"{total_owed_accrued:,.0f} IQD",
+                        "Commission Percentage Rate": f"{rk['commission_percent']}%",
+                        "Total Visits Referred": referral_count,
+                        "Accumulated Total Owed": f"{total_owed_accrued:,.0f} IQD",
                         "Platform Memo Campaign Notes": rk["notes"]
                     })
                 st.dataframe(pd.DataFrame(rek_rows_view), use_container_width=True, hide_index=True)
@@ -848,7 +863,7 @@ elif selected == "⚙️ Settings":
                     st.success("Bundle catalog profile saved.")
                     st.rerun()
 
-    # ── ACCOUNT MATRIX MANAGEMENT (BOSS CONTROL DESK ONLY) ──
+    # ── ACCOUNT MATRIX MANAGEMENT ──
     with s_tabs[4]:
         if role != "Boss":
             st.error("Administrative privilege verification requirements unmet.")
