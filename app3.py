@@ -3,7 +3,6 @@ import pandas as pd
 import sqlite3
 import hashlib
 from datetime import datetime
-import plotly.express as px
 
 # ----------------------------------------------------
 # 1. PREMIUM 2026 SAAS PALETTE & CSS ENGINE
@@ -104,7 +103,7 @@ st.markdown("""
 # ----------------------------------------------------
 # 2. CORE STORAGE ENGINE (DATABASE ENGINE)
 # ----------------------------------------------------
-DB_FILE = "garden_clinic_v4.db"
+DB_FILE = "garden_clinic_v5.db"
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -195,7 +194,7 @@ if not st.session_state.logged_in:
                     st.error("Invalid Administrative Master Code. Transaction dropped.")
                 elif reg_user and reg_pass:
                     if execute_write("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", (reg_user.strip(), hash_password(reg_pass), reg_role)):
-                        st.success("Account initialized. Please authentic via Login tab.")
+                        st.success("Account initialized. Please authenticate via Login tab.")
                     else:
                         st.error("Profile identity conflict found.")
     st.stop()
@@ -206,7 +205,7 @@ if not st.session_state.logged_in:
 st.sidebar.markdown("""
 <div style='text-align:center; padding:15px 10px 5px 10px; margin-bottom:10px;'>
     <h2 style='color:#FFFFFF !important; margin:0; font-weight:800; letter-spacing:0.5px;'>🌿 Garden Clinic</h2>
-    <p style='color:#34D399 !important; font-size:0.9rem; margin-top:4px; font-weight:500;'>Management OS v4.0</p>
+    <p style='color:#34D399 !important; font-size:0.9rem; margin-top:4px; font-weight:500;'>Management OS v5.0</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -279,7 +278,6 @@ net_profit = gross_income - total_outflows
 # MODULE A: CROWN EXECUTIVE DASHBOARD (THE BOSS)
 # ----------------------------------------------------
 if selected_menu == "📈 Boss Command Center":
-    # 10. Dashboard Hero Section
     st.markdown(f"""
     <div style="background:linear-gradient(135deg, #0B291B, #2ECC71); padding:35px; border-radius:20px; color:white; box-shadow: 0 12px 30px rgba(11,41,27,0.15); margin-bottom:25px;">
         <h1 style="margin:0; color:white !important; font-weight:800; font-size:2.4rem;">👑 Executive Dashboard</h1>
@@ -311,7 +309,7 @@ if selected_menu == "📈 Boss Command Center":
             payout_cash = gross_gen * (frate / 100.0)
         else:
             if volume >= 20: applied_strategy = "Tiered Matrix Strategy (5%)"; payout_cash = gross_gen * 0.05
-            elif volume >= 10: applied_strategy = "Tiered Matrix Strategy (3%)"; payout_cash = gross_gen * 0.03
+            elif len(sessions) >= 10: applied_strategy = "Tiered Matrix Strategy (3%)"; payout_cash = gross_gen * 0.03
             else: applied_strategy = "Tiered Matrix Strategy (0%)"; payout_cash = 0.0
                 
         payout_table.append({"Medical Specialist": name, "Assigned Model Framework": applied_strategy, "Case Volumes": volume, "Gross Revenue Contribution": f"${gross_gen:,.2f}", "Calculated Payroll Due": f"${payout_cash:,.2f}"})
@@ -346,7 +344,7 @@ elif selected_menu == "🖥️ Reception Terminal":
             st.dataframe(pd.DataFrame([dict(x) for x in all_p]), use_container_width=True)
             st.markdown("---")
             st.markdown("#### 🚨 Safe Purging Registry Operations")
-            del_target = st.selectbox("Select Target Client Record to Drop Permenantly", [""] + [x["name"] for x in all_p])
+            del_target = st.selectbox("Select Target Client Record to Drop Permanently", [""] + [x["name"] for x in all_p])
             if st.button("Execute Complete Registry Purge", type="primary"):
                 if del_target:
                     execute_write("DELETE FROM patients WHERE name = ?", (del_target,))
@@ -430,16 +428,14 @@ elif selected_menu == "🖥️ Reception Terminal":
                 st.markdown(receipt_html, unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
                 
-                # Direct trigger link for systems printing engine configuration routes
                 st.button("Print Document Receipt 🖨️", on_click=lambda: st.markdown("<script>window.print();</script>", unsafe_allow_html=True), use_container_width=True)
 
 # ----------------------------------------------------
-# MODULE C: UNDERSTANDABLE ACCOUNTING LAYOUT (WITH CHARTS)
+# MODULE C: UNDERSTANDABLE ACCOUNTING LAYOUT (NATIVE CHARTS)
 # ----------------------------------------------------
 elif selected_menu == "📊 Accounting Control Desk":
     render_dashboard_header("📊 Financial Health & Asset Balance Suite", "Granular revenue flow tracing, balance analysis, and resource expenditure allocation management tools.")
     
-    # 4. Premium Exec Card Metrics instead of plain layout
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f"""
@@ -468,40 +464,28 @@ elif selected_menu == "📊 Accounting Control Desk":
         
     st.markdown("---")
     
-    # 8. Add Charts to Accounting Dashboard Section
-    st.subheader("📊 Operational Analytics & Projections Vector Graphs")
+    st.subheader("📊 Operational Analytics (Native Rendering Engine)")
     chart_col1, chart_col2 = st.columns(2)
     
     with chart_col1:
         st.markdown("#### Corporate Resource Expenditure Outflow Breakdown")
         if total_outflows > 0:
-            fig_pie = px.pie(
-                names=["Base Operating Expenses", "Standard Salary Payroll", "Practitioner Commissions Allocation"],
-                values=[base_expenses, payroll_burden, total_commission_burden],
-                hole=0.6,
-                color_discrete_sequence=["#EF4444", "#34D399", "#0B291B"]
-            )
-            fig_pie.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=300, showlegend=True)
-            st.plotly_chart(fig_pie, use_container_width=True)
+            # Native Streamlit Bar Chart implementation
+            df_exp = pd.DataFrame({
+                "Expense Stream": ["Operating Bills", "Staff Salaries", "Specialist Commissions"],
+                "Total Allocated ($)": [base_expenses, payroll_burden, total_commission_burden]
+            }).set_index("Expense Stream")
+            st.bar_chart(df_exp, y="Total Allocated ($)", color="#EF4444")
         else:
-            st.info("Awaiting structural expenditure entries to map out pie data models.")
+            st.info("Awaiting structural expenditure entries to map out data models.")
             
     with chart_col2:
         st.markdown("#### Retrospective Inflow Growth Velocity Track")
         visit_logs_raw = fetch_all("SELECT v.visit_date as Date, v.net_paid as Collected FROM visits v ORDER BY v.id ASC")
         if visit_logs_raw:
             df_rev = pd.DataFrame([dict(vl) for vl in visit_logs_raw])
-            df_line = df_rev.groupby("Date", as_index=False).sum()
-            
-            fig_line = px.line(
-                df_line,
-                x="Date",
-                y="Collected",
-                markers=True,
-                color_discrete_sequence=["#10B981"]
-            )
-            fig_line.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=300, xaxis_title="Timeline Node", yaxis_title="Revenue Inflow ($)")
-            st.plotly_chart(fig_line, use_container_width=True)
+            df_line = df_rev.groupby("Date", as_index=False).sum().set_index("Date")
+            st.line_chart(df_line, y="Collected", color="#10B981")
         else:
             st.info("Awaiting historical transaction inputs to map acceleration matrix vectors.")
             
