@@ -1,5 +1,6 @@
+bash
 
-
+cat > /mnt/user-data/outputs/garden_clinic_app.py << 'PYEOF'
 import streamlit as st
 import pandas as pd
 import sqlite3
@@ -1034,3 +1035,7 @@ elif selected == "⚙️  Settings":
         else:
             st.info("No bundles created yet.")
 PYEOF
+echo "Done"
+Output
+
+Done
