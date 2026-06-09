@@ -103,7 +103,7 @@ st.markdown("""
 # ----------------------------------------------------
 # 2. CORE STORAGE ENGINE (DATABASE ENGINE)
 # ----------------------------------------------------
-DB_FILE = "garden_clinic_v7.db"
+DB_FILE = "garden_clinic_v8.db"
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -122,9 +122,10 @@ def init_db():
         ctx.execute("CREATE TABLE IF NOT EXISTS employees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, role TEXT NOT NULL, salary REAL NOT NULL)")
         ctx.execute("CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, price REAL NOT NULL)")
         ctx.execute("CREATE TABLE IF NOT EXISTS bundles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, price REAL NOT NULL)")
+        ctx.execute("CREATE TABLE IF NOT EXISTS promoters (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, comm_rate REAL DEFAULT 10.0)")
         ctx.execute("""
             CREATE TABLE IF NOT EXISTS visits (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, doctor_id INTEGER, service_id INTEGER, bundle_id INTEGER,
+                id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, doctor_id INTEGER, service_id INTEGER, bundle_id INTEGER, promoter_id INTEGER,
                 visit_date TEXT, base_price REAL, discount_amount REAL, net_paid REAL
             )
         """)
@@ -136,7 +137,12 @@ def init_db():
             )
         """)
         
-        # Inject standard master boss profile if database cluster runs fresh
+        # Migration protections
+        try:
+            ctx.execute("ALTER TABLE visits ADD COLUMN promoter_id INTEGER")
+        except sqlite3.OperationalError:
+            pass
+            
         master_check = ctx.execute("SELECT * FROM users WHERE username = 'admin'").fetchone()
         if not master_check:
             ctx.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", ('admin', hash_password('1011'), 'Boss'))
@@ -237,7 +243,7 @@ if not st.session_state.logged_in:
 st.sidebar.markdown("""
 <div style='text-align:center; padding:15px 10px 5px 10px; margin-bottom:10px;'>
     <h2 style='color:#FFFFFF !important; margin:0; font-weight:800; letter-spacing:0.5px;'>🌿 Garden Clinic</h2>
-    <p style='color:#34D399 !important; font-size:0.9rem; margin-top:4px; font-weight:500;'>Management OS v7.0</p>
+    <p style='color:#34D399 !important; font-size:0.9rem; margin-top:4px; font-weight:500;'>Management OS v8.0</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -285,6 +291,7 @@ base_expenses = expenses_row[0]["total"] if expenses_row and expenses_row[0]["to
 staff_salary_row = fetch_all("SELECT SUM(salary) as total FROM employees")
 payroll_burden = staff_salary_row[0]["total"] if staff_salary_row and staff_salary_row[0]["total"] else 0.0
 
+# Doctor Commission Logic
 all_visits_raw = fetch_all("SELECT d.name, d.comm_type, d.fixed_rate, v.net_paid FROM visits v JOIN doctors d ON v.doctor_id = d.id")
 doc_payroll_totals = {}
 total_commission_burden = 0.0
@@ -300,7 +307,11 @@ for dc in all_docs_configs:
         if len(v_list) >= 20: total_commission_burden += sum(v_list) * 0.05
         elif len(v_list) >= 10: total_commission_burden += sum(v_list) * 0.03
 
-total_outflows = base_expenses + payroll_burden + total_commission_burden
+# Reklam Video Payout Calculation Engine
+reklam_visits_raw = fetch_all("SELECT v.net_paid, pr.comm_rate FROM visits v JOIN promoters pr ON v.promoter_id = pr.id")
+total_reklam_burden = sum(float(rv["net_paid"]) * (float(rv["comm_rate"]) / 100.0) for rv in reklam_visits_raw)
+
+total_outflows = base_expenses + payroll_burden + total_commission_burden + total_reklam_burden
 net_profit = gross_income - total_outflows
 
 # ----------------------------------------------------
@@ -326,7 +337,6 @@ if selected_menu == "📈 Boss Command Center":
     # USER ACCOUNTS VISIBILITY PANEL FOR THE BOSS
     st.markdown("### 👥 System Provisioned User Profiles Matrix")
     users_list = fetch_all("SELECT id, username, role FROM users")
-    
     boss_acc_col1, boss_acc_col2 = st.columns([1, 3])
     with boss_acc_col1:
         st.markdown(f"""
@@ -338,6 +348,32 @@ if selected_menu == "📈 Boss Command Center":
     with boss_acc_col2:
         if users_list:
             st.dataframe(pd.DataFrame([dict(u) for u in users_list]), use_container_width=True)
+
+    # REKLAM VIDEO ANALYTICS FOR THE BOSS
+    st.markdown("### 📢 Reklam Video Marketing Performance & Conversion Matrix")
+    all_promoters_raw = fetch_all("SELECT * FROM promoters")
+    promoter_payout_table = []
+    for pr in all_promoters_raw:
+        p_id = pr["id"]
+        p_name = pr["name"]
+        p_rate = pr["comm_rate"]
+        
+        p_visits_logs = fetch_all("SELECT net_paid FROM visits WHERE promoter_id = ?", (p_id,))
+        brought_count = len(p_visits_logs)
+        total_revenue_brought = sum(v["net_paid"] for v in p_visits_logs)
+        commission_due = total_revenue_brought * (p_rate / 100.0)
+        
+        promoter_payout_table.append({
+            "Video Creator / Promoter": p_name,
+            "Set Commission Percentage": f"{p_rate}%",
+            "Patients Brought via Videos": brought_count,
+            "Gross Revenue Generated": f"${total_revenue_brought:,.2f}",
+            "Calculated Payout Due": f"${commission_due:,.2f}"
+        })
+    if promoter_payout_table:
+        st.dataframe(pd.DataFrame(promoter_payout_table), use_container_width=True)
+    else:
+        st.info("No active Reklam video promoter performance metrics linked yet.")
 
     st.markdown("### 🩺 Practitioner Yield & Performance Matrix")
     payout_table = []
@@ -365,7 +401,7 @@ if selected_menu == "📈 Boss Command Center":
         st.info("No active medical specialist data sets recorded inside the local cluster.")
 
 # ----------------------------------------------------
-# MODULE B: RECEPTION DESK MODULE (APPOINTMENTS INCLUDED)
+# MODULE B: RECEPTION DESK MODULE
 # ----------------------------------------------------
 elif selected_menu == "🖥️ Reception Terminal":
     render_dashboard_header("🖥️ Smart Front Desk Workspace", "Patient intake registers, modern calendar appointment scheduling, and invoice processing logs.")
@@ -378,7 +414,6 @@ elif selected_menu == "🖥️ Reception Terminal":
         "📜 Live Ledger Audit Log"
     ])
     
-    # NEW APPOINTMENT FEATURE TAB
     with rt_0:
         st.subheader("📅 Book New Clinic Appointment Session")
         patients_db = fetch_all("SELECT id, name FROM patients")
@@ -471,15 +506,18 @@ elif selected_menu == "🖥️ Reception Terminal":
         docs_db = fetch_all("SELECT id, name FROM doctors")
         services_db = fetch_all("SELECT id, name, price FROM services")
         bundles_db = fetch_all("SELECT id, name, price FROM bundles")
+        promoters_db = fetch_all("SELECT id, name FROM promoters")
         
         if not docs_db or (not services_db and not bundles_db):
             st.warning("Action Required: Please navigate to global setup and initialize active catalog services, bundles, and doctor configurations.")
         else:
             p_map = {p["name"]: p["id"] for p in patients_db}
             d_map = {d["name"]: d["id"] for d in docs_db}
+            prom_map = {pr["name"]: pr["id"] for pr in promoters_db}
             
             target_p = st.selectbox("Lookup Base Client Node File", [""] + list(p_map.keys()))
             chosen_doc = st.selectbox("Assign Consulting Practitioner on Duty", list(d_map.keys()))
+            chosen_promoter = st.selectbox("Select Referring Reklam Promoter (Optional Video Link)", ["None / Direct Visit"] + list(prom_map.keys()))
             
             item_classification = st.radio("Item Matrix Classification", ["Standard Service SKU Line", "Custom Built Package Bundle"], horizontal=True)
             
@@ -524,10 +562,12 @@ elif selected_menu == "🖥️ Reception Terminal":
                     st.error("Operation Aborted: Cannot invoice an empty item structure configuration line.")
                 else:
                     deducted = base_price - final_due
+                    target_prom_id = prom_map[chosen_promoter] if chosen_promoter != "None / Direct Visit" else None
+                    
                     execute_write("""
-                        INSERT INTO visits (patient_id, doctor_id, service_id, bundle_id, visit_date, base_price, discount_amount, net_paid)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (p_map[target_p], d_map[chosen_doc], srv_id, bnd_id, str(datetime.now().strftime("%Y-%m-%d")), base_price, deducted, final_due))
+                        INSERT INTO visits (patient_id, doctor_id, service_id, bundle_id, promoter_id, visit_date, base_price, discount_amount, net_paid)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (p_map[target_p], d_map[chosen_doc], srv_id, bnd_id, target_prom_id, str(datetime.now().strftime("%Y-%m-%d")), base_price, deducted, final_due))
                     
                     st.success("Ledger verification completed successfully.")
                     
@@ -613,7 +653,7 @@ elif selected_menu == "📊 Accounting Control Desk":
         <div class="feature-card">
             <h3>🔴 Net Cost Outflows</h3>
             <h1 style="color:#EF4444; margin:5px 0 0 0; font-weight:800;">${total_outflows:,.2f}</h1>
-            <p style="color:#6B7280; font-size:0.85rem; margin-top:5px;">Operating costs + automated monthly salaries + commissions.</p>
+            <p style="color:#6B7280; font-size:0.85rem; margin-top:5px;">Operating costs + salaries + doctor/reklam commissions.</p>
         </div>
         """, unsafe_allow_html=True)
     with col3:
@@ -627,6 +667,27 @@ elif selected_menu == "📊 Accounting Control Desk":
         
     st.markdown("---")
     
+    # REKLAM ACCOUNTING LEDGER BREAKDOWN
+    st.subheader("📢 Reklam Video Marketing Commission Liabilities")
+    all_promoters_acc = fetch_all("SELECT * FROM promoters")
+    acc_promoter_table = []
+    for pr in all_promoters_acc:
+        p_visits_logs = fetch_all("SELECT net_paid FROM visits WHERE promoter_id = ?", (pr["id"],))
+        total_rev = sum(v["net_paid"] for v in p_visits_logs)
+        comm_due = total_rev * (pr["comm_rate"] / 100.0)
+        acc_promoter_table.append({
+            "Promoter / Creator Reference": pr["name"],
+            "Commission Rate": f"{pr['comm_rate']}%",
+            "Total Patient Counts": len(p_visits_logs),
+            "Total Value Generated": f"${total_rev:,.2f}",
+            "Calculated Outflow Burden": f"${comm_due:,.2f}"
+        })
+    if acc_promoter_table:
+        st.dataframe(pd.DataFrame(acc_promoter_table), use_container_width=True)
+    else:
+        st.info("No video creator marketing outflows registered on this calendar cycle.")
+
+    st.markdown("---")
     st.subheader("📊 Operational Analytics (Native Rendering Engine)")
     chart_col1, chart_col2 = st.columns(2)
     
@@ -634,8 +695,8 @@ elif selected_menu == "📊 Accounting Control Desk":
         st.markdown("#### Corporate Resource Expenditure Outflow Breakdown")
         if total_outflows > 0:
             df_exp = pd.DataFrame({
-                "Expense Stream": ["Operating Bills", "Automated Salaries", "Specialist Commissions"],
-                "Total Allocated ($)": [base_expenses, payroll_burden, total_commission_burden]
+                "Expense Stream": ["Operating Bills", "Automated Salaries", "Specialist Commissions", "Reklam Commissions"],
+                "Total Allocated ($)": [base_expenses, payroll_burden, total_commission_burden, total_reklam_burden]
             }).set_index("Expense Stream")
             st.bar_chart(df_exp, y="Total Allocated ($)", color="#EF4444")
         else:
@@ -679,12 +740,28 @@ elif selected_menu == "📊 Accounting Control Desk":
 elif selected_menu == "⚙️ System Configuration":
     render_dashboard_header("⚙️ Global Setup Console Suite", "Modify, expand, and structure active practitioners, standard clinical support wages, and therapeutic pricing lists.")
     
-    set1, set2, set3, set4 = st.tabs([
+    set1, set2, set3, set4, set5 = st.tabs([
         "👨‍⚕️ Map Medical Specialist Structures", 
         "👥 Configure General Support Payrolls", 
         "💆‍♂️ Deploy Treatment Catalog Items",
-        "🎁 Create Multi-Service Bundles"
+        "🎁 Create Multi-Service Bundles",
+        "📢 Configure Reklam Video Creators"
     ])
+    
+    # NEW TAB FOR CREATING REKLAM PROMOTERS AND PERCENTAGES
+    with set5:
+        st.subheader("📢 Onboard Reklam Marketing Video Creators")
+        st.markdown("Register your content creators or referrers who make videos for your clinic, and set their dynamic percentage commission share.")
+        
+        prom_name = st.text_input("Creator / Promoter Full Name String")
+        prom_rate = st.number_input("Assigned Video Referral Commission Rate (%)", min_value=0.0, max_value=100.0, value=10.0, step=0.5)
+        
+        if st.button("Publish Promoter Parameters into Active Cell"):
+            if prom_name.strip() and execute_write("INSERT INTO promoters (name, comm_rate) VALUES (?, ?)", (prom_name.strip(), prom_rate)):
+                st.success(f"Video marketing node for '{prom_name}' successfully configured at {prom_rate}% payout per patient checkout.")
+                st.rerun()
+            else:
+                st.error("Validation Dropped: Name configuration field cannot be duplicate or evaluate empty.")
     
     with set1:
         st.subheader("Configure New Medical Specialist Framework Node")
@@ -759,7 +836,6 @@ elif selected_menu == "🔐 Security Settings Cluster":
             elif not new_pass.strip():
                 st.error("Invalid Target: Passcode string cannot evaluate empty.")
             else:
-                # Verify identity check
                 identity_match = fetch_all("SELECT * FROM users WHERE username = ? AND password_hash = ?", (st.session_state.username, hash_password(old_pass)))
                 if identity_match:
                     execute_write("UPDATE users SET password_hash = ? WHERE username = ?", (hash_password(new_pass), st.session_state.username))
