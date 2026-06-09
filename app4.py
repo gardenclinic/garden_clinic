@@ -1,6 +1,5 @@
 bash
 
-cat > /mnt/user-data/outputs/garden_clinic_app.py << 'PYEOF'
 import streamlit as st
 import pandas as pd
 import sqlite3
