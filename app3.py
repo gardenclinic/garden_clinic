@@ -103,7 +103,7 @@ st.markdown("""
 # ----------------------------------------------------
 # 2. CORE STORAGE ENGINE (DATABASE ENGINE)
 # ----------------------------------------------------
-DB_FILE = "garden_clinic_v5.db"
+DB_FILE = "garden_clinic_v6.db"
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -121,13 +121,20 @@ def init_db():
         ctx.execute("CREATE TABLE IF NOT EXISTS doctors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, comm_type TEXT NOT NULL, fixed_rate REAL DEFAULT 0.0)")
         ctx.execute("CREATE TABLE IF NOT EXISTS employees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, role TEXT NOT NULL, salary REAL NOT NULL)")
         ctx.execute("CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, price REAL NOT NULL)")
+        ctx.execute("CREATE TABLE IF NOT EXISTS bundles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, price REAL NOT NULL)")
         ctx.execute("""
             CREATE TABLE IF NOT EXISTS visits (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, doctor_id INTEGER, service_id INTEGER,
+                id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, doctor_id INTEGER, service_id INTEGER, bundle_id INTEGER,
                 visit_date TEXT, base_price REAL, discount_amount REAL, net_paid REAL
             )
         """)
         ctx.execute("CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL)")
+        
+        # Safe migration logic: check if column bundle_id exists inside older tables
+        try:
+            ctx.execute("ALTER TABLE visits ADD COLUMN bundle_id INTEGER")
+        except sqlite3.OperationalError:
+            pass
     ctx.close()
 
 init_db()
@@ -148,6 +155,30 @@ def execute_write(query, params=()):
         return False
     finally:
         db.close()
+
+# ----------------------------------------------------
+# AUTOMATED FIRST-OF-THE-MONTH PAYROLL ENGINE
+# ----------------------------------------------------
+def auto_process_monthly_payroll():
+    current_month = datetime.now().strftime("%Y-%m")
+    desc_tag = f"Automated Monthly Payroll Outflow: {current_month}"
+    
+    # Check if payroll has already been locked for the current calendar cycle
+    already_paid = fetch_all("SELECT id FROM expenses WHERE description = ?", (desc_tag,))
+    if not already_paid:
+        staff_salary_row = fetch_all("SELECT SUM(salary) as total FROM employees")
+        payroll_burden = staff_salary_row[0]["total"] if staff_salary_row and staff_salary_row[0]["total"] else 0.0
+        
+        if payroll_burden > 0:
+            # Commit processing liability line automatically mapped to the 1st day of the month
+            execute_write(
+                "INSERT INTO expenses (description, amount, date) VALUES (?, ?, ?)",
+                (desc_tag, payroll_burden, f"{current_month}-01")
+            )
+
+# Execute the salary sweep instantly on workspace access initialization
+auto_process_monthly_payroll()
+
 
 # ----------------------------------------------------
 # 3. PREMIUM LOGIN CARD GATEWAY
@@ -205,7 +236,7 @@ if not st.session_state.logged_in:
 st.sidebar.markdown("""
 <div style='text-align:center; padding:15px 10px 5px 10px; margin-bottom:10px;'>
     <h2 style='color:#FFFFFF !important; margin:0; font-weight:800; letter-spacing:0.5px;'>🌿 Garden Clinic</h2>
-    <p style='color:#34D399 !important; font-size:0.9rem; margin-top:4px; font-weight:500;'>Management OS v5.0</p>
+    <p style='color:#34D399 !important; font-size:0.9rem; margin-top:4px; font-weight:500;'>Management OS v6.0</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -235,7 +266,6 @@ elif st.session_state.role == "Reception":
 
 selected_menu = st.sidebar.radio("Console Navigation Matrix:", menus)
 
-# Helper Function for Glassmorphic Dashboard Headers
 def render_dashboard_header(title, subtitle):
     st.markdown(f"""
     <div style="background: linear-gradient(135deg, #0B291B, #1F5E3B); padding:30px; border-radius:20px; color:white; margin-bottom:25px; box-shadow:0 10px 30px rgba(0,0,0,0.08);">
@@ -325,7 +355,12 @@ if selected_menu == "📈 Boss Command Center":
 elif selected_menu == "🖥️ Reception Terminal":
     render_dashboard_header("🖥️ Smart Front Desk Workspace", "Patient intake registers, invoice processing, and real-time ledger records deletion tools.")
     
-    rt_1, rt_2, rt_3 = st.tabs(["⚡ Run Checkout Session & Print Receipt", "👥 Patient Central Index Records", "➕ Create New Profile Record"])
+    rt_1, rt_2, rt_3, rt_4 = st.tabs([
+        "⚡ Run Checkout Session & Print Receipt", 
+        "👥 Patient Central Index Records", 
+        "➕ Create New Profile Record",
+        "📜 Live Ledger Audit Log"
+    ])
     
     with rt_3:
         st.subheader("Onboard New Patient Registry Node")
@@ -358,23 +393,45 @@ elif selected_menu == "🖥️ Reception Terminal":
         patients_db = fetch_all("SELECT id, name FROM patients")
         docs_db = fetch_all("SELECT id, name FROM doctors")
         services_db = fetch_all("SELECT id, name, price FROM services")
+        bundles_db = fetch_all("SELECT id, name, price FROM bundles")
         
-        if not docs_db or not services_db:
-            st.warning("Action Required: Please navigate to global setup and initialize active services and doctor configurations.")
+        if not docs_db or (not services_db and not bundles_db):
+            st.warning("Action Required: Please navigate to global setup and initialize active catalog services, bundles, and doctor configurations.")
         else:
             p_map = {p["name"]: p["id"] for p in patients_db}
             d_map = {d["name"]: d["id"] for d in docs_db}
-            s_map = {f"{s['name']} (${s['price']})": (s["id"], s["price"], s["name"]) for s in services_db}
             
             target_p = st.selectbox("Lookup Base Client Node File", [""] + list(p_map.keys()))
             chosen_doc = st.selectbox("Assign Consulting Practitioner on Duty", list(d_map.keys()))
-            chosen_srv = st.selectbox("Select Performed Formulation SKU Line", list(s_map.keys()))
+            
+            # Hybrid Selection Engine: Choose between Individual SKU or Bundle Pack
+            item_classification = st.radio("Item Matrix Classification", ["Standard Service SKU Line", "Custom Built Package Bundle"], horizontal=True)
+            
+            srv_id = None
+            bnd_id = None
+            base_price = 0.0
+            chosen_item_name = ""
+            
+            if item_classification == "Standard Service SKU Line":
+                if services_db:
+                    s_map = {f"✨ {s['name']} (${s['price']})": (s["id"], s["price"], s["name"]) for s in services_db}
+                    chosen_srv_str = st.selectbox("Select Performed Formulation SKU Line", list(s_map.keys()))
+                    if chosen_srv_str:
+                        srv_id, base_price, chosen_item_name = s_map[chosen_srv_str]
+                else:
+                    st.error("No individual service lines configured inside catalog metrics.")
+            else:
+                if bundles_db:
+                    b_map = {f"🎁 {b['name']} (${b['price']})": (b["id"], b["price"], b["name"]) for b in bundles_db}
+                    chosen_bnd_str = st.selectbox("Select Target Active Package Bundle", list(b_map.keys()))
+                    if chosen_bnd_str:
+                        bnd_id, base_price, chosen_item_name = b_map[chosen_bnd_str]
+                else:
+                    st.error("No multi-tier custom bundles designed inside catalog data sets.")
             
             st.markdown("⚙️ **Dynamic Checkout Invoice Deduction Overrides**")
             disc_type = st.radio("Deduction Type Framework", ["None Adjustment", "Flat Nominal Cash Override ($)", "Relative Percentage Shift (%)"], horizontal=True)
             disc_val = st.number_input("Deduction Factor Quantity", min_value=0.0, step=1.0)
-            
-            srv_id, base_price, srv_name = s_map[chosen_srv]
             
             final_due = base_price
             if disc_type == "Flat Nominal Cash Override ($)":
@@ -387,19 +444,21 @@ elif selected_menu == "🖥️ Reception Terminal":
             if st.button("Log Ledger Settlement & Display Receipt", use_container_width=True):
                 if not target_p:
                     st.error("Operation Aborted: Target recipient profile cannot be initialized empty.")
+                elif base_price == 0.0:
+                    st.error("Operation Aborted: Cannot invoice an empty item structure configuration line.")
                 else:
                     deducted = base_price - final_due
                     execute_write("""
-                        INSERT INTO visits (patient_id, doctor_id, service_id, visit_date, base_price, discount_amount, net_paid)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (p_map[target_p], d_map[chosen_doc], srv_id, str(datetime.now().strftime("%Y-%m-%d")), base_price, deducted, final_due))
+                        INSERT INTO visits (patient_id, doctor_id, service_id, bundle_id, visit_date, base_price, discount_amount, net_paid)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (p_map[target_p], d_map[chosen_doc], srv_id, bnd_id, str(datetime.now().strftime("%Y-%m-%d")), base_price, deducted, final_due))
                     
                     st.success("Ledger verification completed successfully.")
                     
                     st.session_state.receipt_ready = True
                     st.session_state.rcpt_patient = target_p
                     st.session_state.rcpt_doc = chosen_doc
-                    st.session_state.rcpt_srv = srv_name
+                    st.session_state.rcpt_srv = chosen_item_name
                     st.session_state.rcpt_base = base_price
                     st.session_state.rcpt_disc = deducted
                     st.session_state.rcpt_net = final_due
@@ -416,7 +475,7 @@ elif selected_menu == "🖥️ Reception Terminal":
                     <hr style="border-top:1px dashed #DCE5DD; margin:15px 0;">
                     <p style="margin:5px 0;"><b>Patient Identity:</b> {st.session_state.rcpt_patient}</p>
                     <p style="margin:5px 0;"><b>Practitioner:</b> {st.session_state.rcpt_doc}</p>
-                    <p style="margin:5px 0;"><b>Therapy Line SKU:</b> {st.session_state.rcpt_srv}</p>
+                    <p style="margin:5px 0;"><b>Charged Item:</b> {st.session_state.rcpt_srv}</p>
                     <hr style="border-top:1px dashed #DCE5DD; margin:15px 0;">
                     <p style="margin:5px 0; color:#4B5563;">Standard Base Rate: <span style="float:right;">${st.session_state.rcpt_base:,.2f}</span></p>
                     <p style="margin:5px 0; color:#EF4444;">Adjustments Deducted: <span style="float:right;">-${st.session_state.rcpt_disc:,.2f}</span></p>
@@ -427,8 +486,36 @@ elif selected_menu == "🖥️ Reception Terminal":
                 """
                 st.markdown(receipt_html, unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
-                
                 st.button("Print Document Receipt 🖨️", on_click=lambda: st.markdown("<script>window.print();</script>", unsafe_allow_html=True), use_container_width=True)
+
+    with rt_4:
+        st.subheader("🛠️ Transaction Ledger Management Control Console")
+        st.markdown("Review running logs of patient sessions processed inside the clinic ecosystem. Use this sector to drop mistyped session invoices.")
+        
+        audit_raw_logs = fetch_all("""
+            SELECT v.id, v.visit_date as Date, p.name as Patient, d.name as Doctor, 
+                   COALESCE(s.name, '[Bundle Pack] ' || b.name) as ChargedItem, v.net_paid as Paid
+            FROM visits v
+            JOIN patients p ON v.patient_id = p.id
+            JOIN doctors d ON v.doctor_id = d.id
+            LEFT JOIN services s ON v.service_id = s.id
+            LEFT JOIN bundles b ON v.bundle_id = b.id
+            ORDER BY v.id DESC
+        """)
+        
+        if audit_raw_logs:
+            df_audit = pd.DataFrame([dict(x) for x in audit_raw_logs])
+            st.dataframe(df_audit, use_container_width=True)
+            
+            st.markdown("---")
+            st.markdown("#### 🚨 Reverse Session Verification Invoice")
+            target_void_id = st.number_input("Input Target Row Identification Index Key (ID Number)", min_value=1, step=1)
+            if st.button("Void and Expunge Selected Invoice Node", type="primary"):
+                execute_write("DELETE FROM visits WHERE id = ?", (target_void_id,))
+                st.success(f"Successfully deleted and reversed transaction rows corresponding to row reference matrix '{target_void_id}'.")
+                st.rerun()
+        else:
+            st.info("No transactional checkout logs captured inside storage nodes yet.")
 
 # ----------------------------------------------------
 # MODULE C: UNDERSTANDABLE ACCOUNTING LAYOUT (NATIVE CHARTS)
@@ -450,7 +537,7 @@ elif selected_menu == "📊 Accounting Control Desk":
         <div class="feature-card">
             <h3>🔴 Net Cost Outflows</h3>
             <h1 style="color:#EF4444; margin:5px 0 0 0; font-weight:800;">${total_outflows:,.2f}</h1>
-            <p style="color:#6B7280; font-size:0.85rem; margin-top:5px;">Operating costs + fixed salaries + commissions.</p>
+            <p style="color:#6B7280; font-size:0.85rem; margin-top:5px;">Operating costs + automated monthly salaries + commissions.</p>
         </div>
         """, unsafe_allow_html=True)
     with col3:
@@ -470,9 +557,8 @@ elif selected_menu == "📊 Accounting Control Desk":
     with chart_col1:
         st.markdown("#### Corporate Resource Expenditure Outflow Breakdown")
         if total_outflows > 0:
-            # Native Streamlit Bar Chart implementation
             df_exp = pd.DataFrame({
-                "Expense Stream": ["Operating Bills", "Staff Salaries", "Specialist Commissions"],
+                "Expense Stream": ["Operating Bills", "Automated Salaries", "Specialist Commissions"],
                 "Total Allocated ($)": [base_expenses, payroll_burden, total_commission_burden]
             }).set_index("Expense Stream")
             st.bar_chart(df_exp, y="Total Allocated ($)", color="#EF4444")
@@ -493,12 +579,12 @@ elif selected_menu == "📊 Accounting Control Desk":
     
     acc_split_1, acc_split_2 = st.columns(2)
     with acc_split_1:
-        st.subheader("📥 Incoming Capital Revenue Stream Matrix Rows")
-        visit_grid_logs = fetch_all("SELECT v.visit_date as Date, p.name as Patient, v.net_paid as Amount FROM visits v JOIN patients p ON v.patient_id = p.id ORDER BY v.id DESC")
-        if visit_grid_logs:
-            st.dataframe(pd.DataFrame([dict(x) for x in visit_grid_logs]), use_container_width=True)
+        st.subheader("📥 General Expense Matrix Adjustments Log")
+        all_exps_listed = fetch_all("SELECT id, date as Date, description as Label, amount as Cost FROM expenses ORDER BY id DESC")
+        if all_exps_listed:
+            st.dataframe(pd.DataFrame([dict(x) for x in all_exps_listed]), use_container_width=True)
         else:
-            st.info("No sales logs indexed in the ledger yet.")
+            st.info("No custom business operation expenditures locked into history.")
             
     with acc_split_2:
         st.subheader("📤 Record New General Expenditure Liability")
@@ -517,7 +603,12 @@ elif selected_menu == "📊 Accounting Control Desk":
 elif selected_menu == "⚙️ System Configuration":
     render_dashboard_header("⚙️ Global Setup Console Suite", "Modify, expand, and structure active practitioners, standard clinical support wages, and therapeutic pricing lists.")
     
-    set1, set2, set3 = st.tabs(["👨‍⚕️ Map Medical Specialist Structures", "👥 Configure General Support Payrolls", "💆‍♂️ Deploy Treatment Catalog Items"])
+    set1, set2, set3, set4 = st.tabs([
+        "👨‍⚕️ Map Medical Specialist Structures", 
+        "👥 Configure General Support Payrolls", 
+        "💆‍♂️ Deploy Treatment Catalog Items",
+        "🎁 Create Multi-Service Bundles"
+    ])
     
     with set1:
         st.subheader("Configure New Medical Specialist Framework Node")
@@ -533,15 +624,18 @@ elif selected_menu == "⚙️ System Configuration":
         if st.button("Onboard Practitioner Structure Model"):
             if d_name.strip() and execute_write("INSERT INTO doctors (name, comm_type, fixed_rate) VALUES (?, ?, ?)", (d_name.strip(), db_comm_type, f_percentage)):
                 st.success(f"Practitioner profile for '{d_name}' verified and successfully written onto configuration registers.")
+                st.rerun()
                 
     with set2:
         st.subheader("Onboard Support Staff Base Salary Wage File")
+        st.markdown("ℹ️ *Note: The total sum configuration written below automatically bills the system as an operational expenditure on the 1st of every month.*")
         emp_name = st.text_input("Employee Complete Identity Label")
         emp_role = st.text_input("Operational Structural Title Role")
         emp_salary = st.number_input("Agreed Static Monthly Remuneration ($)", min_value=0.0, step=100.0)
         if st.button("Save Wage Configuration Profile"):
             if emp_name and emp_role and execute_write("INSERT INTO employees (name, role, salary) VALUES (?, ?, ?)", (emp_name.strip(), emp_role.strip(), emp_salary)):
                 st.success(f"Salary parameters structured successfully for: {emp_name}.")
+                st.rerun()
 
     with set3:
         st.subheader("Deploy New Therapeutic Action Items Catalog Line")
@@ -550,3 +644,21 @@ elif selected_menu == "⚙️ System Configuration":
         if st.button("Publish Service SKU to Main Grid"):
             if s_name.strip() and execute_write("INSERT INTO services (name, price) VALUES (?, ?)", (s_name.strip(), s_price)):
                 st.success(f"Service formulation line item '{s_name}' indexed successfully at ${s_price:,.2f}.")
+                st.rerun()
+
+    with set4:
+        st.subheader("🎁 Engineer Multi-tier Product Bundles")
+        st.markdown("Create high-value medical product combinations or specialty care treatment packages with custom package-level pricing options.")
+        
+        b_name = st.text_input("Bundle / Treatment Package Title Name (e.g., Bundle 2 Executive Pack)")
+        b_price = st.number_input("Set Package Vault Base Retail Price ($)", min_value=0.0, step=25.0)
+        
+        if st.button("Launch Custom Pack SKU to Catalog"):
+            if b_name.strip() and b_price > 0:
+                if execute_write("INSERT INTO bundles (name, price) VALUES (?, ?)", (b_name.strip(), b_price)):
+                    st.success(f"Successfully engineered package configuration matrix entry for '{b_name}' locked at ${b_price:,.2f}.")
+                    st.rerun()
+                else:
+                    st.error("Operation Denied: A package bundle with that precise string name already occupies active catalog cells.")
+            else:
+                st.error("Validation Dropped: Bundle name configuration values cannot register empty.")
