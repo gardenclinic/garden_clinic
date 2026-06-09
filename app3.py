@@ -5,119 +5,102 @@ import hashlib
 from datetime import datetime
 
 # ----------------------------------------------------
-# 1. LUXURY DESIGN DESIGN & CSS INJECTION
+# 1. FRESH MIX DESIGN (DARK GREEN + LIGHT GREEN + WHITE)
 # ----------------------------------------------------
-st.set_page_config(page_title="Garden Clinic OS - Premium", page_icon="🌿", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Garden Clinic OS", page_icon="🌿", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
-    /* Global Base Styling */
+    /* Main Light White Canvas background */
     .stApp {
-        background: linear-gradient(135deg, #04140C 0%, #0A2416 100%);
-        color: #E2EAF4;
-        font-family: 'Playfair Display', 'Georgia', serif;
+        background-color: #F4F7F5;
+        color: #1A3020;
+        font-family: 'Inter', system-ui, sans-serif;
     }
     
-    /* Top Bar Visibility Fix */
-    header, [data-testid="stHeader"] {
-        background-color: rgba(4, 20, 12, 0.8) !important;
-    }
-
-    /* Sidebar Luxury Framing */
+    /* Deep Dark Green Sidebar Header */
     [data-testid="stSidebar"] {
-        background-color: #020C07 !important;
-        border-right: 2px solid #D4AF37;
-        box-shadow: 5px 0px 25px rgba(0,0,0,0.7);
+        background-color: #0B291B !important;
+        border-right: 3px solid #2ECC71;
+    }
+    [data-testid="stSidebar"] * {
+        color: #FFFFFF !important;
     }
     
-    /* Premium Headers */
+    /* Crisp White Luxury Content Cards */
+    .feature-card {
+        background-color: #FFFFFF;
+        padding: 24px;
+        border-radius: 12px;
+        border: 1px solid #E1E8E3;
+        box-shadow: 0 4px 12px rgba(11, 41, 27, 0.05);
+        margin-bottom: 20px;
+    }
+    
+    /* Headers - Strong Forest Green */
     h1, h2, h3, h4, h5, h6 {
-        color: #D4AF37 !important;
-        font-family: 'Playfair Display', serif !important;
-        letter-spacing: 1px;
-        text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
-    }
-
-    /* Custom Premium Card Containers */
-    .luxury-card {
-        background: rgba(17, 54, 38, 0.4);
-        border: 1px solid rgba(212, 175, 55, 0.3);
-        border-left: 4px solid #D4AF37;
-        padding: 20px;
-        border-radius: 8px;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        color: #0B291B !important;
+        font-weight: 700 !important;
     }
     
-    /* Metrics Highlighting */
-    [data-testid="stMetricValue"] {
-        color: #D4AF37 !important;
-        font-size: 2.2rem !important;
-        font-weight: 700 !important;
-        font-family: 'Courier New', monospace;
-    }
-    [data-testid="stMetricLabel"] {
-        color: #A5D6A7 !important;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        font-size: 0.85rem !important;
-    }
-
-    /* Interactive Inputs Styling */
-    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stNumberInput>div>div>input {
-        background-color: #061F13 !important;
-        color: #E2EAF4 !important;
-        border: 1px solid rgba(212, 175, 55, 0.4) !important;
-        border-radius: 4px !important;
-    }
-    .stTextInput>div>div>input:focus, .stSelectbox>div>div>div:focus {
-        border-color: #D4AF37 !important;
-        box-shadow: 0 0 10px rgba(212, 175, 55, 0.5) !important;
-    }
-
-    /* Custom Action Buttons */
+    /* Clean Minty Vibrant Action Buttons */
     .stButton>button {
-        background: linear-gradient(135deg, #113626 0%, #0A2416 100%) !important;
-        color: #D4AF37 !important;
-        border: 1px solid #D4AF37 !important;
-        font-weight: bold !important;
-        letter-spacing: 1px;
-        padding: 10px 24px !important;
-        border-radius: 4px !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        transition: all 0.3s ease-in-out !important;
+        background: linear-gradient(135deg, #2ECC71 0%, #27AE60 100%) !important;
+        color: white !important;
+        border: none !important;
+        font-weight: 600 !important;
+        padding: 10px 22px !important;
+        border-radius: 8px !important;
+        box-shadow: 0 3px 8px rgba(46, 204, 113, 0.2);
+        transition: all 0.2s ease;
     }
     .stButton>button:hover {
-        background: #D4AF37 !important;
-        color: #04140C !important;
-        box-shadow: 0 0 15px #D4AF37;
-        transform: translateY(-2px);
-    }
-
-    /* Styled Tables */
-    div[data-testid="stDataFrame"] table {
-        background-color: #051A10 !important;
-        color: #E2EAF4 !important;
-        border: 1px solid rgba(212, 175, 55, 0.2) !important;
+        transform: translateY(-1px);
+        box-shadow: 0 5px 15px rgba(46, 204, 113, 0.4);
     }
     
-    /* Tabs System UI Luxury Updates */
-    button[data-baseweb="tab"] {
-        color: #A5D6A7 !important;
-        font-size: 1.1rem !important;
+    /* Secondary Delete Buttons style override */
+    button[data-testid="baseButton-primary"] {
+        background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%) !important;
+        box-shadow: 0 3px 8px rgba(231, 76, 60, 0.2) !important;
     }
-    button[aria-selected="true"] {
-        color: #D4AF37 !important;
-        border-bottom-color: #D4AF37 !important;
-        font-weight: bold !important;
+    
+    /* Clear Financial Metrics Layout */
+    [data-testid="stMetricValue"] {
+        color: #0B291B !important;
+        font-size: 2.4rem !important;
+        font-weight: 800 !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #557A61 !important;
+        font-weight: 600;
+    }
+
+    /* Print View Frame Specific Styling */
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #print-area, #print-area * {
+            visibility: visible;
+        }
+        #print-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            background-color: white;
+            color: black;
+            padding: 30px;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ----------------------------------------------------
-# 2. DATA INFRASTRUCTURE (SQLITE ENGINE)
+# 2. CORE STORAGE ENGINE (DATABASE ENGINE)
 # ----------------------------------------------------
-DB_FILE = "garden_clinic_v2.db"
+DB_FILE = "garden_clinic_v3.db"
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -130,59 +113,18 @@ def get_db_connection():
 def init_db():
     ctx = get_db_connection()
     with ctx:
-        # Users Table (Supports Combined Roles)
-        ctx.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL
-            )
-        """)
-        # Patients Table
+        ctx.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL)")
         ctx.execute("CREATE TABLE IF NOT EXISTS patients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, phone TEXT)")
-        
-        # Doctors Table (With Customizable Commision Structures)
-        ctx.execute("""
-            CREATE TABLE IF NOT EXISTS doctors (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                comm_type TEXT NOT NULL, -- 'tiered' or 'fixed'
-                fixed_rate REAL DEFAULT 0.0
-            )
-        """)
-        # General Employees Table
-        ctx.execute("""
-            CREATE TABLE IF NOT EXISTS employees (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                role TEXT NOT NULL,
-                salary REAL NOT NULL
-            )
-        """)
-        # Services Table
+        ctx.execute("CREATE TABLE IF NOT EXISTS doctors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, comm_type TEXT NOT NULL, fixed_rate REAL DEFAULT 0.0)")
+        ctx.execute("CREATE TABLE IF NOT EXISTS employees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, role TEXT NOT NULL, salary REAL NOT NULL)")
         ctx.execute("CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, price REAL NOT NULL)")
-        
-        # Extended Visits Table (with discount tracking)
         ctx.execute("""
             CREATE TABLE IF NOT EXISTS visits (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                patient_id INTEGER, doctor_id INTEGER, service_id INTEGER,
-                visit_date TEXT, base_price REAL, discount_amount REAL, net_paid REAL,
-                FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE,
-                FOREIGN KEY(doctor_id) REFERENCES doctors(id),
-                FOREIGN KEY(service_id) REFERENCES services(id)
+                id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, doctor_id INTEGER, service_id INTEGER,
+                visit_date TEXT, base_price REAL, discount_amount REAL, net_paid REAL
             )
         """)
-        # Expenses Ledger
-        ctx.execute("""
-            CREATE TABLE IF NOT EXISTS expenses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                description TEXT NOT NULL,
-                amount REAL NOT NULL,
-                date TEXT NOT NULL
-            )
-        """)
+        ctx.execute("CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL)")
     ctx.close()
 
 init_db()
@@ -205,7 +147,7 @@ def execute_write(query, params=()):
         db.close()
 
 # ----------------------------------------------------
-# 3. LOCKBOX SYSTEM (ACCESS LOG IN)
+# 3. ENVIRONMENT LOG IN GATEWAY
 # ----------------------------------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -213,18 +155,18 @@ if "logged_in" not in st.session_state:
     st.session_state.role = ""
 
 if not st.session_state.logged_in:
-    st.markdown("<h1 style='text-align: center; font-size: 3.5rem; margin-bottom:0;'>🌿 GARDEN CLINIC</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #D4AF37; letter-spacing: 3px; font-size: 0.95rem; margin-bottom: 30px;'>MEDICAL OPERATIONS & FINANCIAL HARMONY</p>", unsafe_allow_html=True)
-    st.markdown("---")
+    st.markdown("<h1 style='text-align: center; font-size: 3rem; color: #0B291B; margin-top: 40px;'>🌿 Garden Clinic Workspace</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #2ECC71; font-weight:600;'>Clean. Fast. Simple.</p>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 1.8, 1])
+    col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
-        tab1, tab2 = st.tabs(["🔒 Portal Verification", "📝 Provision User Access"])
+        tab1, tab2 = st.tabs(["🔑 Staff Login", "🆕 Create Employee Access"])
         
         with tab1:
-            log_user = st.text_input("System Username", key="log_user")
-            log_pass = st.text_input("Secure Password", type="password", key="log_pass")
-            if st.button("Unlock Environment", use_container_width=True):
+            log_user = st.text_input("Username Identifier")
+            log_pass = st.text_input("Security Password", type="password")
+            if st.button("Enter Workplace 🔓", use_container_width=True):
                 user_record = fetch_all("SELECT * FROM users WHERE username = ? AND password_hash = ?", (log_user.strip(), hash_password(log_pass)))
                 if user_record:
                     st.session_state.logged_in = True
@@ -235,260 +177,252 @@ if not st.session_state.logged_in:
                     st.error("Invalid credentials entered.")
         
         with tab2:
-            st.markdown("<p style='color: #A5D6A7;'>System authorization required to create access configurations.</p>", unsafe_allow_html=True)
-            reg_user = st.text_input("Desired Username")
-            reg_pass = st.text_input("Access Password", type="password")
-            reg_role = st.selectbox("Designated Staff Role", ["Boss", "Accounting", "Reception", "Reception & Accounting", "Doctor"])
-            admin_code = st.text_input("Master Admin Code Required", type="password")
+            reg_user = st.text_input("New System Username")
+            reg_pass = st.text_input("New System Password", type="password")
+            reg_role = st.selectbox("Designated Access Tier", ["Boss", "Accounting", "Reception", "Reception & Accounting"])
+            admin_code = st.text_input("Master Verification Admin Code", type="password")
             
-            if st.button("Create Account Profile", use_container_width=True):
+            if st.button("Authorize Account Creation ✅", use_container_width=True):
                 if admin_code != "1011":
-                    st.error("❌ Invalid Admin Code. Creation authorization denied.")
+                    st.error("Access Code Incorrect. Registration rejected.")
                 elif reg_user and reg_pass:
                     if execute_write("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", (reg_user.strip(), hash_password(reg_pass), reg_role)):
-                        st.success("Account profile authenticated and saved. Access ready via Login.")
+                        st.success("Staff profile generated perfectly. Go to Login tab!")
                     else:
-                        st.error("This profile identity already exists within the ledger.")
-                else:
-                    st.error("Please fill in all identity variables.")
+                        st.error("Username already registered.")
+
     st.stop()
 
 # ----------------------------------------------------
-# 4. ENVIRONMENT ROUTING ARCHITECTURE
+# 4. STAFF ROUTING WORKSPACE
 # ----------------------------------------------------
-st.sidebar.markdown(f"<h3 style='margin-bottom:0;'>🌿 Garden Clinic OS</h3>", unsafe_allow_html=True)
-st.sidebar.markdown(f"<p style='color: #A5D6A7; font-size:0.85rem;'>USER: {st.session_state.username} | <span style='color: #D4AF37;'>{st.session_state.role}</span></p>", unsafe_allow_html=True)
-
-if st.sidebar.button("Lock Console", use_container_width=True):
+st.sidebar.markdown(f"### 🏢 Garden Clinic Admin")
+st.sidebar.markdown(f"👤 **User:** `{st.session_state.username}`\n🔑 **Tier:** `{st.session_state.role}`")
+if st.sidebar.button("Exit Platform 🚪", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
 
 st.sidebar.markdown("---")
 
-# Dynamic Menu Generation Based on Roles (Including the new Hybrid option)
 menus = []
-current_role = st.session_state.role
+if st.session_state.role == "Boss":
+    menus = ["📈 Boss Command Center", "🖥️ Reception Desk", "📊 Accounting & Balance Sheet", "⚙️ Clinic Global Settings"]
+elif st.session_state.role == "Reception & Accounting":
+    menus = ["🖥️ Reception Desk", "📊 Accounting & Balance Sheet"]
+elif st.session_state.role == "Accounting":
+    menus = ["📊 Accounting & Balance Sheet"]
+elif st.session_state.role == "Reception":
+    menus = ["🖥️ Reception Desk"]
 
-if current_role == "Boss":
-    menus = ["👑 Boss Command Center", "👩‍💻 Reception Terminal", "📊 Financial & Payroll Ledger", "⚙️ System Customizer"]
-elif current_role == "Reception & Accounting":
-    menus = ["👩‍💻 Reception Terminal", "📊 Financial & Payroll Ledger"]
-elif current_role == "Accounting":
-    menus = ["📊 Financial & Payroll Ledger"]
-elif current_role == "Reception":
-    menus = ["👩‍💻 Reception Terminal"]
-elif current_role == "Doctor":
-    menus = ["🩺 Clinic Schedule Logs"]
-
-selected_menu = st.sidebar.radio("Navigation Matrix", menus)
+selected_menu = st.sidebar.radio("Navigate Apps:", menus)
 
 # ----------------------------------------------------
-# MODULE A: RECEPTION TERMINAL (Discounts & Deletions)
+# MODULE A: RECEPTION DESK WITH PRINT RECEIPTS
 # ----------------------------------------------------
-if selected_menu == "👩‍💻 Reception Terminal":
-    st.title("🌿 Patient Intake & Management Console")
+if selected_menu == "🖥️ Reception Desk":
+    st.title("🖥️ Smart Front Desk Terminal")
     
-    rt_tab1, rt_tab2, rt_tab3 = st.tabs(["📝 Patient Check-In / Session Logging", "👥 Registered Database & File Purging", "🆕 Add New Patient Profile"])
+    rt_1, rt_2, rt_3 = st.tabs(["⚡ Log Session & Receipt", "👥 Patient Directory", "➕ Add New Patient Profile"])
     
-    with rt_tab3:
-        st.subheader("Onboard New Patient Record")
-        p_name = st.text_input("Patient Full Legal Name")
-        p_phone = st.text_input("Primary Contact Phone Line")
-        if st.button("Commit Patient File"):
-            if p_name.strip():
-                if execute_write("INSERT INTO patients (name, phone) VALUES (?, ?)", (p_name.strip(), p_phone.strip())):
-                    st.success(f"Success: Active file created for {p_name}.")
-                else:
-                    st.error("Validation Error: This identity profile is already in use.")
+    with rt_3:
+        st.subheader("Create a Fresh Patient Profile")
+        p_name = st.text_input("Patient Full Name")
+        p_phone = st.text_input("Phone Number")
+        if st.button("Save Profile"):
+            if p_name.strip() and execute_write("INSERT INTO patients (name, phone) VALUES (?, ?)", (p_name.strip(), p_phone.strip())):
+                st.success(f"Success: Active file created for {p_name}.")
             else:
-                st.error("Process Failed: Name cannot be blank.")
+                st.error("Missing fields or file already exists.")
 
-    with rt_tab2:
-        st.subheader("Active Clinic Directory")
-        st.caption("Review active records or permanently purge selected profiles.")
-        
+    with rt_2:
+        st.subheader("Manage Current Clinic Roster")
         all_p = fetch_all("SELECT * FROM patients ORDER BY name ASC")
-        if not all_p:
-            st.info("Directory currently empty.")
-        else:
-            p_df = pd.DataFrame([dict(x) for x in all_p])
-            st.dataframe(p_df, use_container_width=True)
-            
+        if all_p:
+            st.dataframe(pd.DataFrame([dict(x) for x in all_p]), use_container_width=True)
             st.markdown("---")
-            st.markdown("#### 🚨 Dangerous Actions: Purge Records")
-            del_target = st.selectbox("Select Patient Profile to PERMANENTLY Delete", [""] + list(p_df["name"].values))
-            if st.button("Execute Complete Profile Purge", type="primary"):
+            del_target = st.selectbox("Permanently Delete Patient Profile", [""] + [x["name"] for x in all_p])
+            if st.button("Execute Profile Deletion", type="primary"):
                 if del_target:
                     execute_write("DELETE FROM patients WHERE name = ?", (del_target,))
-                    st.success(f"Medical file belonging to '{del_target}' has been deleted from the registry.")
+                    st.success(f"Profile '{del_target}' has been removed.")
                     st.rerun()
-                else:
-                    st.warning("Please choose a target to remove.")
+        else:
+            st.info("No records loaded yet.")
 
-    with rt_tab1:
-        st.subheader("Process Current Checkout Session")
+    with rt_1:
+        st.subheader("Quick Patient Checkout Session")
         
         patients_db = fetch_all("SELECT id, name FROM patients")
-        docs_db = fetch_all("SELECT id, name, comm_type, fixed_rate FROM doctors")
+        docs_db = fetch_all("SELECT id, name FROM doctors")
         services_db = fetch_all("SELECT id, name, price FROM services")
         
         if not docs_db or not services_db:
-            st.error("Infrastructure Error: The Boss must populate Doctors and Services configuration models first.")
+            st.warning("Action Required: Please go to settings and add your Doctors and Services first.")
         else:
             p_map = {p["name"]: p["id"] for p in patients_db}
-            d_map = {f"{d['name']} ({d['comm_type'].upper()})": d["id"] for d in docs_db}
-            s_map = {f"{s['name']} (${s['price']})": (s["id"], s["price"]) for s in services_db}
+            d_map = {d["name"]: d["id"] for d in docs_db}
+            s_map = {f"{s['name']} (${s['price']})": (s["id"], s["price"], s["name"]) for s in services_db}
             
-            target_p = st.selectbox("Lookup Client File Name", [""] + list(p_map.keys()))
+            target_p = st.selectbox("Find Patient File", [""] + list(p_map.keys()))
+            chosen_doc = st.selectbox("Assign Doctor", list(d_map.keys()))
+            chosen_srv = st.selectbox("Select Therapy / Procedure", list(s_map.keys()))
             
-            # --- INTELLIGENT HISTORICAL PATIENT TRACING ENGINE ---
-            if target_p:
-                p_id = p_map[target_p]
-                history = fetch_all("""
-                    SELECT v.visit_date, d.name as doc_name, s.name as srv_name, v.net_paid 
-                    FROM visits v JOIN doctors d ON v.doctor_id = d.id JOIN services s ON v.service_id = s.id
-                    WHERE v.patient_id = ? ORDER BY v.id DESC LIMIT 1
-                """, (p_id,))
+            st.markdown("⚙️ **Instant Price Adjustments / Discounts**")
+            disc_type = st.radio("Discount Type", ["None", "Flat Rate Cash ($)", "Percentage (%)"], horizontal=True)
+            disc_val = st.number_input("Value to Deduct", min_value=0.0, step=1.0)
+            
+            srv_id, base_price, srv_name = s_map[chosen_srv]
+            
+            final_due = base_price
+            if disc_type == "Flat Rate Cash ($)":
+                final_due = max(0.0, base_price - disc_val)
+            elif disc_type == "Percentage (%)":
+                final_due = max(0.0, base_price - (base_price * (disc_val / 100.0)))
                 
-                if history:
-                    st.markdown(f"""
-                        <div class="luxury-card">
-                            <h4>📜 Smart Historical Trace Found</h4>
-                            <p><b>Last Session Date:</b> {history[0]['visit_date']}<br>
-                            <b>Allocated Treatment:</b> {history[0]['srv_name']} by <b>{history[0]['doc_name']}</b><br>
-                            <b>Amount Contributed:</b> ${history[0]['net_paid']:,.2f}</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.warning("✨ Fresh File: This patient has no previously registered visits.")
+            st.markdown(f"### Total Invoice Due: **${final_due:,.2f}**")
             
-            st.markdown("---")
-            chosen_doc = st.selectbox("Assign Practitioner On-Duty", list(d_map.keys()))
-            chosen_srv = st.selectbox("Assigned Medical Service / Procedure", list(s_map.keys()))
-            custom_date = st.date_input("Transaction Log Date", datetime.now())
-            
-            # --- FULL VALUE DISCOUNT IMPLEMENTATION SCHEME ---
-            st.markdown("#### 🎫 Value Modification / Adjustments")
-            disc_type = st.radio("Discount Application Framework", ["None", "Flat Rate Cash Deductible ($)", "Percentage Based (%)"])
-            disc_val = st.number_input("Discount Value", min_value=0.0, step=1.0)
-            
-            srv_id, base_retail_price = s_map[chosen_srv]
-            
-            # Compute Final Price Deductions
-            final_due = base_retail_price
-            deducted = 0.0
-            if disc_type == "Flat Rate Cash Deductible ($)":
-                deducted = disc_val
-                final_due = max(0.0, base_retail_price - disc_val)
-            elif disc_type == "Percentage Based (%)":
-                deducted = base_retail_price * (disc_val / 100.0)
-                final_due = max(0.0, base_retail_price - deducted)
-                
-            st.markdown(f"### Total Adjusted Invoice: <span style='color:#D4AF37;'>${final_due:,.2f}</span> <small>(Saved ${deducted:,.2f})</small>", unsafe_allow_html=True)
-            
-            if st.button("Authorize Session Payment & Close Log", use_container_width=True):
+            if st.button("Log Checkout & Show Invoice", use_container_width=True):
                 if not target_p:
-                    st.error("Validation Error: Session cannot be logged without selecting an active patient profile.")
+                    st.error("You must choose a patient profile first.")
                 else:
+                    deducted = base_price - final_due
                     execute_write("""
                         INSERT INTO visits (patient_id, doctor_id, service_id, visit_date, base_price, discount_amount, net_paid)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (p_map[target_p], d_map[chosen_doc], srv_id, str(custom_date), base_retail_price, deducted, final_due))
-                    st.success("Transaction written to blockchain storage channel. Allocation successful.")
-                    st.balloons()
+                    """, (p_map[target_p], d_map[chosen_doc], srv_id, str(datetime.now().strftime("%Y-%m-%d")), base_price, deducted, final_due))
+                    
+                    st.success("Session saved to ledger database!")
+                    
+                    # Store variables for live receipt printing block
+                    st.session_state.receipt_ready = True
+                    st.session_state.rcpt_patient = target_p
+                    st.session_state.rcpt_doc = chosen_doc
+                    st.session_state.rcpt_srv = srv_name
+                    st.session_state.rcpt_base = base_price
+                    st.session_state.rcpt_disc = deducted
+                    st.session_state.rcpt_net = final_due
+
+            # --- RECEIPT GENERATION WINDOW ---
+            if "receipt_ready" in st.session_state and st.session_state.receipt_ready:
+                st.markdown("---")
+                st.markdown("### 🖨️ Live Invoice Receipt Print Preview")
+                
+                # HTML structured layout clean receipt box
+                receipt_html = f"""
+                <div id="print-area" style="background:#FFF; color:#000; padding:20px; border:2px dashed #0B291B; border-radius:8px; font-family:monospace; max-width:400px; margin:0 auto;">
+                    <h2 style="text-align:center; margin:0; color:#0B291B;">🌿 GARDEN CLINIC</h2>
+                    <p style="text-align:center; margin:2px 0; font-size:12px;">Operational Invoice Receipt</p>
+                    <p style="text-align:center; margin:0; font-size:11px;">Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+                    <hr style="border-top:1px dashed #000;">
+                    <p><b>Patient:</b> {st.session_state.rcpt_patient}</p>
+                    <p><b>Attending Specialist:</b> {st.session_state.rcpt_doc}</p>
+                    <p><b>Treatment SKU:</b> {st.session_state.rcpt_srv}</p>
+                    <hr style="border-top:1px dashed #000;">
+                    <p>Standard Retail Rate: <span style="float:right;">${st.session_state.rcpt_base:,.2f}</span></p>
+                    <p style="color:red;">Discounts Subtracted: <span style="float:right;">-${st.session_state.rcpt_disc:,.2f}</span></p>
+                    <h3 style="margin:5px 0 0 0;">TOTAL DUE: <span style="float:right;">${st.session_state.rcpt_net:,.2f}</span></h3>
+                    <hr style="border-top:1px dashed #000;">
+                    <p style="text-align:center; font-size:12px; margin:0;">Thank you for choosing Garden Clinic!</p>
+                </div>
+                """
+                st.markdown(receipt_html, unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                # Triggers browser print window directly
+                st.button("Click to Print Receipt 🖨️", on_click=lambda: st.markdown("<script>window.print();</script>", unsafe_allow_html=True), use_container_width=True)
 
 # ----------------------------------------------------
-# MODULE B: FINANCIAL & PAYROLL LEDGER
+# MODULE B: UNDERSTANDABLE ACCOUNTING LAYOUT
 # ----------------------------------------------------
-elif selected_menu == "📊 Financial & Payroll Ledger":
-    st.title("⚖️ General Ledger & Asset Balance Sheet")
+elif selected_menu == "📊 Accounting & Balance Sheet":
+    st.title("📊 Clear Financial Health Dashboard")
+    st.caption("Simplified cash tracking framework showing exact money paths.")
     
-    # Financial Aggregations
+    # Financial data loaders
     gross_in_row = fetch_all("SELECT SUM(net_paid) as total FROM visits")
     gross_income = gross_in_row[0]["total"] if gross_in_row and gross_in_row[0]["total"] else 0.0
     
     expenses_row = fetch_all("SELECT SUM(amount) as total FROM expenses")
     base_expenses = expenses_row[0]["total"] if expenses_row and expenses_row[0]["total"] else 0.0
     
-    # Calculate Staff Payroll Burden Automatically
     staff_salary_row = fetch_all("SELECT SUM(salary) as total FROM employees")
     payroll_burden = staff_salary_row[0]["total"] if staff_salary_row and staff_salary_row[0]["total"] else 0.0
     
-    # Calculate Dynamic Commissions Total Burden
-    all_visits_raw = fetch_all("""
-        SELECT d.name, d.comm_type, d.fixed_rate, v.net_paid
-        FROM visits v JOIN doctors d ON v.doctor_id = d.id
-    """)
+    # Calculate Total Commission burden
+    all_visits_raw = fetch_all("SELECT d.name, d.comm_type, d.fixed_rate, v.net_paid FROM visits v JOIN doctors d ON v.doctor_id = d.id")
     doc_payroll_totals = {}
     total_commission_burden = 0.0
-    
-    # Group totals first for tiered math
     for vr in all_visits_raw:
         doc_payroll_totals[vr["name"]] = doc_payroll_totals.get(vr["name"], []) + [vr["net_paid"]]
         
     all_docs_configs = fetch_all("SELECT name, comm_type, fixed_rate FROM doctors")
     for dc in all_docs_configs:
         v_list = doc_payroll_totals.get(dc["name"], [])
-        count = len(v_list)
-        total_rev = sum(v_list)
-        
         if dc["comm_type"] == "fixed":
-            total_commission_burden += total_rev * (dc["fixed_rate"] / 100.0)
-        else: # tiered system logic
-            if count >= 20: total_commission_burden += total_rev * 0.05
-            elif count >= 10: total_commission_burden += total_rev * 0.03
+            total_commission_burden += sum(v_list) * (dc["fixed_rate"] / 100.0)
+        else:
+            if len(v_list) >= 20: total_commission_burden += sum(v_list) * 0.05
+            elif len(v_list) >= 10: total_commission_burden += sum(v_list) * 0.03
 
     total_outflows = base_expenses + payroll_burden + total_commission_burden
-    net_surplus = gross_income - total_outflows
+    net_profit = gross_income - total_outflows
     
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Gross Revenue", f"${gross_income:,.2f}")
-    col2.metric("Operating Expenses", f"${base_expenses:,.2f}")
-    col3.metric("Staff Payroll Outflow", f"${(payroll_burden + total_commission_burden):,.2f}")
-    col4.metric("Net Operational Profit", f"${net_surplus:,.2f}")
-    
+    # Side-by-Side Easy Metrics Columns
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown('<div class="feature-card">', unsafe_allow_html=True)
+        st.metric("🟢 Total Cash Inflows", f"${gross_income:,.2f}")
+        st.caption("Gross revenue collected from front desk treatment entries.")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown('<div class="feature-card">', unsafe_allow_html=True)
+        st.metric("🔴 Total Cash Outflows", f"${total_outflows:,.2f}")
+        st.caption("Operating costs + Staff wages + Commission payouts.")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with c3:
+        st.markdown('<div class="feature-card">', unsafe_allow_html=True)
+        st.metric("💰 Final Net Profit Margin", f"${net_profit:,.2f}")
+        st.caption("Net remaining capital after clear bills deductions.")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
     st.markdown("---")
     
-    fl_tab1, fl_tab2 = st.tabs(["💸 Log Operating Expense Outflows", "📋 Operational Ledger Data Rows"])
+    acc_col1, acc_col2 = st.columns(2)
     
-    with fl_tab1:
-        st.subheader("Log General Capital Outflow")
-        with st.form("exp_form_lux"):
-            e_desc = st.text_input("Expense Categorization / Description (e.g. Utility Grid, Premium Oils)")
-            e_amt = st.number_input("Disbursal Total ($)", min_value=0.0, step=10.0)
-            e_date = st.date_input("Disbursal Entry Timestamp", datetime.now())
-            if st.form_submit_button("Record Financial Liability"):
+    with acc_col1:
+        st.subheader("📥 Incoming Revenue Records")
+        visit_logs = fetch_all("SELECT v.visit_date as Date, p.name as Patient, v.net_paid as Collected FROM visits v JOIN patients p ON v.patient_id = p.id ORDER BY v.id DESC")
+        if visit_logs:
+            st.dataframe(pd.DataFrame([dict(vl) for vl in visit_logs]), use_container_width=True)
+        else:
+            st.info("No dynamic income logged yet.")
+            
+    with acc_col2:
+        st.subheader("📤 Log New Operational Expense Outflow")
+        with st.form("exp_form"):
+            e_desc = st.text_input("Expense Title (e.g. Clinic Rent, Utility Grid, Inventory)")
+            e_amt = st.number_input("Amount Disbursed ($)", min_value=0.0, step=50.0)
+            if st.form_submit_button("Record Bill Outflow"):
                 if e_desc and e_amt > 0:
-                    execute_write("INSERT INTO expenses (description, amount, date) VALUES (?, ?, ?)", (e_desc, e_amt, str(e_date)))
-                    st.success("Expense liability updated. Analytics updated.")
+                    execute_write("INSERT INTO expenses (description, amount, date) VALUES (?, ?, ?)", (e_desc, e_amt, str(datetime.now().strftime("%Y-%m-%d"))))
+                    st.success("Outflow item added.")
                     st.rerun()
-    with fl_tab2:
-        st.subheader("Historical Corporate Expense Flows")
-        logs = fetch_all("SELECT date, description, amount FROM expenses ORDER BY id DESC")
-        if logs:
-            st.dataframe(pd.DataFrame([dict(l) for l in logs]), use_container_width=True)
 
 # ----------------------------------------------------
-# MODULE C: CROWN EXECUTIVE BOARD (THE BOSS PLATFORM)
+# MODULE C: CROWN EXECUTIVE DASHBOARD (THE BOSS)
 # ----------------------------------------------------
-elif selected_menu == "👑 Boss Command Center":
-    st.title("👑 Garden Clinic Corporate Command Center")
-    st.caption("Live high-resolution visibility into clinical performance, operational payroll vectors, and customized doctor payouts.")
+elif selected_menu == "📈 Boss Command Center":
+    st.title("👑 High Level Management Hub")
     
-    # Load and process performance grids
-    all_v = fetch_all("""
-        SELECT d.name as doctor, d.comm_type, d.fixed_rate, v.net_paid as rev
-        FROM visits v JOIN doctors d ON v.doctor_id = d.id
-    """)
-    
-    st.markdown("### 🩺 Practitioner Yield & Commission Ledger Matrices")
+    st.markdown("### 🩺 Doctors Commissions & Custom Yields Matrix")
+    all_v = fetch_all("SELECT d.name as doctor, d.comm_type, d.fixed_rate, v.net_paid as rev FROM visits v JOIN doctors d ON v.doctor_id = d.id")
     
     doc_struct = {}
     for row in all_v:
         doc_struct[row["doctor"]] = doc_struct.get(row["doctor"], []) + [row["rev"]]
         
     doc_configs = fetch_all("SELECT name, comm_type, fixed_rate FROM doctors")
-    payout_reporting_engine = []
+    payout_table = []
     
     for d_conf in doc_configs:
         name = d_conf["name"]
@@ -504,82 +438,68 @@ elif selected_menu == "👑 Boss Command Center":
             payout_cash = gross_gen * (frate / 100.0)
         else:
             if volume >= 20:
-                applied_strategy = "Tiered Matrix (5% High Volume)"
+                applied_strategy = "Tiered System (5%)"
                 payout_cash = gross_gen * 0.05
             elif volume >= 10:
-                applied_strategy = "Tiered Matrix (3% Mid Volume)"
+                applied_strategy = "Tiered System (3%)"
                 payout_cash = gross_gen * 0.03
             else:
-                applied_strategy = "Tiered Matrix (0% Base Volume)"
+                applied_strategy = "Tiered System (0% Base)"
                 payout_cash = 0.0
                 
-        payout_reporting_engine.append({
-            "Medical Specialist": name,
-            "Operating Compensation Model": applied_strategy,
-            "Patient Case Volume": volume,
-            "Gross Intake Revenue Generated": f"${gross_gen:,.2f}",
-            "Calculated Payroll Payout": f"${payout_cash:,.2f}"
+        payout_table.append({
+            "Specialist": name,
+            "Pay Strategy Assigned": applied_strategy,
+            "Visits Run": volume,
+            "Total Inflow Generated": f"${gross_gen:,.2f}",
+            "Payroll Due Out": f"${payout_cash:,.2f}"
         })
-        
-    st.dataframe(pd.DataFrame(payout_reporting_engine), use_container_width=True)
+    st.dataframe(pd.DataFrame(payout_table), use_container_width=True)
     
     st.markdown("---")
-    st.markdown("### 👥 Operational Clinic General Employee Payroll")
+    st.markdown("### 👥 Operational Salaried Employees Payroll List")
     staff_db = fetch_all("SELECT name, role, salary FROM employees ORDER BY salary DESC")
     if staff_db:
         st.dataframe(pd.DataFrame([dict(stf) for stf in staff_db]), use_container_width=True)
     else:
-        st.info("No standard employees logged in payroll infrastructure database pipelines.")
+        st.info("No salaried staff configured. Use the settings page to add basic employees.")
 
 # ----------------------------------------------------
-# MODULE D: CONFIGURATION CONTROL PLATFORM
+# MODULE D: SYSTEM MANAGEMENT SETTINGS
 # ----------------------------------------------------
-elif selected_menu == "⚙️ System Customizer":
-    st.title("⚙️ Global Clinic Parameter Customization Suite")
+elif selected_menu == "⚙️ Clinic Global Settings":
+    st.title("⚙️ Global Setup Console")
     
-    sc_tab1, sc_tab2, sc_tab3 = st.tabs(["👨‍⚕️ Provision Specialist Medical Staff", "👥 Onboard Standard Salaried Employees", "💆‍♂️ Deploy Luxury Therapy Formulations"])
+    set1, set2, set3 = st.tabs(["👨‍⚕️ Setup Doctors", "👥 Setup General Staff Salaries", "💆‍♂️ Setup Clinic Service Items"])
     
-    with sc_tab1:
-        st.subheader("Configure New Medical Specialist Parameters")
-        d_name = st.text_input("Practitioner Full Identity Title (e.g. Dr. Eveline)")
-        
-        # Fully customizable compensation choice architecture
-        c_mode = st.selectbox("Compensation Strategy Model", ["Tiered Performance Metrics (3% at 10, 5% at 20)", "Custom Fixed Fee Percentage System"])
+    with set1:
+        st.subheader("Configure Doctor Profile & Payout Logic")
+        d_name = st.text_input("Doctor Name")
+        c_mode = st.selectbox("Select Pay Rate Structure", ["Standard Tiered Metric (3%/5%)", "Custom Fixed Take-Home Percentage"])
         
         f_percentage = 0.0
         db_comm_type = "tiered"
-        if c_mode == "Custom Fixed Fee Percentage System":
+        if c_mode == "Custom Fixed Take-Home Percentage":
             db_comm_type = "fixed"
-            f_percentage = st.number_input("Custom Target Percentage Per Session Take (%)", min_value=0.0, max_value=100.0, value=50.0, step=5.0)
+            f_percentage = st.number_input("Custom Target Take-Home Percentage (%)", min_value=0.0, max_value=100.0, value=50.0)
             
-        if st.button("Deploy Specialist Parameters to Base Engine"):
-            if d_name.strip():
-                if execute_write("INSERT INTO doctors (name, comm_type, fixed_rate) VALUES (?, ?, ?)", (d_name.strip(), db_comm_type, f_percentage)):
-                    st.success(f"Parameters mapped. Specialist '{d_name}' activated on network.")
-                else:
-                    st.error("Operation Denied: Identity conflicts exist in database.")
-                    
-    with sc_tab2:
-        st.subheader("Onboard Standard Operational Staff & Base Wages")
+        if st.button("Onboard Doctor Into Engine"):
+            if d_name.strip() and execute_write("INSERT INTO doctors (name, comm_type, fixed_rate) VALUES (?, ?, ?)", (d_name.strip(), db_comm_type, f_percentage)):
+                st.success(f"Doctor '{d_name}' activated perfectly on profile logs.")
+                
+    with set2:
+        st.subheader("Add Salaried Employee Details")
         emp_name = st.text_input("Employee Legal Name")
-        emp_role = st.text_input("Operational Title (e.g. Clinical Nurse Coordinator, Executive Security)")
-        emp_salary = st.number_input("Agreed Fixed Monthly Base Salary ($)", min_value=0.0, step=100.0)
-        
-        if st.button("Commit Salary Framework File"):
-            if emp_name and emp_role:
-                if execute_write("INSERT INTO employees (name, role, salary) VALUES (?, ?, ?)", (emp_name.strip(), emp_role.strip(), emp_salary)):
-                    st.success(f"Salary framework compiled and initialized for {emp_name}.")
-                else:
-                    st.error("Error: Employee records indicate entry match duplicate.")
+        emp_role = st.text_input("Operational Title Role (e.g. Receptionist, Nurse Analyst)")
+        emp_salary = st.number_input("Fixed Base Monthly Wage ($)", min_value=0.0, step=100.0)
+        if st.button("Save Employee Profile"):
+            if emp_name and emp_role and execute_write("INSERT INTO employees (name, role, salary) VALUES (?, ?, ?)", (emp_name.strip(), emp_role.strip(), emp_salary)):
+                st.success(f"Salary metrics structured for {emp_name}.")
 
-    with sc_tab3:
-        st.subheader("Publish Treatment Matrix Item Line")
-        s_name = st.text_input("Therapeutic Label (e.g. Cryotherapy Decompression)")
-        s_price = st.number_input("Retail Valuation Frame Price ($)", min_value=0.0, step=10.0)
-        
-        if st.button("Publish Service Line to Front Desk"):
-            if s_name.strip():
-                if execute_write("INSERT INTO services (name, price) VALUES (?, ?)", (s_name.strip(), s_price)):
-                    st.success(f"Service SKU launched: '{s_name}' indexed at ${s_price:,.2f}.")
-                else:
-                    st.error("Operation Aborted: Item naming collisions exist.")
+    with set3:
+        st.subheader("Add Treatment Service Offerings")
+        s_name = st.text_input("Treatment Action Label")
+        s_price = st.number_input("Retail Price Tag ($)", min_value=0.0, step=10.0)
+        if st.button("Publish Service Offering"):
+            if s_name.strip() and execute_write("INSERT INTO services (name, price) VALUES (?, ?)", (s_name.strip(), s_price)):
+                st.success(f"Service Item '{s_name}' indexed successfully at ${s_price:,.2f}.")
