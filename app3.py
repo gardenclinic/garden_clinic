@@ -151,12 +151,18 @@ if not st.session_state.logged_in:
                     st.error("Invalid credentials. Please try again.")
         
         with tab2:
-            st.warning("Admin Note: In a live system, registration should be locked. Left open for setup.")
+            st.info("Registration is locked. You must have the Admin Code to create a user.")
             reg_user = st.text_input("New Username")
             reg_pass = st.text_input("New Password", type="password")
             reg_role = st.selectbox("Assign Role", ["Boss", "Accounting", "Reception", "Doctor"])
+            
+            # --- THE NEW ADMIN CODE EDIT ---
+            admin_code = st.text_input("Admin Registration Code", type="password")
+            
             if st.button("Register Account", use_container_width=True):
-                if reg_user and reg_pass:
+                if admin_code != "1011":
+                    st.error("❌ Invalid Admin Code. Registration denied.")
+                elif reg_user and reg_pass:
                     if execute_write("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", (reg_user.strip(), hash_password(reg_pass), reg_role)):
                         st.success("Account created successfully! You can now log in.")
                     else:
