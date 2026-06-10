@@ -914,7 +914,7 @@ elif selected == "📊  Accounting":
     ae1, ae2 = st.columns([3, 2])
     with ae1:
         section_label("Expense log")
-        filter_cat = st.selectbox("Filter by category", ["All", "General", "Payroll", "Supplies", "Utilities", "Rent", "Equipment", "Marketing", "Other"])
+        filter_cat = st.selectbox("Filter by category", ["All", "General", "Payroll", "Supplies", "Utilities", "Rent", "Equipment", "Marketing", "Subscription", "Other"], key="acc_filter_cat")
         if filter_cat == "All":
             exp_list = fetch_all("SELECT id, date as Date, category as Category, description as Description, amount as Amount FROM expenses ORDER BY id DESC")
         else:
@@ -947,8 +947,8 @@ elif selected == "📊  Accounting":
         del_exp_list = fetch_all("SELECT id, date, description, amount FROM expenses ORDER BY id DESC LIMIT 100")
         if del_exp_list:
             del_exp_options = {f"#{r['id']} · {r['date']} · {r['description']} · ${r['amount']:.2f}": r["id"] for r in del_exp_list}
-            chosen_del_exp = st.selectbox("Select expense to delete", ["— select —"] + list(del_exp_options.keys()))
-            if st.button("Delete Expense", type="primary"):
+            chosen_del_exp = st.selectbox("Select expense to delete", ["— select —"] + list(del_exp_options.keys()), key="del_exp_select")
+            if st.button("Delete Expense", type="primary", key="btn_del_expense"):
                 if chosen_del_exp != "— select —":
                     exp_id = del_exp_options[chosen_del_exp]
                     execute_write("DELETE FROM expenses WHERE id = ?", (exp_id,))
@@ -1153,12 +1153,12 @@ elif selected == "⚙️  Settings":
         st.info("💡 Add anyone who promotes the clinic — influencers, video creators, partners. When a patient comes via them, select their name at checkout. Commission is calculated monthly in Accounting.")
         col1, col2 = st.columns(2)
         with col1:
-            ref_name = st.text_input("Full name")
-            ref_phone = st.text_input("Phone / contact")
+            ref_name = st.text_input("Referrer full name", key="ref_name_input")
+            ref_phone = st.text_input("Phone / contact", key="ref_phone_input")
         with col2:
-            ref_rate = st.number_input("Commission rate (%)", min_value=0.0, max_value=100.0, step=1.0, value=10.0)
-            ref_notes = st.text_area("Notes (platform, content type, etc.)", height=80)
-        if st.button("Add Referrer"):
+            ref_rate = st.number_input("Commission rate (%)", min_value=0.0, max_value=100.0, step=1.0, value=10.0, key="ref_rate_input")
+            ref_notes = st.text_area("Notes (platform, content type, etc.)", height=80, key="ref_notes_input")
+        if st.button("Add Referrer", key="btn_add_referrer"):
             if ref_name.strip():
                 if execute_write("INSERT INTO referrers (name, phone, commission_rate, notes, added_by, created_at) VALUES (?,?,?,?,?,?)",
                                  (ref_name.strip(), ref_phone.strip(), ref_rate, ref_notes.strip(), username, today_str)):
@@ -1175,8 +1175,8 @@ elif selected == "⚙️  Settings":
         all_refs = fetch_all("SELECT * FROM referrers ORDER BY name")
         if all_refs:
             st.dataframe(pd.DataFrame([dict(r) for r in all_refs]), use_container_width=True, hide_index=True)
-            del_ref = st.selectbox("Remove referrer", ["— select —"] + [r["name"] for r in all_refs])
-            if st.button("Remove Referrer", type="primary"):
+            del_ref = st.selectbox("Remove referrer", ["— select —"] + [r["name"] for r in all_refs], key="del_ref_select")
+            if st.button("Remove Referrer", type="primary", key="btn_del_referrer"):
                 if del_ref != "— select —":
                     execute_write("DELETE FROM referrers WHERE name = ?", (del_ref,))
                     log_action(username, "Remove Referrer", del_ref)
@@ -1191,15 +1191,15 @@ elif selected == "⚙️  Settings":
         st.info("💡 Add recurring monthly costs (software licenses, platform fees, etc.). They are automatically recorded as an expense each month.")
         col1, col2, col3 = st.columns(3)
         with col1:
-            sub_name = st.text_input("Subscription name (e.g. Instagram Ads, Clinic Software)")
-            sub_cat = st.selectbox("Category", ["Subscription", "Marketing", "Software", "Utilities", "Other"])
+            sub_name = st.text_input("Subscription name (e.g. Instagram Ads, Clinic Software)", key="sub_name_input")
+            sub_cat = st.selectbox("Category", ["Subscription", "Marketing", "Software", "Utilities", "Other"], key="sub_cat_select")
         with col2:
-            sub_amount = st.number_input("Monthly amount ($)", min_value=0.0, step=5.0)
-            sub_day = st.number_input("Billing day of month", min_value=1, max_value=28, step=1, value=1)
+            sub_amount = st.number_input("Monthly amount ($)", min_value=0.0, step=5.0, key="sub_amount_input")
+            sub_day = st.number_input("Billing day of month", min_value=1, max_value=28, step=1, value=1, key="sub_day_input")
         with col3:
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("Subscriptions auto-post as expenses on the billing day each month.")
-        if st.button("Add Subscription"):
+        if st.button("Add Subscription", key="btn_add_subscription"):
             if sub_name.strip() and sub_amount > 0:
                 if execute_write("INSERT INTO subscriptions (name, amount, billing_day, category, active, added_by, created_at) VALUES (?,?,?,?,1,?,?)",
                                  (sub_name.strip(), sub_amount, int(sub_day), sub_cat, username, today_str)):
@@ -1220,17 +1220,17 @@ elif selected == "⚙️  Settings":
             st.markdown(f"**Total active monthly subscriptions: ${total_monthly:,.2f}/month**")
             col1, col2 = st.columns(2)
             with col1:
-                toggle_sub = st.selectbox("Pause / activate subscription", ["— select —"] + [s["name"] for s in all_subs])
-                if st.button("Toggle Active/Paused"):
+                toggle_sub = st.selectbox("Pause / activate subscription", ["— select —"] + [s["name"] for s in all_subs], key="toggle_sub_select")
+                if st.button("Toggle Active/Paused", key="btn_toggle_sub"):
                     if toggle_sub != "— select —":
-                        current = next((s["active"] for s in all_subs if s["name"] == toggle_sub), 1)
-                        execute_write("UPDATE subscriptions SET active = ? WHERE name = ?", (0 if current else 1, toggle_sub))
-                        log_action(username, "Toggle Subscription", f"{toggle_sub} → {'Paused' if current else 'Active'}")
-                        st.success(f"'{toggle_sub}' is now {'paused' if current else 'active'}.")
+                        current_active = next((s["active"] for s in all_subs if s["name"] == toggle_sub), 1)
+                        execute_write("UPDATE subscriptions SET active = ? WHERE name = ?", (0 if current_active else 1, toggle_sub))
+                        log_action(username, "Toggle Subscription", f"{toggle_sub} → {'Paused' if current_active else 'Active'}")
+                        st.success(f"'{toggle_sub}' is now {'paused' if current_active else 'active'}.")
                         st.rerun()
             with col2:
-                del_sub = st.selectbox("Remove subscription", ["— select —"] + [s["name"] for s in all_subs])
-                if st.button("Remove Subscription", type="primary"):
+                del_sub = st.selectbox("Remove subscription", ["— select —"] + [s["name"] for s in all_subs], key="del_sub_select")
+                if st.button("Remove Subscription", type="primary", key="btn_del_subscription"):
                     if del_sub != "— select —":
                         execute_write("DELETE FROM subscriptions WHERE name = ?", (del_sub,))
                         log_action(username, "Remove Subscription", del_sub)
