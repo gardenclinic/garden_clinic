@@ -3,6 +3,7 @@ import pandas as pd
 import sqlite3
 import hashlib
 from datetime import datetime, date
+import streamlit.components.v1 as components
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG
@@ -340,6 +341,28 @@ def init_db():
 init_db()
 
 # ─────────────────────────────────────────────
+# BELL SOUND HELPER
+# ─────────────────────────────────────────────
+def play_ding():
+    components.html("""
+    <script>
+    try {
+        var context = new (window.AudioContext || window.webkitAudioContext)();
+        var osc = context.createOscillator();
+        var gain = context.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1100, context.currentTime);
+        gain.gain.setValueAtTime(0.2, context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(context.destination);
+        osc.start();
+        osc.stop(context.currentTime + 0.5);
+    } catch(e) { console.log(e); }
+    </script>
+    """, height=0, width=0)
+
+# ─────────────────────────────────────────────
 # AUTO PAYROLL
 # ─────────────────────────────────────────────
 def auto_payroll():
@@ -492,7 +515,9 @@ if not st.session_state.logged_in:
                     st.error("Invalid admin code.")
                 elif ru and rp:
                     if execute_write("INSERT INTO users (username, password_hash, role) VALUES (?,?,?)", (ru.strip(), hash_password(rp), role)):
+                        log_action("System", "Create Account", f"User: {ru.strip()} | Role: {role}")
                         st.success("Account created. Sign in above.")
+                        play_ding()
                     else:
                         st.error("Username already taken.")
     st.stop()
@@ -516,7 +541,7 @@ st.sidebar.markdown(f"""
 """, unsafe_allow_html=True)
 
 menu_map = {
-    "Boss": ["📈  Dashboard", "🖥️  Reception", "📊  Accounting", "📅  Appointments", "⚙️  Settings"],
+    "Boss": ["📈  Dashboard", "🖥️  Reception", "📊  Accounting", "📅  Appointments", "👥  Accounts", "⚙️  Settings"],
     "Reception & Accounting": ["🖥️  Reception", "📊  Accounting", "📅  Appointments"],
     "Accounting": ["📊  Accounting"],
     "Reception": ["🖥️  Reception", "📅  Appointments"],
@@ -535,18 +560,18 @@ if selected == "📈  Dashboard":
     page_header("Executive Dashboard", f"Showing all-time clinic performance · Today is {date.today().strftime('%A, %B %d %Y')}")
     
     pulse_bar([
-        ("Today's Revenue", f"{today_revenue:,.0f} IQD"),
+        ("Today's Revenue", f"${today_revenue:,.0f}"),
         ("Visits Today", str(today_visits)),
         ("Total Patients", str(patient_count)),
-        ("All-Time Revenue", f"{gross_income:,.0f} IQD"),
-        ("Net Profit", f"{net_profit:,.0f} IQD"),
+        ("All-Time Revenue", f"${gross_income:,.0f}"),
+        ("Net Profit", f"${net_profit:,.0f}"),
     ])
 
     col1, col2, col3, col4 = st.columns(4)
-    with col1: st.markdown(card("Gross Revenue", f"{gross_income:,.2f} IQD", "green", "All collected payments"), unsafe_allow_html=True)
-    with col2: st.markdown(card("Total Expenses", f"{total_outflows:,.2f} IQD", "red", "Bills + payroll + commissions"), unsafe_allow_html=True)
-    with col3: st.markdown(card("Net Profit", f"{net_profit:,.2f} IQD", "dark", "Revenue minus all costs"), unsafe_allow_html=True)
-    with col4: st.markdown(card("Doctor Commissions", f"{total_commissions:,.2f} IQD", "dark", "Total owed to doctors"), unsafe_allow_html=True)
+    with col1: st.markdown(card("Gross Revenue", f"${gross_income:,.2f}", "green", "All collected payments"), unsafe_allow_html=True)
+    with col2: st.markdown(card("Total Expenses", f"${total_outflows:,.2f}", "red", "Bills + payroll + commissions"), unsafe_allow_html=True)
+    with col3: st.markdown(card("Net Profit", f"${net_profit:,.2f}", "dark", "Revenue minus all costs"), unsafe_allow_html=True)
+    with col4: st.markdown(card("Doctor Commissions", f"${total_commissions:,.2f}", "dark", "Total owed to doctors"), unsafe_allow_html=True)
 
     st.markdown("---")
     col_a, col_b = st.columns([3, 2])
@@ -577,7 +602,7 @@ if selected == "📈  Dashboard":
                 if vol >= 20: payout = gen * 0.05; model = "Tiered 5%"
                 elif vol >= 10: payout = gen * 0.03; model = "Tiered 3%"
                 else: payout = 0; model = "Tiered 0%"
-            rows.append({"Doctor": d["name"], "Visits": vol, "Revenue": f"{gen:,.0f} IQD", "Commission": f"{payout:,.0f} IQD", "Model": model})
+            rows.append({"Doctor": d["name"], "Visits": vol, "Revenue": f"${gen:,.0f}", "Commission": f"${payout:,.0f}", "Model": model})
         if rows:
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
         else:
@@ -593,7 +618,7 @@ if selected == "📈  Dashboard":
 
     st.markdown("---")
     section_label("Activity audit log — who added what")
-    audit_filter = st.selectbox("Filter by action type", ["All", "New Visit", "Add Expense", "Delete Expense", "Add Referrer", "Remove Referrer", "Add Subscription", "Remove Subscription", "Toggle Subscription", "Referral Commission Paid"], key="audit_filter")
+    audit_filter = st.selectbox("Filter by action type", ["All", "New Visit", "New Patient", "Remove Patient", "Add Expense", "Delete Expense", "Add Referrer", "Remove Referrer", "Add Subscription", "Remove Subscription", "Toggle Subscription", "Referral Commission Paid"], key="audit_filter")
     if audit_filter == "All":
         audit_rows = fetch_all("SELECT timestamp as Time, username as User, action as Action, details as Details FROM audit_log ORDER BY id DESC LIMIT 200")
     else:
@@ -608,7 +633,7 @@ if selected == "📈  Dashboard":
 # ─────────────────────────────────────────────
 elif selected == "🖥️  Reception":
     page_header("Reception Desk", "Patient checkout, records, and visit history.")
-    pulse_bar([("Today's Revenue", f"{today_revenue:,.0f} IQD"), ("Visits Today", str(today_visits)), ("Total Patients", str(patient_count))])
+    pulse_bar([("Today's Revenue", f"${today_revenue:,.0f}"), ("Visits Today", str(today_visits)), ("Total Patients", str(patient_count))])
 
     t1, t2, t3, t4, t5 = st.tabs(["Checkout", "Patient Records", "Add Patient", "Visit History", "Delete Visit"])
 
@@ -639,24 +664,24 @@ elif selected == "🖥️  Reception":
 
                 if item_type == "Service":
                     if services_db:
-                        s_map = {f"{s['name']}  —  {s['price']:.2f} IQD": (s["id"], s["price"], s["name"]) for s in services_db}
+                        s_map = {f"{s['name']}  —  ${s['price']:.2f}": (s["id"], s["price"], s["name"]) for s in services_db}
                         chosen = st.selectbox("Service", list(s_map.keys()))
                         srv_id, base_price, chosen_item_name = s_map[chosen]
                     else:
                         st.error("No services configured.")
                 else:
                     if bundles_db:
-                        b_map = {f"{b['name']}  —  {b['price']:.2f} IQD": (b["id"], b["price"], b["name"]) for b in bundles_db}
+                        b_map = {f"{b['name']}  —  ${b['price']:.2f}": (b["id"], b["price"], b["name"]) for b in bundles_db}
                         chosen = st.selectbox("Bundle", list(b_map.keys()))
                         bnd_id, base_price, chosen_item_name = b_map[chosen]
                     else:
                         st.error("No bundles configured.")
 
-                disc_type = st.radio("Discount", ["None", "Fixed (IQD)", "Percent (%)"], horizontal=True)
+                disc_type = st.radio("Discount", ["None", "Fixed ($)", "Percent (%)"], horizontal=True)
                 disc_val = st.number_input("Discount value", min_value=0.0, step=1.0)
 
             final_due = base_price
-            if disc_type == "Fixed (IQD)": final_due = max(0.0, base_price - disc_val)
+            if disc_type == "Fixed ($)": final_due = max(0.0, base_price - disc_val)
             elif disc_type == "Percent (%)": final_due = max(0.0, base_price * (1 - disc_val / 100))
 
             visit_notes = st.text_area("Visit notes (optional)", height=70)
@@ -668,7 +693,7 @@ elif selected == "🖥️  Reception":
             # If a referrer name was selected, store it; otherwise store the label
             referred_by_val = how_found if how_found in [r["name"] for r in referrers_db] else None
 
-            st.markdown(f"### Total due: **{final_due:,.2f} IQD**")
+            st.markdown(f"### Total due: **${final_due:,.2f}**")
 
             if st.button("Save & Print Receipt", use_container_width=True):
                 if target_p == "— select —":
@@ -681,8 +706,9 @@ elif selected == "🖥️  Reception":
                         INSERT INTO visits (patient_id, doctor_id, service_id, bundle_id, visit_date, base_price, discount_amount, net_paid, payment_method, notes, referred_by, added_by)
                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                     """, (p_map[target_p], d_map[chosen_doc], srv_id, bnd_id, today_str, base_price, disc_amt, final_due, payment_method, visit_notes, referred_by_val, username))
-                    log_action(username, "New Visit", f"Patient: {target_p} | Doctor: {chosen_doc} | Paid: {final_due:.2f} IQD | Via: {how_found}")
+                    log_action(username, "New Visit", f"Patient: {target_p} | Doctor: {chosen_doc} | Paid: ${final_due:.2f} | Via: {how_found}")
                     st.success("Visit saved.")
+                    play_ding()
                     st.session_state.rcpt = {
                         "patient": target_p, "doctor": chosen_doc, "item": chosen_item_name,
                         "base": base_price, "disc": disc_amt, "net": final_due,
@@ -701,9 +727,9 @@ elif selected == "🖥️  Reception":
                     <div class="receipt-row"><span>Service</span><span>{r['item']}</span></div>
                     <div class="receipt-row"><span>Payment</span><span>{r['method']}</span></div>
                     <hr class="dashed">
-                    <div class="receipt-row"><span>Base price</span><span>{r['base']:,.2f} IQD</span></div>
-                    <div class="receipt-row" style="color:#C0392B;"><span>Discount</span><span>-{r['disc']:,.2f} IQD</span></div>
-                    <div class="receipt-row receipt-total"><span>Total paid</span><span>{r['net']:,.2f} IQD</span></div>
+                    <div class="receipt-row"><span>Base price</span><span>${r['base']:,.2f}</span></div>
+                    <div class="receipt-row" style="color:#C0392B;"><span>Discount</span><span>-${r['disc']:,.2f}</span></div>
+                    <div class="receipt-row receipt-total"><span>Total paid</span><span>${r['net']:,.2f}</span></div>
                     <p class="receipt-footer">Thank you for visiting Garden Clinic</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -723,7 +749,9 @@ elif selected == "🖥️  Reception":
             if st.button("Remove Patient", type="primary"):
                 if del_target != "— select —":
                     execute_write("DELETE FROM patients WHERE name = ?", (del_target,))
+                    log_action(username, "Remove Patient", f"Patient Name: {del_target}")
                     st.success(f"Removed {del_target}.")
+                    play_ding()
                     st.rerun()
         else:
             st.info("No patients found.")
@@ -743,7 +771,9 @@ elif selected == "🖥️  Reception":
             if p_name.strip():
                 if execute_write("INSERT INTO patients (name, phone, date_of_birth, gender, notes, created_at) VALUES (?,?,?,?,?,?)",
                                  (p_name.strip(), p_phone.strip(), p_dob.strip(), p_gender, p_notes.strip(), today_str)):
+                    log_action(username, "New Patient", f"Added patient: {p_name.strip()} | Gender: {p_gender}")
                     st.success(f"Patient '{p_name}' registered.")
+                    play_ding()
                 else:
                     st.error("A patient with that name already exists.")
             else:
@@ -773,7 +803,7 @@ elif selected == "🖥️  Reception":
                     total_spent = sum(r["Paid"] for r in hist)
                     col1, col2 = st.columns(2)
                     col1.metric("Total visits", len(hist))
-                    col2.metric("Total spent", f"{total_spent:,.2f} IQD")
+                    col2.metric("Total spent", f"${total_spent:,.2f}")
                     st.dataframe(pd.DataFrame([dict(r) for r in hist]), use_container_width=True, hide_index=True)
                 else:
                     st.info(f"No visits recorded for {lookup_p}.")
@@ -800,7 +830,9 @@ elif selected == "🖥️  Reception":
             void_id = st.number_input("Visit ID to delete", min_value=1, step=1)
             if st.button("Delete Visit", type="primary"):
                 execute_write("DELETE FROM visits WHERE id = ?", (void_id,))
+                log_action(username, "Delete Visit", f"Voided visit reference ID: #{void_id}")
                 st.success(f"Visit #{void_id} deleted.")
+                play_ding()
                 st.rerun()
         else:
             st.info("No visits recorded yet.")
@@ -833,7 +865,9 @@ elif selected == "📅  Appointments":
             if st.button("Book Appointment"):
                 execute_write("INSERT INTO appointments (patient_id, doctor_id, appt_date, appt_time, reason, status) VALUES (?,?,?,?,?,?)",
                               (p_map[ap_patient], d_map[ap_doctor], str(ap_date), str(ap_time), ap_reason, "Scheduled"))
+                log_action(username, "Book Appointment", f"Scheduled appointment for {ap_patient} with Doc ID: {d_map[ap_doctor]} on {ap_date}")
                 st.success(f"Appointment booked for {ap_patient} on {ap_date} at {ap_time}.")
+                play_ding()
 
     with ta2:
         section_label("Upcoming & recent appointments")
@@ -857,7 +891,9 @@ elif selected == "📅  Appointments":
                 new_status = st.selectbox("New status", ["Scheduled", "Completed", "Cancelled", "No-show"])
             if st.button("Update Status"):
                 execute_write("UPDATE appointments SET status = ? WHERE id = ?", (new_status, upd_id))
+                log_action(username, "Update Appointment", f"Changed Appt ID #{upd_id} layout to {new_status}")
                 st.success(f"Appointment #{upd_id} updated to '{new_status}'.")
+                play_ding()
                 st.rerun()
         else:
             st.info("No appointments booked yet.")
@@ -868,16 +904,16 @@ elif selected == "📅  Appointments":
 elif selected == "📊  Accounting":
     page_header("Accounting", "Revenue, expenses, and financial health.")
     pulse_bar([
-        ("Gross Revenue", f"{gross_income:,.0f} IQD"),
-        ("Total Expenses", f"{total_outflows:,.0f} IQD"),
-        ("Net Profit", f"{net_profit:,.0f} IQD"),
-        ("Doctor Commissions", f"{total_commissions:,.0f} IQD"),
+        ("Gross Revenue", f"${gross_income:,.0f}"),
+        ("Total Expenses", f"${total_outflows:,.0f}"),
+        ("Net Profit", f"${net_profit:,.0f}"),
+        ("Doctor Commissions", f"${total_commissions:,.0f}"),
     ])
 
     col1, col2, col3 = st.columns(3)
-    with col1: st.markdown(card("Gross Revenue", f"{gross_income:,.2f} IQD", "green"), unsafe_allow_html=True)
-    with col2: st.markdown(card("Total Outflows", f"{total_outflows:,.2f} IQD", "red"), unsafe_allow_html=True)
-    with col3: st.markdown(card("Net Profit", f"{net_profit:,.2f} IQD", "dark"), unsafe_allow_html=True)
+    with col1: st.markdown(card("Gross Revenue", f"${gross_income:,.2f}", "green"), unsafe_allow_html=True)
+    with col2: st.markdown(card("Total Outflows", f"${total_outflows:,.2f}", "red"), unsafe_allow_html=True)
+    with col3: st.markdown(card("Net Profit", f"${net_profit:,.2f}", "dark"), unsafe_allow_html=True)
 
     st.markdown("---")
     ac1, ac2 = st.columns(2)
@@ -894,9 +930,9 @@ elif selected == "📊  Accounting":
             other_exp = base_expenses - payroll_in_exp
             df_exp2 = pd.DataFrame({
                 "Category": ["Other Expenses", "Payroll", "Doctor Commissions"],
-                "Amount (IQD)": [other_exp, payroll_in_exp, total_commissions]
+                "Amount ($)": [other_exp, payroll_in_exp, total_commissions]
             }).set_index("Category")
-            st.bar_chart(df_exp2, y="Amount (IQD)", color="#C0392B", height=220)
+            st.bar_chart(df_exp2, y="Amount ($)", color="#C0392B", height=220)
         else:
             st.info("No expense data yet.")
 
@@ -929,13 +965,14 @@ elif selected == "📊  Accounting":
         with st.form("expense_form"):
             e_desc = st.text_input("Description")
             e_cat = st.selectbox("Category", ["General", "Supplies", "Utilities", "Rent", "Equipment", "Marketing", "Other"])
-            e_amt = st.number_input("Amount (IQD)", min_value=0.0, step=10.0)
+            e_amt = st.number_input("Amount ($)", min_value=0.0, step=10.0)
             e_date = st.date_input("Date", value=date.today())
             if st.form_submit_button("Add Expense"):
                 if e_desc and e_amt > 0:
                     execute_write("INSERT INTO expenses (description, category, amount, date, added_by) VALUES (?,?,?,?,?)", (e_desc, e_cat, e_amt, str(e_date), username))
-                    log_action(username, "Add Expense", f"{e_desc} | {e_amt:.2f} IQD | {e_cat}")
+                    log_action(username, "Add Expense", f"{e_desc} | ${e_amt:.2f} | {e_cat}")
                     st.success("Expense added.")
+                    play_ding()
                     st.rerun()
                 else:
                     st.error("Description and amount are required.")
@@ -946,7 +983,7 @@ elif selected == "📊  Accounting":
     if role in ["Boss", "Accounting", "Reception & Accounting"]:
         del_exp_list = fetch_all("SELECT id, date, description, amount FROM expenses ORDER BY id DESC LIMIT 100")
         if del_exp_list:
-            del_exp_options = {f"#{r['id']} · {r['date']} · {r['description']} · {r['amount']:.2f} IQD": r["id"] for r in del_exp_list}
+            del_exp_options = {f"#{r['id']} · {r['date']} · {r['description']} · ${r['amount']:.2f}": r["id"] for r in del_exp_list}
             chosen_del_exp = st.selectbox("Select expense to delete", ["— select —"] + list(del_exp_options.keys()), key="del_exp_select")
             if st.button("Delete Expense", type="primary", key="btn_del_expense"):
                 if chosen_del_exp != "— select —":
@@ -954,6 +991,7 @@ elif selected == "📊  Accounting":
                     execute_write("DELETE FROM expenses WHERE id = ?", (exp_id,))
                     log_action(username, "Delete Expense", f"Deleted expense ID #{exp_id}: {chosen_del_exp}")
                     st.success("Expense deleted.")
+                    play_ding()
                     st.rerun()
         else:
             st.info("No expenses to delete.")
@@ -977,23 +1015,24 @@ elif selected == "📊  Accounting":
                 "Referrer": ref["name"],
                 "Rate": f"{ref['commission_rate']}%",
                 "Visits This Month": count,
-                "Revenue Generated": f"{total_rev:,.2f} IQD",
-                "Commission Due": f"{commission_due:,.2f} IQD",
+                "Revenue Generated": f"${total_rev:,.2f}",
+                "Commission Due": f"${commission_due:,.2f}",
             })
         st.dataframe(pd.DataFrame(ref_rows), use_container_width=True, hide_index=True)
         total_ref_comm = sum(
             (fetch_one("SELECT SUM(net_paid) as t FROM visits WHERE referred_by = ? AND substr(visit_date,1,7) = ?", (r["name"], current_month))["t"] or 0.0) * (r["commission_rate"] / 100.0)
             for r in all_referrers
         )
-        st.markdown(f"**Total referral commissions owed this month: {total_ref_comm:,.2f} IQD**")
+        st.markdown(f"**Total referral commissions owed this month: ${total_ref_comm:,.2f}**")
         if st.button("Mark All Referral Commissions as Paid (add as expense)"):
             if total_ref_comm > 0:
                 tag = f"Referral Commissions — {current_month}"
                 if not fetch_all("SELECT id FROM expenses WHERE description = ?", (tag,)):
                     execute_write("INSERT INTO expenses (description, category, amount, date, added_by) VALUES (?,?,?,?,?)",
                                   (tag, "Marketing", total_ref_comm, f"{current_month}-01", username))
-                    log_action(username, "Referral Commission Paid", f"{total_ref_comm:.2f} IQD for {current_month}")
-                    st.success(f"Referral commissions of {total_ref_comm:,.2f} IQD recorded as expense.")
+                    log_action(username, "Referral Commission Paid", f"${total_ref_comm:.2f} for {current_month}")
+                    st.success(f"Referral commissions of ${total_ref_comm:,.2f} recorded as expense.")
+                    play_ding()
                     st.rerun()
                 else:
                     st.warning("Referral commissions for this month have already been recorded.")
@@ -1001,6 +1040,62 @@ elif selected == "📊  Accounting":
                 st.info("No referral commissions to record this month.")
     else:
         st.info("No referrers added yet. Add them in Settings → Referrers.")
+
+# ─────────────────────────────────────────────
+# MODULE: ACCOUNTS (BOSS ONLY VIEW)
+# ─────────────────────────────────────────────
+elif selected == "👥  Accounts":
+    if role != "Boss":
+        st.error("🔒 Security Access Violation. This interface is restricted to executive 'Boss' accounts only.")
+    else:
+        page_header("Accounts Control Center", "Manage administrative staff profiles, system registrations, and log trackers.")
+        
+        accounts_registered = fetch_all("SELECT id, username, role FROM users")
+        st.metric("Total User Accounts Configured", len(accounts_registered))
+        
+        acc_tab1, acc_tab2 = st.tabs(["🔒 Profiles & Access control", "📜 Activity tracking ledger"])
+        
+        with acc_tab1:
+            section_label("System Registration Roster")
+            if accounts_registered:
+                df_profiles = pd.DataFrame([dict(u) for u in accounts_registered])
+                st.dataframe(df_profiles, use_container_width=True, hide_index=True)
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                section_label("Decommission Employee Access Account")
+                st.warning("⚠️ Attention: Revoking an account instantly disconnects workspace rights. Historical audit trails are preserved inside ledger logs.")
+                
+                # Prevent a Boss from deleting their own currently active session account
+                killable_users = [u["username"] for u in accounts_registered if u["username"] != username]
+                selection_pool = ["— select profile —"] + killable_users
+                target_user_burn = st.selectbox("Select employee handle to delete", selection_pool, key="burn_user_select")
+                
+                if st.button("Permanently Delete Account", type="primary"):
+                    if target_user_burn != "— select profile —":
+                        execute_write("DELETE FROM users WHERE username = ?", (target_user_burn,))
+                        log_action(username, "Delete Account", f"Purged security access profile for: {target_user_burn}")
+                        st.success(f"Security Profile '{target_user_burn}' wiped successfully from application database runtime.")
+                        play_ding()
+                        st.rerun()
+                    else:
+                        st.error("Please pick an active staff profile from selection tray before trying to trigger deletion processes.")
+            else:
+                st.info("No administrative profiles found.")
+                
+        with acc_tab2:
+            section_label("Cross-Examine Operational Logs By User Profile")
+            profile_list_filter = ["Show All Operations"] + [u["username"] for u in accounts_registered]
+            chosen_profile_audit = st.selectbox("Filter audit lines by specific employee profile name", profile_list_filter)
+            
+            if chosen_profile_audit == "Show All Operations":
+                audit_records = fetch_all("SELECT timestamp as [Time Marked], username as [Staff Member], action as [Operation], details as [Action Breakdown] FROM audit_log ORDER BY id DESC LIMIT 400")
+            else:
+                audit_records = fetch_all("SELECT timestamp as [Time Marked], username as [Staff Member], action as [Operation], details as [Action Breakdown] FROM audit_log WHERE username = ? ORDER BY id DESC LIMIT 400", (chosen_profile_audit,))
+                
+            if audit_records:
+                st.dataframe(pd.DataFrame([dict(row) for row in audit_records]), use_container_width=True, hide_index=True)
+            else:
+                st.info(f"No specific adjustments or transactions indexed yet under user selection: '{chosen_profile_audit}'")
 
 # ─────────────────────────────────────────────
 # MODULE: SETTINGS
@@ -1027,7 +1122,9 @@ elif selected == "⚙️  Settings":
         if st.button("Add Doctor"):
             if d_name.strip():
                 if execute_write("INSERT INTO doctors (name, specialty, comm_type, fixed_rate) VALUES (?,?,?,?)", (d_name.strip(), d_spec.strip(), comm_type, f_rate)):
+                    log_action(username, "Add Doctor", f"Name: {d_name.strip()} | Specialty: {d_spec.strip()} | Model: {comm_type}")
                     st.success(f"Doctor '{d_name}' added.")
+                    play_ding()
                     st.rerun()
                 else:
                     st.error("A doctor with that name already exists.")
@@ -1043,7 +1140,9 @@ elif selected == "⚙️  Settings":
             if st.button("Remove Doctor", type="primary"):
                 if del_doc != "— select —":
                     execute_write("DELETE FROM doctors WHERE name = ?", (del_doc,))
+                    log_action(username, "Remove Doctor", f"Removed Doctor Name: {del_doc}")
                     st.success(f"Doctor '{del_doc}' removed.")
+                    play_ding()
                     st.rerun()
         else:
             st.info("No doctors added yet.")
@@ -1054,12 +1153,14 @@ elif selected == "⚙️  Settings":
         col1, col2, col3 = st.columns(3)
         with col1: emp_name = st.text_input("Full name")
         with col2: emp_role = st.text_input("Role / title")
-        with col3: emp_salary = st.number_input("Monthly salary (IQD)", min_value=0.0, step=100.0)
+        with col3: emp_salary = st.number_input("Monthly salary ($)", min_value=0.0, step=100.0)
         st.info("💡 Staff salaries are automatically recorded as an expense on the 1st of each month.")
         if st.button("Add Staff Member"):
             if emp_name.strip() and emp_role.strip():
                 if execute_write("INSERT INTO employees (name, role, salary) VALUES (?,?,?)", (emp_name.strip(), emp_role.strip(), emp_salary)):
+                    log_action(username, "Add Staff", f"Employee: {emp_name.strip()} | Role: {emp_role.strip()} | Salary: ${emp_salary}")
                     st.success(f"{emp_name} added to payroll.")
+                    play_ding()
                     st.rerun()
                 else:
                     st.error("An employee with that name already exists.")
@@ -1073,12 +1174,14 @@ elif selected == "⚙️  Settings":
             df_emp = pd.DataFrame([dict(e) for e in all_emp])
             st.dataframe(df_emp, use_container_width=True, hide_index=True)
             total_payroll = sum(e["salary"] for e in all_emp)
-            st.markdown(f"**Monthly payroll total: {total_payroll:,.2f} IQD**")
+            st.markdown(f"**Monthly payroll total: ${total_payroll:,.2f}**")
             del_emp = st.selectbox("Remove employee", ["— select —"] + [e["name"] for e in all_emp])
             if st.button("Remove Employee", type="primary"):
                 if del_emp != "— select —":
                     execute_write("DELETE FROM employees WHERE name = ?", (del_emp,))
+                    log_action(username, "Remove Staff", f"Fired/Removed employee: {del_emp}")
                     st.success(f"Removed {del_emp} from payroll.")
+                    play_ding()
                     st.rerun()
         else:
             st.info("No staff added yet.")
@@ -1089,11 +1192,13 @@ elif selected == "⚙️  Settings":
         col1, col2, col3 = st.columns(3)
         with col1: s_name = st.text_input("Service name")
         with col2: s_cat = st.selectbox("Category", ["General", "Consultation", "Procedure", "Therapy", "Diagnostic", "Other"])
-        with col3: s_price = st.number_input("Price (IQD)", min_value=0.0, step=10.0)
+        with col3: s_price = st.number_input("Price ($)", min_value=0.0, step=10.0)
         if st.button("Add Service"):
             if s_name.strip():
                 if execute_write("INSERT INTO services (name, category, price, active) VALUES (?,?,?,1)", (s_name.strip(), s_cat, s_price)):
-                    st.success(f"Service '{s_name}' added at {s_price:.2f} IQD.")
+                    log_action(username, "Add Service", f"Service catalog item: {s_name.strip()} | Price: ${s_price}")
+                    st.success(f"Service '{s_name}' added at ${s_price:.2f}.")
+                    play_ding()
                     st.rerun()
                 else:
                     st.error("A service with that name already exists.")
@@ -1109,7 +1214,9 @@ elif selected == "⚙️  Settings":
             if st.button("Remove Service", type="primary"):
                 if del_svc != "— select —":
                     execute_write("DELETE FROM services WHERE name = ?", (del_svc,))
+                    log_action(username, "Remove Service", f"Deleted Service: {del_svc}")
                     st.success(f"Service '{del_svc}' removed.")
+                    play_ding()
                     st.rerun()
         else:
             st.info("No services added yet.")
@@ -1120,13 +1227,15 @@ elif selected == "⚙️  Settings":
         col1, col2 = st.columns(2)
         with col1:
             b_name = st.text_input("Bundle name (e.g. Premium Care Package)")
-            b_price = st.number_input("Bundle price (IQD)", min_value=0.0, step=25.0)
+            b_price = st.number_input("Bundle price ($)", min_value=0.0, step=25.0)
         with col2:
             b_desc = st.text_area("Description / included services", height=90)
         if st.button("Create Bundle"):
             if b_name.strip() and b_price > 0:
                 if execute_write("INSERT INTO bundles (name, price, description) VALUES (?,?,?)", (b_name.strip(), b_price, b_desc.strip())):
-                    st.success(f"Bundle '{b_name}' created at {b_price:.2f} IQD.")
+                    log_action(username, "Create Bundle", f"Package created: {b_name.strip()} | Priced: ${b_price}")
+                    st.success(f"Bundle '{b_name}' created at ${b_price:.2f}.")
+                    play_ding()
                     st.rerun()
                 else:
                     st.error("A bundle with that name already exists.")
@@ -1142,7 +1251,9 @@ elif selected == "⚙️  Settings":
             if st.button("Remove Bundle", type="primary"):
                 if del_bnd != "— select —":
                     execute_write("DELETE FROM bundles WHERE name = ?", (del_bnd,))
+                    log_action(username, "Remove Bundle", f"Deleted Bundle: {del_bnd}")
                     st.success(f"Bundle '{del_bnd}' removed.")
+                    play_ding()
                     st.rerun()
         else:
             st.info("No bundles created yet.")
@@ -1164,6 +1275,7 @@ elif selected == "⚙️  Settings":
                                  (ref_name.strip(), ref_phone.strip(), ref_rate, ref_notes.strip(), username, today_str)):
                     log_action(username, "Add Referrer", f"{ref_name} at {ref_rate}%")
                     st.success(f"Referrer '{ref_name}' added with {ref_rate}% commission.")
+                    play_ding()
                     st.rerun()
                 else:
                     st.error("A referrer with that name already exists.")
@@ -1181,6 +1293,7 @@ elif selected == "⚙️  Settings":
                     execute_write("DELETE FROM referrers WHERE name = ?", (del_ref,))
                     log_action(username, "Remove Referrer", del_ref)
                     st.success(f"Referrer '{del_ref}' removed.")
+                    play_ding()
                     st.rerun()
         else:
             st.info("No referrers added yet.")
@@ -1194,7 +1307,7 @@ elif selected == "⚙️  Settings":
             sub_name = st.text_input("Subscription name (e.g. Instagram Ads, Clinic Software)", key="sub_name_input")
             sub_cat = st.selectbox("Category", ["Subscription", "Marketing", "Software", "Utilities", "Other"], key="sub_cat_select")
         with col2:
-            sub_amount = st.number_input("Monthly amount (IQD)", min_value=0.0, step=5.0, key="sub_amount_input")
+            sub_amount = st.number_input("Monthly amount ($)", min_value=0.0, step=5.0, key="sub_amount_input")
             sub_day = st.number_input("Billing day of month", min_value=1, max_value=28, step=1, value=1, key="sub_day_input")
         with col3:
             st.markdown("<br>", unsafe_allow_html=True)
@@ -1203,8 +1316,9 @@ elif selected == "⚙️  Settings":
             if sub_name.strip() and sub_amount > 0:
                 if execute_write("INSERT INTO subscriptions (name, amount, billing_day, category, active, added_by, created_at) VALUES (?,?,?,?,1,?,?)",
                                  (sub_name.strip(), sub_amount, int(sub_day), sub_cat, username, today_str)):
-                    log_action(username, "Add Subscription", f"{sub_name} {sub_amount} IQD/mo")
-                    st.success(f"Subscription '{sub_name}' added at {sub_amount:.2f} IQD/month.")
+                    log_action(username, "Add Subscription", f"{sub_name} ${sub_amount}/mo")
+                    st.success(f"Subscription '{sub_name}' added at ${sub_amount:.2f}/month.")
+                    play_ding()
                     st.rerun()
                 else:
                     st.error("A subscription with that name already exists.")
@@ -1217,7 +1331,7 @@ elif selected == "⚙️  Settings":
         if all_subs:
             st.dataframe(pd.DataFrame([dict(s) for s in all_subs]), use_container_width=True, hide_index=True)
             total_monthly = sum(s["amount"] for s in all_subs if s["active"])
-            st.markdown(f"**Total active monthly subscriptions: {total_monthly:,.2f} IQD/month**")
+            st.markdown(f"**Total active monthly subscriptions: ${total_monthly:,.2f}/month**")
             col1, col2 = st.columns(2)
             with col1:
                 toggle_sub = st.selectbox("Pause / activate subscription", ["— select —"] + [s["name"] for s in all_subs], key="toggle_sub_select")
@@ -1227,6 +1341,7 @@ elif selected == "⚙️  Settings":
                         execute_write("UPDATE subscriptions SET active = ? WHERE name = ?", (0 if current_active else 1, toggle_sub))
                         log_action(username, "Toggle Subscription", f"{toggle_sub} → {'Paused' if current_active else 'Active'}")
                         st.success(f"'{toggle_sub}' is now {'paused' if current_active else 'active'}.")
+                        play_ding()
                         st.rerun()
             with col2:
                 del_sub = st.selectbox("Remove subscription", ["— select —"] + [s["name"] for s in all_subs], key="del_sub_select")
@@ -1235,6 +1350,7 @@ elif selected == "⚙️  Settings":
                         execute_write("DELETE FROM subscriptions WHERE name = ?", (del_sub,))
                         log_action(username, "Remove Subscription", del_sub)
                         st.success(f"Subscription '{del_sub}' removed.")
+                        play_ding()
                         st.rerun()
         else:
             st.info("No subscriptions added yet.")
