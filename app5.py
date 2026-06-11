@@ -16,9 +16,8 @@ scope = [
 ]
 
 try:
-    # Directly load structured TOML section as a dictionary
-    gcp_info = dict(st.secrets["gcp_json"])
-    creds = Credentials.from_service_account_info(gcp_info, scopes=scope)
+    # Pass st.secrets directly as the dictionary
+    creds = Credentials.from_service_account_info(st.secrets, scopes=scope)
     gc = gspread.authorize(creds)
     sh = gc.open("Garden Clinic Data")
     worksheet = sh.sheet1
