@@ -11,13 +11,12 @@ import json
 # GOOGLE SHEETS CLOUD CONNECTION
 # ─────────────────────────────────────────────
 import streamlit as st
-# Change your import to the native Streamlit connections module:
-from streamlit.connections import GSheetsConnection
+from streamlit_gsheets import GSheetsConnection
 
-# Establish the connection
+# Initialize the connection using the explicit connector class
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Read the data (adjust the spreadsheet name/URL as needed for your code)
+# Read the target sheet data
 df = conn.read()
 # ─────────────────────────────────────────────
 # PAGE CONFIG
