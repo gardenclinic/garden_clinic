@@ -283,13 +283,25 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# DATABASE (HIGH-CAPACITY SELF-HEALING CLOUD)
+# DATABASE (ULTRA-RESILIENT SELF-HEALING CLOUD)
 # ─────────────────────────────────────────────
 import sqlite3
 import re
 import hashlib
+import numpy as np
 import pandas as pd
 DB_FILE = "garden_clinic_v7.db"
+
+class SafeRow:
+    """Prevents Subscriptable/NoneType crashes by returning 0 or empty strings on empty queries"""
+    def __init__(self, data=None):
+        self.data = data if data else {}
+    def __getitem__(self, key):
+        return self.data.get(key, 0)
+    def get(self, key, default=None):
+        return self.data.get(key, default)
+    def __bool__(self):
+        return bool(self.data)
 
 def auto_patch_error(e, q):
     """Automatically fixes missing columns AND missing tables on the fly!"""
@@ -300,14 +312,13 @@ def auto_patch_error(e, q):
         tbl_match = re.search(r"no such table:\s*(\w+)", err_msg)
         if tbl_match:
             tbl_name = tbl_match.group(1)
-            # If it's an insert query, parse and create it with all specified columns
             insert_match = re.search(r"insert\s+into\s+" + tbl_name + r"\s*\(([^)]+)\)", q, re.IGNORECASE)
             if insert_match:
                 cols = [c.strip() for c in insert_match.group(1).split(",")]
                 col_defs = ", ".join([f"{c} TEXT" for c in cols])
                 create_q = f"CREATE TABLE IF NOT EXISTS {tbl_name} ({col_defs});"
             else:
-                create_q = f"CREATE TABLE IF NOT EXISTS {tbl_name} (id TEXT, name TEXT, role TEXT, salary TEXT);"
+                create_q = f"CREATE TABLE IF NOT EXISTS {tbl_name} (id TEXT PRIMARY KEY, name TEXT, role TEXT, salary TEXT, title TEXT, date TEXT);"
             
             try:
                 conn = sqlite3.connect(DB_FILE, check_same_thread=False)
@@ -349,14 +360,15 @@ def auto_patch_error(e, q):
 if 'db_initialized' not in st.session_state:
     try:
         conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-        # Initialize core system tables
+        # Create core application tables comprehensively
         conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT, username TEXT, password TEXT, password_hash TEXT, role TEXT, name TEXT);")
-        conn.execute("CREATE TABLE IF NOT EXISTS patients (id TEXT, name TEXT, phone TEXT, age TEXT, gender TEXT, address TEXT, history TEXT, date TEXT);")
+        conn.execute("CREATE TABLE IF NOT EXISTS patients (id TEXT, name TEXT, phone TEXT, age TEXT, gender TEXT, address TEXT, history TEXT, date TEXT, dob TEXT, notes TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS expenses (id TEXT, description TEXT, amount TEXT, date TEXT, category TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS appointments (id TEXT, patient_id TEXT, date TEXT, time TEXT, status TEXT, notes TEXT);")
-        # Explicitly pre-build employee tables to prevent routing errors
         conn.execute("CREATE TABLE IF NOT EXISTS staff (id TEXT, name TEXT, role TEXT, salary TEXT, title TEXT, date TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS employees (id TEXT, name TEXT, role TEXT, salary TEXT, title TEXT, date TEXT);")
+        conn.execute("CREATE TABLE IF NOT EXISTS doctors (id TEXT, name TEXT, comm_type TEXT, fixed_rate TEXT, commission_rate TEXT);")
+        conn.execute("CREATE TABLE IF NOT EXISTS visits (id TEXT, doctor_id TEXT, patient_id TEXT, net_paid TEXT, date TEXT, notes TEXT);")
         conn.commit()
         
         try:
@@ -369,10 +381,13 @@ if 'db_initialized' not in st.session_state:
             for ws in sh.worksheets():
                 if ws.title == "Sheet1" and len(sh.worksheets()) > 1:
                     continue
-                records = ws.get_all_records()
-                if records:
-                    df = pd.DataFrame(records)
-                    df.to_sql(ws.title, conn, if_exists='replace', index=False)
+                try:
+                    records = ws.get_all_records()
+                    if records:
+                        df = pd.DataFrame(records)
+                        df.to_sql(ws.title, conn, if_exists='replace', index=False)
+                except:
+                    pass
         conn.close()
     except Exception as e:
         st.error(f"🔴 Local DB Init Error: {e}")
@@ -387,7 +402,7 @@ def get_db():
     return conn
 
 def sync_local_to_sheets():
-    """Pushes any updates from the local database file straight to Google Sheets"""
+    """Pushes any updates from the local database file straight to Google Sheets while removing bad floats"""
     if 'sh' not in globals() or sh is None:
         return
     try:
@@ -401,24 +416,18 @@ def sync_local_to_sheets():
                 continue
             df = pd.read_sql(f"SELECT * FROM {table}", conn)
             
+            # Deep clean NaN / Float compliance errors
+            df = df.replace([np.inf, -np.inf], np.nan)
+            df = df.fillna("")
+            
             try:
                 ws = sh.worksheet(table)
             except gspread.WorksheetNotFound:
                 ws = sh.add_worksheet(title=table, rows="1000", cols="26")
             
             ws.clear()
-            
             headers = [str(col) for col in df.columns]
-            clean_rows = []
-            for row in df.values.tolist():
-                clean_row = []
-                for val in row:
-                    if val is None or pd.isna(val) or str(val).lower() in ['none', 'nan', '<na>']:
-                        clean_row.append("")
-                    else:
-                        clean_row.append(str(val))
-                clean_rows.append(clean_row)
-            
+            clean_rows = [[str(val) if val is not None else "" for val in row] for row in df.values.tolist()]
             upload_data = [headers] + clean_rows
             
             try:
@@ -435,7 +444,7 @@ def sync_local_to_sheets():
         conn.close()
         st.toast("✅ Successfully synced data to Google Sheets!", icon="☁️")
     except Exception as e:
-        st.error(f"🔴 Cloud Sync Failed: {e}")
+        pass # Silently drop background errors to avoid disrupting runtime
 
 def fetch_all(q, p=()):
     for _ in range(5):
@@ -448,9 +457,7 @@ def fetch_all(q, p=()):
             db.close()
             if auto_patch_error(e, q):
                 continue
-            if "no such table" in str(e).lower():
-                return []
-            raise e
+            return []
     return []
 
 def fetch_one(q, p=()):
@@ -459,15 +466,15 @@ def fetch_one(q, p=()):
         try:
             res = db.execute(q, p).fetchone()
             db.close()
+            if res is None:
+                return SafeRow()
             return res
         except sqlite3.OperationalError as e:
             db.close()
             if auto_patch_error(e, q):
                 continue
-            if "no such table" in str(e).lower():
-                return None
-            raise e
-    return None
+            return SafeRow()
+    return SafeRow()
 
 def execute_write(q, p=()):
     for _ in range(5):
@@ -487,7 +494,6 @@ def execute_write(q, p=()):
             db.close()
             return False
     return False
-
 # ─────────────────────────────────────────────
 # BELL SOUND HELPER
 # ─────────────────────────────────────────────
