@@ -459,7 +459,7 @@ def fetch_all(q, p=()):
         if "no such table" in str(e).lower():
             return []
         raise e
-        def fetch_one(q, p=()):
+def fetch_one(q, p=()):
     try:
         with sqlite3.connect("clinic.db") as conn:
             db = conn.cursor()
