@@ -13,11 +13,15 @@ import json
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
-# Initialize the connection using the explicit connector class
+# 1. Establish connection using secrets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Read the target sheet data
-df = conn.read()
+# 2. Pass your exact sheet URL into the read function
+spreadsheet_url = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE/edit?usp=sharing"
+df = conn.read(spreadsheet=spreadsheet_url)
+
+# 3. Display the data
+st.dataframe(df)
 # ─────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────
