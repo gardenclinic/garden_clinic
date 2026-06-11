@@ -10,10 +10,7 @@ import json
 # ─────────────────────────────────────────────
 # GOOGLE SHEETS CLOUD CONNECTION
 # ─────────────────────────────────────────────
-import streamlit as st
 import json
-import gspread
-from google.oauth2.service_account import Credentials
 
 scope = [
     "https://spreadsheets.google.com/feeds",
@@ -21,8 +18,13 @@ scope = [
 ]
 
 try:
-    # This reads the flat TOML secrets correctly as a dictionary
-    creds = Credentials.from_service_account_info(dict(st.secrets), scopes=scope)
+    # Load raw JSON from secrets
+    gcp_dict = json.loads(st.secrets["gcp_json"])
+    
+    # Fix the private key newlines
+    gcp_dict["private_key"] = gcp_dict["private_key"].replace("\\n", "\n")
+    
+    creds = Credentials.from_service_account_info(gcp_dict, scopes=scope)
     gc = gspread.authorize(creds)
     sh = gc.open("Garden Clinic Data")
     worksheet = sh.sheet1
