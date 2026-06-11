@@ -27,6 +27,12 @@ def sync_to_sheets(table_name: str, df: pd.DataFrame):
         _gsheets_conn.update(worksheet=table_name, data=df)
     except Exception:
         pass  # Never crash the app over a sync failure
+def sync_to_sheets(table_name: str, df: pd.DataFrame):
+    """Push a dataframe to a Google Sheet worksheet."""
+    if not _gsheets_enabled or _gsheets_conn is None:
+        return
+    # Temporarily remove the try/except block to see the actual error
+    _gsheets_conn.update(worksheet=table_name, data=df)
 # ─────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────
