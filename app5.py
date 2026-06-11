@@ -1,34 +1,33 @@
 import streamlit as st
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
+import sqlite3
 import hashlib
 from datetime import datetime, date
 import streamlit.components.v1 as components
-import json
 
 # ─────────────────────────────────────────────
-# GOOGLE SHEETS CLOUD CONNECTION
+# GOOGLE SHEETS SYNC (OPTIONAL — won't crash if not configured)
 # ─────────────────────────────────────────────
-import streamlit as st
-from streamlit_gsheets import GSheetsConnection
+_gsheets_enabled = False
+_gsheets_conn = None
 
-# 1. Grab the raw connection dictionary from secrets
-creds = dict(st.secrets["connections"]["gsheets"])
+try:
+    from streamlit_gsheets import GSheetsConnection
+    # st.connection reads secrets automatically from [connections.gsheets] in secrets.toml
+    # Do NOT pass **creds as kwargs — that is what causes the TypeError
+    _gsheets_conn = st.connection("gsheets", type=GSheetsConnection)
+    _gsheets_enabled = True
+except Exception:
+    pass  # GSheets not configured — app runs fine on local SQLite
 
-# 2. Safely fix any text layout conflicts from the raw JSON string
-if "private_key" in creds:
-    # Remove literal backslash-n sequences if they exist
-    creds["private_key"] = creds["private_key"].replace("\\n", "\n")
-    # Clean up accidental double-newlines
-    creds["private_key"] = creds["private_key"].replace("\n\n", "\n")
-
-# 3. Initialize connection using the cleaned dictionary
-conn = st.connection("gsheets", type=GSheetsConnection, **creds)
-
-# 4. Read the spreadsheet URL directly
-df = conn.read(spreadsheet="https://docs.google.com/spreadsheets/d/1234567890abcdefghijklmnopqrstuvwxyz/edit?usp=sharing")
-st.dataframe(df)
+def sync_to_sheets(table_name: str, df: pd.DataFrame):
+    """Push a dataframe to a Google Sheet worksheet. Silent no-op if GSheets not configured."""
+    if not _gsheets_enabled or _gsheets_conn is None:
+        return
+    try:
+        _gsheets_conn.update(worksheet=table_name, data=df)
+    except Exception:
+        pass  # Never crash the app over a sync failure
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG
@@ -288,234 +287,82 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# DATABASE (ULTRA-RESILIENT SELF-HEALING CLOUD)
+# DATABASE
 # ─────────────────────────────────────────────
-import sqlite3
-import re
-import hashlib
-import numpy as np
-import pandas as pd
 DB_FILE = "garden_clinic_v7.db"
 
-class SafeRow:
-    """Prevents Subscriptable/NoneType crashes by returning 0 or empty strings on empty queries"""
-    def __init__(self, data=None):
-        self.data = data if data else {}
-    def __getitem__(self, key):
-        return self.data.get(key, 0)
-    def get(self, key, default=None):
-        return self.data.get(key, default)
-    def __bool__(self):
-        return bool(self.data)
-
-def auto_patch_error(e, q):
-    """Automatically fixes missing columns AND missing tables on the fly!"""
-    err_msg = str(e).lower()
-    
-    # 1. Auto-Heal Missing Tables
-    if "no such table" in err_msg:
-        tbl_match = re.search(r"no such table:\s*(\w+)", err_msg)
-        if tbl_match:
-            tbl_name = tbl_match.group(1)
-            insert_match = re.search(r"insert\s+into\s+" + tbl_name + r"\s*\(([^)]+)\)", q, re.IGNORECASE)
-            if insert_match:
-                cols = [c.strip() for c in insert_match.group(1).split(",")]
-                col_defs = ", ".join([f"{c} TEXT" for c in cols])
-                create_q = f"CREATE TABLE IF NOT EXISTS {tbl_name} ({col_defs});"
-            else:
-                create_q = f"CREATE TABLE IF NOT EXISTS {tbl_name} (id TEXT PRIMARY KEY, name TEXT, role TEXT, salary TEXT, title TEXT, date TEXT);"
-            
-            try:
-                conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-                conn.execute(create_q)
-                conn.commit()
-                conn.close()
-                return True
-            except:
-                pass
-
-    # 2. Auto-Heal Missing Columns
-    col_name = None
-    tbl_name = None
-    if "no such column" in err_msg:
-        col_match = re.search(r"no such column:\s*(\w+)", err_msg)
-        if col_match:
-            col_name = col_match.group(1)
-            tbl_match = re.search(r"(?:from|join|insert\s+into|update)\s+(\w+)", q, re.IGNORECASE)
-            if tbl_match:
-                tbl_name = tbl_match.group(1)
-                
-    elif "has no column named" in err_msg:
-        match = re.search(r"table\s+(\w+)\s+has\s+no\s+column\s+named\s+(\w+)", err_msg)
-        if match:
-            tbl_name = match.group(1)
-            col_name = match.group(2)
-    
-    if col_name and tbl_name:
-        try:
-            conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-            conn.execute(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} TEXT;")
-            conn.commit()
-            conn.close()
-            return True
-        except:
-            pass
-    return False
-
-if 'db_initialized' not in st.session_state:
-    try:
-        conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-        # Create core application tables comprehensively
-        conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT, username TEXT, password TEXT, password_hash TEXT, role TEXT, name TEXT);")
-        conn.execute("CREATE TABLE IF NOT EXISTS patients (id TEXT, name TEXT, phone TEXT, age TEXT, gender TEXT, address TEXT, history TEXT, date TEXT, dob TEXT, notes TEXT);")
-        conn.execute("CREATE TABLE IF NOT EXISTS expenses (id TEXT, description TEXT, amount TEXT, date TEXT, category TEXT);")
-        conn.execute("CREATE TABLE IF NOT EXISTS appointments (id TEXT, patient_id TEXT, date TEXT, time TEXT, status TEXT, notes TEXT);")
-        conn.execute("CREATE TABLE IF NOT EXISTS staff (id TEXT, name TEXT, role TEXT, salary TEXT, title TEXT, date TEXT);")
-        conn.execute("CREATE TABLE IF NOT EXISTS employees (id TEXT, name TEXT, role TEXT, salary TEXT, title TEXT, date TEXT);")
-        conn.execute("CREATE TABLE IF NOT EXISTS doctors (id TEXT, name TEXT, comm_type TEXT, fixed_rate TEXT, commission_rate TEXT);")
-        conn.execute("CREATE TABLE IF NOT EXISTS visits (id TEXT, doctor_id TEXT, patient_id TEXT, net_paid TEXT, date TEXT, notes TEXT);")
-        conn.commit()
-        
-        try:
-            conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT;")
-            conn.commit()
-        except:
-            pass
-            
-        if 'sh' in globals() and sh is not None:
-            for ws in sh.worksheets():
-                if ws.title == "Sheet1" and len(sh.worksheets()) > 1:
-                    continue
-                try:
-                    records = ws.get_all_records()
-                    if records:
-                        df = pd.DataFrame(records)
-                        df.to_sql(ws.title, conn, if_exists='replace', index=False)
-                except:
-                    pass
-        conn.close()
-    except Exception as e:
-        st.error(f"🔴 Local DB Init Error: {e}")
-    st.session_state.db_initialized = True
-
-def hash_password(pw): 
-    return hashlib.sha256(pw.encode()).hexdigest()
+def hash_password(pw): return hashlib.sha256(pw.encode()).hexdigest()
 
 def get_db():
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
-def sync_local_to_sheets():
-    """Pushes any updates from the local database file straight to Google Sheets while removing bad floats"""
-    if 'sh' not in globals() or sh is None:
-        return
-    try:
-        conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = [row[0] for row in cursor.fetchall()]
-        
-        for table in tables:
-            if table.startswith('sqlite_'):
-                continue
-            df = pd.read_sql(f"SELECT * FROM {table}", conn)
-            
-            # Deep clean NaN / Float compliance errors
-            df = df.replace([np.inf, -np.inf], np.nan)
-            df = df.fillna("")
-            
-            try:
-                ws = sh.worksheet(table)
-            except gspread.WorksheetNotFound:
-                ws = sh.add_worksheet(title=table, rows="1000", cols="26")
-            
-            ws.clear()
-            headers = [str(col) for col in df.columns]
-            clean_rows = [[str(val) if val is not None else "" for val in row] for row in df.values.tolist()]
-            upload_data = [headers] + clean_rows
-            
-            try:
-                ws.update(range_name="A1", values=upload_data)
-            except:
-                ws.update(upload_data)
-            
-        try:
-            default_ws = sh.worksheet("Sheet1")
-            if len(sh.worksheets()) > 1:
-                sh.del_worksheet(default_ws)
-        except:
-            pass
-        conn.close()
-        st.toast("✅ Successfully synced data to Google Sheets!", icon="☁️")
-    except Exception as e:
-        pass # Silently drop background errors to avoid disrupting runtime
-
 def fetch_all(q, p=()):
-    try:
-        with sqlite3.connect("clinic.db") as conn:
-            db = conn.cursor()
-            res = db.execute(q, p).fetchall()
-            return res
-    except sqlite3.OperationalError as e:
-        # If a table doesn't exist yet, return an empty list gracefully instead of crashing
-        if "no such table" in str(e).lower():
-            return []
-        raise e
+    db = get_db()
+    res = db.execute(q, p).fetchall()
+    db.close()
+    return res
+
 def fetch_one(q, p=()):
+    db = get_db()
+    res = db.execute(q, p).fetchone()
+    db.close()
+    return res
+
+def execute_write(q, p=()):
+    db = get_db()
     try:
-        with sqlite3.connect("clinic.db") as conn:
-            db = conn.cursor()
-            res = db.execute(q, p).fetchone()
-            return res
-    except sqlite3.OperationalError as e:
-        if "no such table" in str(e).lower():
-            return None
-        raise e
+        with db: db.execute(q, p)
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        db.close()
 
-def get_financials():
-    # Safe default values in case tables are missing on day one
-    gross_income = 0.0
-    base_expenses = 0.0
-    total_commissions = 0.0
-    net_profit = 0.0
-    doc_visits = {}
+def init_db():
+    db = get_db()
+    with db:
+        db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS patients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, phone TEXT, date_of_birth TEXT, gender TEXT, notes TEXT, created_at TEXT)")
+        db.execute("CREATE TABLE IF NOT EXISTS doctors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, specialty TEXT, comm_type TEXT NOT NULL, fixed_rate REAL DEFAULT 0.0)")
+        db.execute("CREATE TABLE IF NOT EXISTS employees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, role TEXT NOT NULL, salary REAL NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, category TEXT, price REAL NOT NULL, active INTEGER DEFAULT 1)")
+        db.execute("CREATE TABLE IF NOT EXISTS bundles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, price REAL NOT NULL, description TEXT)")
+        db.execute("""CREATE TABLE IF NOT EXISTS visits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER, doctor_id INTEGER, service_id INTEGER, bundle_id INTEGER,
+            visit_date TEXT, base_price REAL, discount_amount REAL, net_paid REAL,
+            payment_method TEXT DEFAULT 'Cash', notes TEXT
+        )""")
+        db.execute("CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT NOT NULL, category TEXT DEFAULT 'General', amount REAL NOT NULL, date TEXT NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS appointments (id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, doctor_id INTEGER, appt_date TEXT, appt_time TEXT, reason TEXT, status TEXT DEFAULT 'Scheduled')")
+        db.execute("CREATE TABLE IF NOT EXISTS referrers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, phone TEXT, commission_rate REAL NOT NULL DEFAULT 0.0, notes TEXT, added_by TEXT, created_at TEXT)")
+        db.execute("CREATE TABLE IF NOT EXISTS subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, amount REAL NOT NULL, billing_day INTEGER DEFAULT 1, category TEXT DEFAULT 'Subscription', active INTEGER DEFAULT 1, added_by TEXT, created_at TEXT)")
+        db.execute("CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, action TEXT NOT NULL, details TEXT, timestamp TEXT NOT NULL)")
 
-    all_visits = fetch_all("SELECT d.name, d.comm_type, d.fixed_rate, v.net_paid FROM visits v JOIN doctors d ON v.doctor_id = d.id")
-    
-    # Process calculations only if we have records
-    for name, comm_type, fixed_rate, net_paid in all_visits:
-        gross_income += net_paid
-        doc_visits[name] = doc_visits.get(name, 0) + 1
-        if comm_type == "Fixed":
-            total_commissions += fixed_rate
-        else:
-            total_commissions += (net_paid * 0.30) # 30% default split
-            
-    net_profit = gross_income - base_expenses - total_commissions
-    return gross_income, base_expenses, total_commissions, gross_income - total_commissions, net_profit, doc_visits
-   
-# ─────────────────────────────────────────────
-# BELL SOUND HELPER
-# ─────────────────────────────────────────────
-def play_ding():
-    components.html("""
-    <script>
-    try {
-        var context = new (window.AudioContext || window.webkitAudioContext)();
-        var osc = context.createOscillator();
-        var gain = context.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1100, context.currentTime);
-        gain.gain.setValueAtTime(0.2, context.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.5);
-        osc.connect(gain);
-        gain.connect(context.destination);
-        osc.start();
-        osc.stop(context.currentTime + 0.5);
-    } catch(e) { console.log(e); }
-    </script>
-    """, height=0, width=0)
+        # migrations
+        for col, definition in [
+            ("notes TEXT", "ALTER TABLE visits ADD COLUMN notes TEXT"),
+            ("payment_method TEXT", "ALTER TABLE visits ADD COLUMN payment_method TEXT DEFAULT 'Cash'"),
+            ("specialty TEXT", "ALTER TABLE doctors ADD COLUMN specialty TEXT"),
+            ("category TEXT", "ALTER TABLE services ADD COLUMN category TEXT"),
+            ("active INTEGER", "ALTER TABLE services ADD COLUMN active INTEGER DEFAULT 1"),
+            ("description TEXT", "ALTER TABLE bundles ADD COLUMN description TEXT"),
+            ("date_of_birth TEXT", "ALTER TABLE patients ADD COLUMN date_of_birth TEXT"),
+            ("gender TEXT", "ALTER TABLE patients ADD COLUMN gender TEXT"),
+            ("patient_notes TEXT", "ALTER TABLE patients ADD COLUMN notes TEXT"),
+            ("created_at TEXT", "ALTER TABLE patients ADD COLUMN created_at TEXT"),
+            ("category TEXT expenses", "ALTER TABLE expenses ADD COLUMN category TEXT DEFAULT 'General'"),
+            ("referred_by TEXT visits", "ALTER TABLE visits ADD COLUMN referred_by TEXT"),
+            ("added_by TEXT visits", "ALTER TABLE visits ADD COLUMN added_by TEXT"),
+            ("added_by TEXT expenses", "ALTER TABLE expenses ADD COLUMN added_by TEXT"),
+        ]:
+            try: db.execute(definition)
+            except: pass
+    db.close()
+
+init_db()
 
 # ─────────────────────────────────────────────
 # AUTO PAYROLL
@@ -557,6 +404,21 @@ def log_action(uname, action, details=""):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     execute_write("INSERT INTO audit_log (username, action, details, timestamp) VALUES (?,?,?,?)",
                   (uname, action, details, ts))
+
+# ─────────────────────────────────────────────
+# BELL SOUND
+# ─────────────────────────────────────────────
+def play_ding():
+    components.html("""<script>
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var o = ctx.createOscillator(); var g = ctx.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(1100, ctx.currentTime);
+        g.gain.setValueAtTime(0.18, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+        o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.45);
+    } catch(e) {}
+    </script>""", height=0, width=0)
 
 # ─────────────────────────────────────────────
 # HELPERS
@@ -627,9 +489,9 @@ today_row = fetch_one("SELECT SUM(net_paid) as t, COUNT(*) as c FROM visits WHER
 today_revenue = today_row["t"] if today_row and today_row["t"] else 0.0
 today_visits = today_row["c"] if today_row else 0
 
-# Access the first element of the returned tuple (index 0)
-patient_count_row = fetch_one("SELECT COUNT(*) FROM patients")
-patient_count = patient_count_row[0] if patient_count_row else 0
+# Patient count
+patient_count = fetch_one("SELECT COUNT(*) as c FROM patients")["c"]
+
 # ─────────────────────────────────────────────
 # LOGIN
 # ─────────────────────────────────────────────
@@ -670,9 +532,7 @@ if not st.session_state.logged_in:
                     st.error("Invalid admin code.")
                 elif ru and rp:
                     if execute_write("INSERT INTO users (username, password_hash, role) VALUES (?,?,?)", (ru.strip(), hash_password(rp), role)):
-                        log_action("System", "Create Account", f"User: {ru.strip()} | Role: {role}")
                         st.success("Account created. Sign in above.")
-                        play_ding()
                     else:
                         st.error("Username already taken.")
     st.stop()
@@ -704,6 +564,23 @@ menu_map = {
 menus = menu_map.get(role, [])
 selected = st.sidebar.radio("Navigation", menus, label_visibility="collapsed")
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
+
+# GSheets sync button (only shown if configured)
+if _gsheets_enabled:
+    if st.sidebar.button("☁️ Sync to Google Sheets", use_container_width=True):
+        try:
+            db_tmp = get_db()
+            for tbl in ["visits", "patients", "expenses", "doctors", "employees", "referrers", "subscriptions", "audit_log"]:
+                try:
+                    df_tbl = pd.read_sql(f"SELECT * FROM {tbl}", db_tmp)
+                    sync_to_sheets(tbl, df_tbl)
+                except Exception:
+                    pass
+            db_tmp.close()
+            st.sidebar.success("Synced!")
+        except Exception as e:
+            st.sidebar.error(f"Sync failed: {e}")
+
 if st.sidebar.button("Sign Out", use_container_width=True):
     st.session_state.logged_in = False
     st.rerun()
@@ -773,7 +650,7 @@ if selected == "📈  Dashboard":
 
     st.markdown("---")
     section_label("Activity audit log — who added what")
-    audit_filter = st.selectbox("Filter by action type", ["All", "New Visit", "New Patient", "Remove Patient", "Add Expense", "Delete Expense", "Add Referrer", "Remove Referrer", "Add Subscription", "Remove Subscription", "Toggle Subscription", "Referral Commission Paid"], key="audit_filter")
+    audit_filter = st.selectbox("Filter by action type", ["All", "New Visit", "Add Expense", "Delete Expense", "Add Referrer", "Remove Referrer", "Add Subscription", "Remove Subscription", "Toggle Subscription", "Referral Commission Paid"], key="audit_filter")
     if audit_filter == "All":
         audit_rows = fetch_all("SELECT timestamp as Time, username as User, action as Action, details as Details FROM audit_log ORDER BY id DESC LIMIT 200")
     else:
@@ -863,7 +740,6 @@ elif selected == "🖥️  Reception":
                     """, (p_map[target_p], d_map[chosen_doc], srv_id, bnd_id, today_str, base_price, disc_amt, final_due, payment_method, visit_notes, referred_by_val, username))
                     log_action(username, "New Visit", f"Patient: {target_p} | Doctor: {chosen_doc} | Paid: ${final_due:.2f} | Via: {how_found}")
                     st.success("Visit saved.")
-                    play_ding()
                     st.session_state.rcpt = {
                         "patient": target_p, "doctor": chosen_doc, "item": chosen_item_name,
                         "base": base_price, "disc": disc_amt, "net": final_due,
@@ -904,9 +780,7 @@ elif selected == "🖥️  Reception":
             if st.button("Remove Patient", type="primary"):
                 if del_target != "— select —":
                     execute_write("DELETE FROM patients WHERE name = ?", (del_target,))
-                    log_action(username, "Remove Patient", f"Patient Name: {del_target}")
                     st.success(f"Removed {del_target}.")
-                    play_ding()
                     st.rerun()
         else:
             st.info("No patients found.")
@@ -926,9 +800,7 @@ elif selected == "🖥️  Reception":
             if p_name.strip():
                 if execute_write("INSERT INTO patients (name, phone, date_of_birth, gender, notes, created_at) VALUES (?,?,?,?,?,?)",
                                  (p_name.strip(), p_phone.strip(), p_dob.strip(), p_gender, p_notes.strip(), today_str)):
-                    log_action(username, "New Patient", f"Added patient: {p_name.strip()} | Gender: {p_gender}")
                     st.success(f"Patient '{p_name}' registered.")
-                    play_ding()
                 else:
                     st.error("A patient with that name already exists.")
             else:
@@ -985,9 +857,7 @@ elif selected == "🖥️  Reception":
             void_id = st.number_input("Visit ID to delete", min_value=1, step=1)
             if st.button("Delete Visit", type="primary"):
                 execute_write("DELETE FROM visits WHERE id = ?", (void_id,))
-                log_action(username, "Delete Visit", f"Voided visit reference ID: #{void_id}")
                 st.success(f"Visit #{void_id} deleted.")
-                play_ding()
                 st.rerun()
         else:
             st.info("No visits recorded yet.")
@@ -1020,9 +890,7 @@ elif selected == "📅  Appointments":
             if st.button("Book Appointment"):
                 execute_write("INSERT INTO appointments (patient_id, doctor_id, appt_date, appt_time, reason, status) VALUES (?,?,?,?,?,?)",
                               (p_map[ap_patient], d_map[ap_doctor], str(ap_date), str(ap_time), ap_reason, "Scheduled"))
-                log_action(username, "Book Appointment", f"Scheduled appointment for {ap_patient} with Doc ID: {d_map[ap_doctor]} on {ap_date}")
                 st.success(f"Appointment booked for {ap_patient} on {ap_date} at {ap_time}.")
-                play_ding()
 
     with ta2:
         section_label("Upcoming & recent appointments")
@@ -1046,9 +914,7 @@ elif selected == "📅  Appointments":
                 new_status = st.selectbox("New status", ["Scheduled", "Completed", "Cancelled", "No-show"])
             if st.button("Update Status"):
                 execute_write("UPDATE appointments SET status = ? WHERE id = ?", (new_status, upd_id))
-                log_action(username, "Update Appointment", f"Changed Appt ID #{upd_id} layout to {new_status}")
                 st.success(f"Appointment #{upd_id} updated to '{new_status}'.")
-                play_ding()
                 st.rerun()
         else:
             st.info("No appointments booked yet.")
@@ -1127,7 +993,6 @@ elif selected == "📊  Accounting":
                     execute_write("INSERT INTO expenses (description, category, amount, date, added_by) VALUES (?,?,?,?,?)", (e_desc, e_cat, e_amt, str(e_date), username))
                     log_action(username, "Add Expense", f"{e_desc} | ${e_amt:.2f} | {e_cat}")
                     st.success("Expense added.")
-                    play_ding()
                     st.rerun()
                 else:
                     st.error("Description and amount are required.")
@@ -1146,7 +1011,6 @@ elif selected == "📊  Accounting":
                     execute_write("DELETE FROM expenses WHERE id = ?", (exp_id,))
                     log_action(username, "Delete Expense", f"Deleted expense ID #{exp_id}: {chosen_del_exp}")
                     st.success("Expense deleted.")
-                    play_ding()
                     st.rerun()
         else:
             st.info("No expenses to delete.")
@@ -1187,7 +1051,6 @@ elif selected == "📊  Accounting":
                                   (tag, "Marketing", total_ref_comm, f"{current_month}-01", username))
                     log_action(username, "Referral Commission Paid", f"${total_ref_comm:.2f} for {current_month}")
                     st.success(f"Referral commissions of ${total_ref_comm:,.2f} recorded as expense.")
-                    play_ding()
                     st.rerun()
                 else:
                     st.warning("Referral commissions for this month have already been recorded.")
@@ -1197,60 +1060,46 @@ elif selected == "📊  Accounting":
         st.info("No referrers added yet. Add them in Settings → Referrers.")
 
 # ─────────────────────────────────────────────
-# MODULE: ACCOUNTS (BOSS ONLY VIEW)
+# MODULE: ACCOUNTS (BOSS ONLY)
 # ─────────────────────────────────────────────
 elif selected == "👥  Accounts":
-    if role != "Boss":
-        st.error("🔒 Security Access Violation. This interface is restricted to executive 'Boss' accounts only.")
-    else:
-        page_header("Accounts Control Center", "Manage administrative staff profiles, system registrations, and log trackers.")
-        
-        accounts_registered = fetch_all("SELECT id, username, role FROM users")
-        st.metric("Total User Accounts Configured", len(accounts_registered))
-        
-        acc_tab1, acc_tab2 = st.tabs(["🔒 Profiles & Access control", "📜 Activity tracking ledger"])
-        
-        with acc_tab1:
-            section_label("System Registration Roster")
-            if accounts_registered:
-                df_profiles = pd.DataFrame([dict(u) for u in accounts_registered])
-                st.dataframe(df_profiles, use_container_width=True, hide_index=True)
-                
-                st.markdown("<br>", unsafe_allow_html=True)
-                section_label("Decommission Employee Access Account")
-                st.warning("⚠️ Attention: Revoking an account instantly disconnects workspace rights. Historical audit trails are preserved inside ledger logs.")
-                
-                # Prevent a Boss from deleting their own currently active session account
-                killable_users = [u["username"] for u in accounts_registered if u["username"] != username]
-                selection_pool = ["— select profile —"] + killable_users
-                target_user_burn = st.selectbox("Select employee handle to delete", selection_pool, key="burn_user_select")
-                
-                if st.button("Permanently Delete Account", type="primary"):
-                    if target_user_burn != "— select profile —":
-                        execute_write("DELETE FROM users WHERE username = ?", (target_user_burn,))
-                        log_action(username, "Delete Account", f"Purged security access profile for: {target_user_burn}")
-                        st.success(f"Security Profile '{target_user_burn}' wiped successfully from application database runtime.")
-                        play_ding()
-                        st.rerun()
-                    else:
-                        st.error("Please pick an active staff profile from selection tray before trying to trigger deletion processes.")
-            else:
-                st.info("No administrative profiles found.")
-                
-        with acc_tab2:
-            section_label("Cross-Examine Operational Logs By User Profile")
-            profile_list_filter = ["Show All Operations"] + [u["username"] for u in accounts_registered]
-            chosen_profile_audit = st.selectbox("Filter audit lines by specific employee profile name", profile_list_filter)
-            
-            if chosen_profile_audit == "Show All Operations":
-                audit_records = fetch_all("SELECT timestamp as [Time Marked], username as [Staff Member], action as [Operation], details as [Action Breakdown] FROM audit_log ORDER BY id DESC LIMIT 400")
-            else:
-                audit_records = fetch_all("SELECT timestamp as [Time Marked], username as [Staff Member], action as [Operation], details as [Action Breakdown] FROM audit_log WHERE username = ? ORDER BY id DESC LIMIT 400", (chosen_profile_audit,))
-                
-            if audit_records:
-                st.dataframe(pd.DataFrame([dict(row) for row in audit_records]), use_container_width=True, hide_index=True)
-            else:
-                st.info(f"No specific adjustments or transactions indexed yet under user selection: '{chosen_profile_audit}'")
+    page_header("Accounts", "Manage user access and review full activity logs.")
+    accounts_registered = fetch_all("SELECT id, username, role FROM users")
+    st.metric("Total user accounts", len(accounts_registered))
+
+    acc_tab1, acc_tab2 = st.tabs(["Profiles & Access", "Activity Log"])
+
+    with acc_tab1:
+        section_label("All accounts")
+        if accounts_registered:
+            st.dataframe(pd.DataFrame([dict(u) for u in accounts_registered]), use_container_width=True, hide_index=True)
+            st.markdown("---")
+            section_label("Remove account")
+            st.warning("⚠️ Removing an account immediately revokes access. Audit history is preserved.")
+            killable = ["— select —"] + [u["username"] for u in accounts_registered if u["username"] != username]
+            target_del = st.selectbox("Select account to remove", killable, key="burn_user_select")
+            if st.button("Delete Account", type="primary", key="btn_del_account"):
+                if target_del != "— select —":
+                    execute_write("DELETE FROM users WHERE username = ?", (target_del,))
+                    log_action(username, "Delete Account", f"Removed: {target_del}")
+                    play_ding()
+                    st.success(f"Account '{target_del}' removed.")
+                    st.rerun()
+        else:
+            st.info("No accounts found.")
+
+    with acc_tab2:
+        section_label("Audit log by user")
+        profile_filter = ["All"] + [u["username"] for u in accounts_registered]
+        chosen_user = st.selectbox("Filter by user", profile_filter, key="acc_audit_user_filter")
+        if chosen_user == "All":
+            audit_records = fetch_all("SELECT timestamp as Time, username as User, action as Action, details as Details FROM audit_log ORDER BY id DESC LIMIT 400")
+        else:
+            audit_records = fetch_all("SELECT timestamp as Time, username as User, action as Action, details as Details FROM audit_log WHERE username = ? ORDER BY id DESC LIMIT 400", (chosen_user,))
+        if audit_records:
+            st.dataframe(pd.DataFrame([dict(r) for r in audit_records]), use_container_width=True, hide_index=True)
+        else:
+            st.info("No activity recorded yet.")
 
 # ─────────────────────────────────────────────
 # MODULE: SETTINGS
@@ -1277,9 +1126,7 @@ elif selected == "⚙️  Settings":
         if st.button("Add Doctor"):
             if d_name.strip():
                 if execute_write("INSERT INTO doctors (name, specialty, comm_type, fixed_rate) VALUES (?,?,?,?)", (d_name.strip(), d_spec.strip(), comm_type, f_rate)):
-                    log_action(username, "Add Doctor", f"Name: {d_name.strip()} | Specialty: {d_spec.strip()} | Model: {comm_type}")
                     st.success(f"Doctor '{d_name}' added.")
-                    play_ding()
                     st.rerun()
                 else:
                     st.error("A doctor with that name already exists.")
@@ -1295,9 +1142,7 @@ elif selected == "⚙️  Settings":
             if st.button("Remove Doctor", type="primary"):
                 if del_doc != "— select —":
                     execute_write("DELETE FROM doctors WHERE name = ?", (del_doc,))
-                    log_action(username, "Remove Doctor", f"Removed Doctor Name: {del_doc}")
                     st.success(f"Doctor '{del_doc}' removed.")
-                    play_ding()
                     st.rerun()
         else:
             st.info("No doctors added yet.")
@@ -1313,9 +1158,7 @@ elif selected == "⚙️  Settings":
         if st.button("Add Staff Member"):
             if emp_name.strip() and emp_role.strip():
                 if execute_write("INSERT INTO employees (name, role, salary) VALUES (?,?,?)", (emp_name.strip(), emp_role.strip(), emp_salary)):
-                    log_action(username, "Add Staff", f"Employee: {emp_name.strip()} | Role: {emp_role.strip()} | Salary: ${emp_salary}")
                     st.success(f"{emp_name} added to payroll.")
-                    play_ding()
                     st.rerun()
                 else:
                     st.error("An employee with that name already exists.")
@@ -1334,9 +1177,7 @@ elif selected == "⚙️  Settings":
             if st.button("Remove Employee", type="primary"):
                 if del_emp != "— select —":
                     execute_write("DELETE FROM employees WHERE name = ?", (del_emp,))
-                    log_action(username, "Remove Staff", f"Fired/Removed employee: {del_emp}")
                     st.success(f"Removed {del_emp} from payroll.")
-                    play_ding()
                     st.rerun()
         else:
             st.info("No staff added yet.")
@@ -1351,9 +1192,7 @@ elif selected == "⚙️  Settings":
         if st.button("Add Service"):
             if s_name.strip():
                 if execute_write("INSERT INTO services (name, category, price, active) VALUES (?,?,?,1)", (s_name.strip(), s_cat, s_price)):
-                    log_action(username, "Add Service", f"Service catalog item: {s_name.strip()} | Price: ${s_price}")
                     st.success(f"Service '{s_name}' added at ${s_price:.2f}.")
-                    play_ding()
                     st.rerun()
                 else:
                     st.error("A service with that name already exists.")
@@ -1369,9 +1208,7 @@ elif selected == "⚙️  Settings":
             if st.button("Remove Service", type="primary"):
                 if del_svc != "— select —":
                     execute_write("DELETE FROM services WHERE name = ?", (del_svc,))
-                    log_action(username, "Remove Service", f"Deleted Service: {del_svc}")
                     st.success(f"Service '{del_svc}' removed.")
-                    play_ding()
                     st.rerun()
         else:
             st.info("No services added yet.")
@@ -1388,9 +1225,7 @@ elif selected == "⚙️  Settings":
         if st.button("Create Bundle"):
             if b_name.strip() and b_price > 0:
                 if execute_write("INSERT INTO bundles (name, price, description) VALUES (?,?,?)", (b_name.strip(), b_price, b_desc.strip())):
-                    log_action(username, "Create Bundle", f"Package created: {b_name.strip()} | Priced: ${b_price}")
                     st.success(f"Bundle '{b_name}' created at ${b_price:.2f}.")
-                    play_ding()
                     st.rerun()
                 else:
                     st.error("A bundle with that name already exists.")
@@ -1406,9 +1241,7 @@ elif selected == "⚙️  Settings":
             if st.button("Remove Bundle", type="primary"):
                 if del_bnd != "— select —":
                     execute_write("DELETE FROM bundles WHERE name = ?", (del_bnd,))
-                    log_action(username, "Remove Bundle", f"Deleted Bundle: {del_bnd}")
                     st.success(f"Bundle '{del_bnd}' removed.")
-                    play_ding()
                     st.rerun()
         else:
             st.info("No bundles created yet.")
@@ -1430,7 +1263,6 @@ elif selected == "⚙️  Settings":
                                  (ref_name.strip(), ref_phone.strip(), ref_rate, ref_notes.strip(), username, today_str)):
                     log_action(username, "Add Referrer", f"{ref_name} at {ref_rate}%")
                     st.success(f"Referrer '{ref_name}' added with {ref_rate}% commission.")
-                    play_ding()
                     st.rerun()
                 else:
                     st.error("A referrer with that name already exists.")
@@ -1448,7 +1280,6 @@ elif selected == "⚙️  Settings":
                     execute_write("DELETE FROM referrers WHERE name = ?", (del_ref,))
                     log_action(username, "Remove Referrer", del_ref)
                     st.success(f"Referrer '{del_ref}' removed.")
-                    play_ding()
                     st.rerun()
         else:
             st.info("No referrers added yet.")
@@ -1473,7 +1304,6 @@ elif selected == "⚙️  Settings":
                                  (sub_name.strip(), sub_amount, int(sub_day), sub_cat, username, today_str)):
                     log_action(username, "Add Subscription", f"{sub_name} ${sub_amount}/mo")
                     st.success(f"Subscription '{sub_name}' added at ${sub_amount:.2f}/month.")
-                    play_ding()
                     st.rerun()
                 else:
                     st.error("A subscription with that name already exists.")
@@ -1496,7 +1326,6 @@ elif selected == "⚙️  Settings":
                         execute_write("UPDATE subscriptions SET active = ? WHERE name = ?", (0 if current_active else 1, toggle_sub))
                         log_action(username, "Toggle Subscription", f"{toggle_sub} → {'Paused' if current_active else 'Active'}")
                         st.success(f"'{toggle_sub}' is now {'paused' if current_active else 'active'}.")
-                        play_ding()
                         st.rerun()
             with col2:
                 del_sub = st.selectbox("Remove subscription", ["— select —"] + [s["name"] for s in all_subs], key="del_sub_select")
@@ -1505,7 +1334,6 @@ elif selected == "⚙️  Settings":
                         execute_write("DELETE FROM subscriptions WHERE name = ?", (del_sub,))
                         log_action(username, "Remove Subscription", del_sub)
                         st.success(f"Subscription '{del_sub}' removed.")
-                        play_ding()
                         st.rerun()
         else:
             st.info("No subscriptions added yet.")
