@@ -21,10 +21,8 @@ scope = [
 ]
 
 try:
-    # Safely load the raw JSON block
-    gcp_dict = json.loads(st.secrets["gcp_json"])
-    
-    creds = Credentials.from_service_account_info(gcp_dict, scopes=scope)
+    # This reads the flat TOML secrets correctly as a dictionary
+    creds = Credentials.from_service_account_info(dict(st.secrets), scopes=scope)
     gc = gspread.authorize(creds)
     sh = gc.open("Garden Clinic Data")
     worksheet = sh.sheet1
