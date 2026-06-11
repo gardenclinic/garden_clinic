@@ -10,13 +10,16 @@ import json
 # ─────────────────────────────────────────────
 # GOOGLE SHEETS CLOUD CONNECTION
 # ─────────────────────────────────────────────
+import streamlit as st
+import gspread
+from google.oauth2.service_account import Credentials
+
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
 try:
-    # Converts un-nested TOML directly to the dictionary format Google expects
     creds = Credentials.from_service_account_info(dict(st.secrets), scopes=scope)
     gc = gspread.authorize(creds)
     sh = gc.open("Garden Clinic Data")
