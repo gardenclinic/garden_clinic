@@ -13,19 +13,21 @@ import json
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
-# 1. Clean up the single-line private key format directly in Streamlit's secrets cache
-if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-    # Force fix any escaped backslashes in the private key string
-    if "private_key" in st.secrets["connections"]["gsheets"]:
-        raw_key = st.secrets["connections"]["gsheets"]["private_key"]
-        st.secrets["connections"]["gsheets"]["private_key"] = raw_key.replace("\\n", "\n")
-
-# 2. Establish the connection cleanly (Streamlit automatically maps it to your secrets)
+# 1. Establish the connection cleanly
+# Streamlit will automatically read your triple-quoted secrets in the background!
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 3. Read and display the sheet data frame
+# 2. Read and display the sheet data frame
 df = conn.read()
 st.dataframe(df)
+
+# --- PAGE CONFIG (Keep your existing config below this) ---
+st.set_page_config(
+    page_title="Garden Clinic",
+    page_icon="🌿",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 # ─────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────
