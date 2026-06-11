@@ -481,6 +481,16 @@ def get_financials():
             
     net_profit = gross_income - base_expenses - total_commissions
     return gross_income, base_expenses, total_commissions, gross_income - total_commissions, net_profit, doc_visits
+    def fetch_one(q, p=()):
+    try:
+        with sqlite3.connect("clinic.db") as conn:
+            db = conn.cursor()
+            res = db.execute(q, p).fetchone()
+            return res if res else None
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e).lower():
+            return None
+        raise e
 # ─────────────────────────────────────────────
 # BELL SOUND HELPER
 # ─────────────────────────────────────────────
