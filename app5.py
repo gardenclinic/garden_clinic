@@ -11,25 +11,17 @@ import json
 # GOOGLE SHEETS CLOUD CONNECTION
 # ─────────────────────────────────────────────
 import streamlit as st
-import gspread
-from google.oauth2.service_account import Credentials
+from streamlit_gsheets import GSheetsConnection
 
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive"
-]
+# Streamlit automatically finds the secrets and connects safely
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # Target the specific dictionary we created in the secrets file
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"], 
-        scopes=scope
-    )
-    gc = gspread.authorize(creds)
-    sh = gc.open("Garden Clinic Data")
-    worksheet = sh.sheet1
+    # Read the data into a pandas DataFrame instantly
+    df = conn.read(spreadsheet="Garden Clinic Data", worksheet="sheet1")
+    st.success("🟢 Connected successfully!")
 except Exception as e:
-    st.error(f"🔴 Google Sheets Connection Error: {e}")
+    st.error(f"🔴 Connection Error: {e}")
 # ─────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────
