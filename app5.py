@@ -284,8 +284,8 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 # ─────────────────────────────────────────────
 # DATABASE (CLOUD-SYNC FILE VERSION)
 # ─────────────────────────────────────────────
+import sqlite3  #
 DB_FILE = "garden_clinic_v7.db"
-
 # Pull data from Google Sheets into the local file ONLY ONCE when the app starts up
 if 'db_initialized' not in st.session_state:
     try:
