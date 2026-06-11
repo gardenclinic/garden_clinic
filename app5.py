@@ -283,24 +283,53 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# DATABASE (AUTO-BUILD CLOUD VERSION)
+# DATABASE (SELF-HEALING CLOUD VERSION)
 # ─────────────────────────────────────────────
 import sqlite3
 import re
+import hashlib
+import pandas as pd
 DB_FILE = "garden_clinic_v7.db"
+
+def auto_patch_error(e, q):
+    """Automatically fixes missing column errors on the fly!"""
+    err_msg = str(e).lower()
+    if "no such column" in err_msg:
+        col_match = re.search(r"no such column:\s*(\w+)", err_msg)
+        if col_match:
+            col_name = col_match.group(1)
+            tbl_match = re.search(r"(?:FROM|JOIN|INSERT\s+INTO|UPDATE)\s+(\w+)", q, re.IGNORECASE)
+            if tbl_match:
+                tbl_name = tbl_match.group(1)
+                try:
+                    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+                    conn.execute(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} TEXT;")
+                    conn.commit()
+                    conn.close()
+                    return True
+                except:
+                    pass
+    return False
 
 if 'db_initialized' not in st.session_state:
     try:
         conn = sqlite3.connect(DB_FILE, check_same_thread=False)
         
-        # 1. Automatically build core tables if they don't exist yet (prevents empty cloud crashes!)
-        conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT, username TEXT, password TEXT, role TEXT, name TEXT);")
+        # 1. Build initial core tables
+        conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT, username TEXT, password TEXT, password_hash TEXT, role TEXT, name TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS patients (id TEXT, name TEXT, phone TEXT, age TEXT, gender TEXT, address TEXT, history TEXT, date TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS expenses (id TEXT, description TEXT, amount TEXT, date TEXT, category TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS appointments (id TEXT, patient_id TEXT, date TEXT, time TEXT, status TEXT, notes TEXT);")
         conn.commit()
         
-        # 2. Pull data from Google Sheets if any rows exist to overwrite local tables
+        # 2. Force patch existing table if it was built without password_hash earlier
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT;")
+            conn.commit()
+        except:
+            pass
+            
+        # 3. Synchronize any structured data existing inside Google Sheets
         if 'sh' in globals() and sh is not None:
             for ws in sh.worksheets():
                 if ws.title == "Sheet1" and len(sh.worksheets()) > 1:
@@ -365,44 +394,55 @@ def sync_local_to_sheets():
         st.error(f"🔴 Cloud Sync Failed: {e}")
 
 def fetch_all(q, p=()):
-    db = get_db()
-    try:
-        res = db.execute(q, p).fetchall()
-        db.close()
-        return res
-    except sqlite3.OperationalError as e:
-        db.close()
-        if "no such table" in str(e):
-            return []
-        raise e
+    for _ in range(2):
+        db = get_db()
+        try:
+            res = db.execute(q, p).fetchall()
+            db.close()
+            return res
+        except sqlite3.OperationalError as e:
+            db.close()
+            if auto_patch_error(e, q):
+                continue
+            if "no such table" in str(e):
+                return []
+            raise e
+    return []
 
 def fetch_one(q, p=()):
-    db = get_db()
-    try:
-        res = db.execute(q, p).fetchone()
-        db.close()
-        return res
-    except sqlite3.OperationalError as e:
-        db.close()
-        if "no such table" in str(e):
-            return None
-        raise e
+    for _ in range(2):
+        db = get_db()
+        try:
+            res = db.execute(q, p).fetchone()
+            db.close()
+            return res
+        except sqlite3.OperationalError as e:
+            db.close()
+            if auto_patch_error(e, q):
+                continue
+            if "no such table" in str(e):
+                return None
+            raise e
+    return None
 
 def execute_write(q, p=()):
-    db = get_db()
-    try:
-        with db:
-            db.execute(q, p)
-        sync_local_to_sheets()
-        db.close()
-        return True
-    except sqlite3.OperationalError as e:
-        db.close()
-        return False
-    except sqlite3.IntegrityError:
-        db.close()
-        return False
-
+    for _ in range(2):
+        db = get_db()
+        try:
+            with db:
+                db.execute(q, p)
+            sync_local_to_sheets()
+            db.close()
+            return True
+        except sqlite3.OperationalError as e:
+            db.close()
+            if auto_patch_error(e, q):
+                continue
+            return False
+        except sqlite3.IntegrityError:
+            db.close()
+            return False
+    return False
 # ─────────────────────────────────────────────
 # BELL SOUND HELPER
 # ─────────────────────────────────────────────
