@@ -30,13 +30,6 @@ conn = st.connection("gsheets", type=GSheetsConnection, **creds)
 df = conn.read(spreadsheet="https://docs.google.com/spreadsheets/d/1234567890abcdefghijklmnopqrstuvwxyz/edit?usp=sharing")
 st.dataframe(df)
 
-# --- YOUR EXISTING PAGE CONFIG BELOW ---
-st.set_page_config(
-    page_title="Garden Clinic",
-    page_icon="🌿",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 # ─────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────
