@@ -20,7 +20,7 @@ scope = [
 ]
 
 try:
-    # Target only the isolated gcp_service_account dictionary
+    # Routes straight to your isolated gcp_service_account block
     creds = Credentials.from_service_account_info(
         st.secrets["gcp_service_account"], 
         scopes=scope
