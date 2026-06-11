@@ -283,7 +283,7 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# DATABASE (UNIVERSAL SELF-HEALING CLOUD VERSION)
+# DATABASE (HIGH-CAPACITY SELF-HEALING CLOUD)
 # ─────────────────────────────────────────────
 import sqlite3
 import re
@@ -297,7 +297,6 @@ def auto_patch_error(e, q):
     col_name = None
     tbl_name = None
     
-    # Case 1: Triggered during a search/read (SELECT)
     if "no such column" in err_msg:
         col_match = re.search(r"no such column:\s*(\w+)", err_msg)
         if col_match:
@@ -306,7 +305,6 @@ def auto_patch_error(e, q):
             if tbl_match:
                 tbl_name = tbl_match.group(1)
                 
-    # Case 2: Triggered during a save/write (INSERT/UPDATE)
     elif "has no column named" in err_msg:
         match = re.search(r"table\s+(\w+)\s+has\s+no\s+column\s+named\s+(\w+)", err_msg)
         if match:
@@ -327,22 +325,18 @@ def auto_patch_error(e, q):
 if 'db_initialized' not in st.session_state:
     try:
         conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-        
-        # 1. Build initial core tables
         conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT, username TEXT, password TEXT, password_hash TEXT, role TEXT, name TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS patients (id TEXT, name TEXT, phone TEXT, age TEXT, gender TEXT, address TEXT, history TEXT, date TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS expenses (id TEXT, description TEXT, amount TEXT, date TEXT, category TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS appointments (id TEXT, patient_id TEXT, date TEXT, time TEXT, status TEXT, notes TEXT);")
         conn.commit()
         
-        # 2. Safety patch for user tables
         try:
             conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT;")
             conn.commit()
         except:
             pass
             
-        # 3. Synchronize any existing data tables inside Google Sheets
         if 'sh' in globals() and sh is not None:
             for ws in sh.worksheets():
                 if ws.title == "Sheet1" and len(sh.worksheets()) > 1:
@@ -386,7 +380,6 @@ def sync_local_to_sheets():
             
             ws.clear()
             
-            # Sanitizes float values to prevent JSON compliance issues
             headers = [str(col) for col in df.columns]
             clean_rows = []
             for row in df.values.tolist():
@@ -417,7 +410,7 @@ def sync_local_to_sheets():
         st.error(f"🔴 Cloud Sync Failed: {e}")
 
 def fetch_all(q, p=()):
-    for _ in range(2):
+    for _ in range(5):  # Increased capacity to handle multi-column adjustments
         db = get_db()
         try:
             res = db.execute(q, p).fetchall()
@@ -433,7 +426,7 @@ def fetch_all(q, p=()):
     return []
 
 def fetch_one(q, p=()):
-    for _ in range(2):
+    for _ in range(5):  # Increased capacity to handle multi-column adjustments
         db = get_db()
         try:
             res = db.execute(q, p).fetchone()
@@ -449,7 +442,7 @@ def fetch_one(q, p=()):
     return None
 
 def execute_write(q, p=()):
-    for _ in range(2):
+    for _ in range(5):  # Increased capacity to handle multi-column adjustments
         db = get_db()
         try:
             with db:
