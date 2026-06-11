@@ -449,53 +449,38 @@ def sync_local_to_sheets():
         pass # Silently drop background errors to avoid disrupting runtime
 
 def fetch_all(q, p=()):
-    for _ in range(5):
-        db = get_db()
-        try:
+    try:
+        with sqlite3.connect("clinic.db") as conn:
+            db = conn.cursor()
             res = db.execute(q, p).fetchall()
-            db.close()
             return res
-        except sqlite3.OperationalError as e:
-            db.close()
-            if auto_patch_error(e, q):
-                continue
+    except sqlite3.OperationalError as e:
+        # If a table doesn't exist yet, return an empty list gracefully instead of crashing
+        if "no such table" in str(e).lower():
             return []
-    return []
+        raise e
 
-def fetch_one(q, p=()):
-    for _ in range(5):
-        db = get_db()
-        try:
-            res = db.execute(q, p).fetchone()
-            db.close()
-            if res is None:
-                return SafeRow()
-            return res
-        except sqlite3.OperationalError as e:
-            db.close()
-            if auto_patch_error(e, q):
-                continue
-            return SafeRow()
-    return SafeRow()
+def get_financials():
+    # Safe default values in case tables are missing on day one
+    gross_income = 0.0
+    base_expenses = 0.0
+    total_commissions = 0.0
+    net_profit = 0.0
+    doc_visits = {}
 
-def execute_write(q, p=()):
-    for _ in range(5):
-        db = get_db()
-        try:
-            with db:
-                db.execute(q, p)
-            sync_local_to_sheets()
-            db.close()
-            return True
-        except sqlite3.OperationalError as e:
-            db.close()
-            if auto_patch_error(e, q):
-                continue
-            return False
-        except sqlite3.IntegrityError:
-            db.close()
-            return False
-    return False
+    all_visits = fetch_all("SELECT d.name, d.comm_type, d.fixed_rate, v.net_paid FROM visits v JOIN doctors d ON v.doctor_id = d.id")
+    
+    # Process calculations only if we have records
+    for name, comm_type, fixed_rate, net_paid in all_visits:
+        gross_income += net_paid
+        doc_visits[name] = doc_visits.get(name, 0) + 1
+        if comm_type == "Fixed":
+            total_commissions += fixed_rate
+        else:
+            total_commissions += (net_paid * 0.30) # 30% default split
+            
+    net_profit = gross_income - base_expenses - total_commissions
+    return gross_income, base_expenses, total_commissions, gross_income - total_commissions, net_profit, doc_visits
 # ─────────────────────────────────────────────
 # BELL SOUND HELPER
 # ─────────────────────────────────────────────
