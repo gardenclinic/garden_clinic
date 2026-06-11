@@ -283,7 +283,7 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# DATABASE (SELF-HEALING CLOUD VERSION)
+# DATABASE (SELF-HEALING & FLOATING-NAN PROOF)
 # ─────────────────────────────────────────────
 import sqlite3
 import re
@@ -372,10 +372,21 @@ def sync_local_to_sheets():
                 ws = sh.add_worksheet(title=table, rows="1000", cols="26")
             
             ws.clear()
-            for col in df.columns:
-                df[col] = df[col].astype(str).replace('None', '').replace('NaN', '')
             
-            upload_data = [df.columns.values.tolist()] + df.values.tolist()
+            # --- PURE PYTHON SANITIZATION PASS (Stops float 'nan' JSON crashes completely) ---
+            headers = [str(col) for col in df.columns]
+            clean_rows = []
+            for row in df.values.tolist():
+                clean_row = []
+                for val in row:
+                    if val is None or pd.isna(val) or str(val).lower() in ['none', 'nan', '<na>']:
+                        clean_row.append("")
+                    else:
+                        clean_row.append(str(val))
+                clean_rows.append(clean_row)
+            
+            upload_data = [headers] + clean_rows
+            # ---------------------------------------------------------------------------------
             
             try:
                 ws.update(range_name="A1", values=upload_data)
@@ -443,6 +454,7 @@ def execute_write(q, p=()):
             db.close()
             return False
     return False
+
 # ─────────────────────────────────────────────
 # BELL SOUND HELPER
 # ─────────────────────────────────────────────
