@@ -6,9 +6,9 @@ from datetime import datetime, date
 import streamlit.components.v1 as components
 
 # ─────────────────────────────────────────────
-# GOOGLE SHEETS SYNC
+# GOOGLE SHEETS SYNC (OPTIONAL — won't crash if not configured)
 # ─────────────────────────────────────────────
-   _gsheets_enabled = False
+_gsheets_enabled = False
 _gsheets_conn = None
 
 try:
