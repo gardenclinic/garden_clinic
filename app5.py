@@ -1,9 +1,28 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
+import gspread
+from google.oauth2.service_account import Credentials
 import hashlib
 from datetime import datetime, date
 import streamlit.components.v1 as components
+import json
+
+# ─────────────────────────────────────────────
+# GOOGLE SHEETS CLOUD CONNECTION
+# ─────────────────────────────────────────────
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
+
+try:
+    gcp_info = json.loads(st.secrets["gcp_json"])
+    creds = Credentials.from_service_account_info(gcp_info, scopes=scope)
+    gc = gspread.authorize(creds)
+    sh = gc.open("Garden Clinic Data")
+    worksheet = sh.sheet1
+except Exception as e:
+    pass
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG
@@ -263,38 +282,98 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# DATABASE
+# DATABASE (CLOUD-SYNC VERSION)
 # ─────────────────────────────────────────────
-DB_FILE = "garden_clinic_v7.db"
+import sqlite3
 
-def hash_password(pw): return hashlib.sha256(pw.encode()).hexdigest()
+# Create a continuous cloud connection in the app memory
+if 'db_conn' not in st.session_state:
+    # 1. Open a fast temporary database inside memory
+    st.session_state.db_conn = sqlite3.connect(":memory:", check_same_thread=False)
+    st.session_state.db_conn.row_factory = sqlite3.Row
+    
+    # 2. Pull existing records from your Google Sheet tabs (if any exist yet)
+    if 'sh' in globals() and sh is not None:
+        try:
+            for ws in sh.worksheets():
+                if ws.title == "Sheet1" and len(sh.worksheets()) > 1:
+                    continue
+                records = ws.get_all_records()
+                if records:
+                    df = pd.DataFrame(records)
+                    df.to_sql(ws.title, st.session_state.db_conn, if_exists='replace', index=False)
+        except Exception as e:
+            pass
 
 def get_db():
-    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return st.session_state.db_conn
+
+def sync_local_to_sheets():
+    """Pushes any new inputs/changes instantly up to your Google Sheet"""
+    if 'sh' not in globals() or sh is None:
+        return
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [row[0] for row in cursor.fetchall()]
+        
+        for table in tables:
+            if table.startswith('sqlite_'):
+                continue
+            # Read the updated table from memory
+            df = pd.read_sql(f"SELECT * FROM {table}", db)
+            
+            # Find or create a matching tab in Google Sheets
+            try:
+                ws = sh.worksheet(table)
+            except gspread.WorksheetNotFound:
+                ws = sh.add_worksheet(title=table, rows="1000", cols="26")
+            
+            ws.clear()
+            
+            # Clean dates/numbers so Google Sheets accepts them cleanly
+            for col in df.columns:
+                df[col] = df[col].astype(str).replace('None', '').replace('NaN', '')
+            
+            # Upload everything
+            upload_data = [df.columns.values.tolist()] + df.values.tolist()
+            ws.update(upload_data)
+            
+        # Clean up the default empty Sheet1 if it's no longer needed
+        try:
+            default_ws = sh.worksheet("Sheet1")
+            if len(sh.worksheets()) > 1:
+                sh.del_worksheet(default_ws)
+        except:
+            pass
+    except Exception as e:
+        pass
+
+def hash_password(pw): 
+    return hashlib.sha256(pw.encode()).hexdigest()
 
 def fetch_all(q, p=()):
     db = get_db()
     res = db.execute(q, p).fetchall()
-    db.close()
     return res
 
 def fetch_one(q, p=()):
     db = get_db()
     res = db.execute(q, p).fetchone()
-    db.close()
     return res
 
 def execute_write(q, p=()):
     db = get_db()
     try:
-        with db: db.execute(q, p)
+        with db: 
+            db.execute(q, p)
+        # Save to the cloud sheet immediately after a change!
+        sync_local_to_sheets()
         return True
     except sqlite3.IntegrityError:
         return False
-    finally:
-        db.close()
+
 
 def init_db():
     db = get_db()
