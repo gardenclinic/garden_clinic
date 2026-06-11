@@ -10,14 +10,17 @@ import json
 # ─────────────────────────────────────────────
 # GOOGLE SHEETS CLOUD CONNECTION
 # ─────────────────────────────────────────────
+import json # Ensure this is imported at the top of your file
+
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
 try:
-    # Pass st.secrets directly as the dictionary
-    creds = Credentials.from_service_account_info(st.secrets, scopes=scope)
+    # Safely load the single-line string back into a Python dict
+    gcp_info = json.loads(st.secrets["gcp_json_str"])
+    creds = Credentials.from_service_account_info(gcp_info, scopes=scope)
     gc = gspread.authorize(creds)
     sh = gc.open("Garden Clinic Data")
     worksheet = sh.sheet1
