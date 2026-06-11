@@ -459,6 +459,16 @@ def fetch_all(q, p=()):
         if "no such table" in str(e).lower():
             return []
         raise e
+        def fetch_one(q, p=()):
+    try:
+        with sqlite3.connect("clinic.db") as conn:
+            db = conn.cursor()
+            res = db.execute(q, p).fetchone()
+            return res if res else None
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e).lower():
+            return None
+        raise e
 
 def get_financials():
     # Safe default values in case tables are missing on day one
