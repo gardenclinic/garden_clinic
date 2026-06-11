@@ -13,15 +13,30 @@ import json
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
-# 1. Establish the connection cleanly using your secrets
-conn = st.connection("gsheets", type=GSheetsConnection)
+# 1. Grab the raw connection dictionary from secrets
+creds = dict(st.secrets["connections"]["gsheets"])
 
-# 2. Read the data by passing your exact URL right here
-# (Replace the link below with your actual Google Sheet link)
-df = conn.read(spreadsheet="https://docs.google.com/spreadsheets/d/YOUR_ACTUAL_SPREADSHEET_ID_HERE/edit?usp=sharing")
+# 2. Safely fix any text layout conflicts from the raw JSON string
+if "private_key" in creds:
+    # Remove literal backslash-n sequences if they exist
+    creds["private_key"] = creds["private_key"].replace("\\n", "\n")
+    # Clean up accidental double-newlines
+    creds["private_key"] = creds["private_key"].replace("\n\n", "\n")
 
-# 3. Display the data frame
+# 3. Initialize connection using the cleaned dictionary
+conn = st.connection("gsheets", type=GSheetsConnection, **creds)
+
+# 4. Read the spreadsheet URL directly
+df = conn.read(spreadsheet="https://docs.google.com/spreadsheets/d/1234567890abcdefghijklmnopqrstuvwxyz/edit?usp=sharing")
 st.dataframe(df)
+
+# --- YOUR EXISTING PAGE CONFIG BELOW ---
+st.set_page_config(
+    page_title="Garden Clinic",
+    page_icon="🌿",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 # ─────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────
