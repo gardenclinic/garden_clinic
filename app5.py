@@ -464,7 +464,7 @@ def fetch_one(q, p=()):
         with sqlite3.connect("clinic.db") as conn:
             db = conn.cursor()
             res = db.execute(q, p).fetchone()
-            return res if res else None
+            return res
     except sqlite3.OperationalError as e:
         if "no such table" in str(e).lower():
             return None
