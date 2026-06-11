@@ -11,7 +11,6 @@ import json
 # GOOGLE SHEETS CLOUD CONNECTION
 # ─────────────────────────────────────────────
 import streamlit as st
-import json
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -21,8 +20,11 @@ scope = [
 ]
 
 try:
-    # Reads the flat TOML secrets correctly as a dictionary
-    creds = Credentials.from_service_account_info(dict(st.secrets), scopes=scope)
+    # Target the specific dictionary we created in the secrets file
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"], 
+        scopes=scope
+    )
     gc = gspread.authorize(creds)
     sh = gc.open("Garden Clinic Data")
     worksheet = sh.sheet1
