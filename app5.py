@@ -22,7 +22,8 @@ try:
     sh = gc.open("Garden Clinic Data")
     worksheet = sh.sheet1
 except Exception as e:
-    pass
+    # This will show us if your secret key or sheet name has an issue!
+    st.error(f"🔴 Google Sheets Connection Error: {e}")
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG
@@ -282,11 +283,11 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# DATABASE (CLOUD-SYNC FILE VERSION)
+# DATABASE (DIAGNOSTIC VERSION)
 # ─────────────────────────────────────────────
-import sqlite3  #
+import sqlite3
 DB_FILE = "garden_clinic_v7.db"
-# Pull data from Google Sheets into the local file ONLY ONCE when the app starts up
+
 if 'db_initialized' not in st.session_state:
     try:
         if 'sh' in globals() and sh is not None:
@@ -300,7 +301,7 @@ if 'db_initialized' not in st.session_state:
                     df.to_sql(ws.title, conn, if_exists='replace', index=False)
             conn.close()
     except Exception as e:
-        pass
+        st.error(f"🔴 Local DB Init Error: {e}")
     st.session_state.db_initialized = True
 
 def hash_password(pw): 
@@ -314,6 +315,7 @@ def get_db():
 def sync_local_to_sheets():
     """Pushes any updates from the local database file straight to Google Sheets"""
     if 'sh' not in globals() or sh is None:
+        st.warning("⚠️ Cannot sync: Google Sheets connection is not active.")
         return
     try:
         conn = sqlite3.connect(DB_FILE, check_same_thread=False)
@@ -336,7 +338,12 @@ def sync_local_to_sheets():
                 df[col] = df[col].astype(str).replace('None', '').replace('NaN', '')
             
             upload_data = [df.columns.values.tolist()] + df.values.tolist()
-            ws.update(range_name="A1", values=upload_data)
+            
+            # This handles both old and new gspread versions automatically
+            try:
+                ws.update(range_name="A1", values=upload_data)
+            except:
+                ws.update(upload_data)
             
         try:
             default_ws = sh.worksheet("Sheet1")
@@ -345,8 +352,9 @@ def sync_local_to_sheets():
         except:
             pass
         conn.close()
+        st.toast("✅ Successfully synced data to Google Sheets!", icon="☁️")
     except Exception as e:
-        pass
+        st.error(f"🔴 Cloud Sync Failed: {e}")
 
 def fetch_all(q, p=()):
     db = get_db()
@@ -365,7 +373,6 @@ def execute_write(q, p=()):
     try:
         with db: 
             db.execute(q, p)
-        # Sync to Google Sheets immediately after writing locally!
         sync_local_to_sheets()
         return True
     except sqlite3.IntegrityError:
