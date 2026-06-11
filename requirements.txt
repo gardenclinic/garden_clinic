@@ -3,3 +3,6 @@ pandas
 st-gsheets-connection
 gspread
 google-auth
+streamlit>=1.37.0
+st-gsheets-connection>=0.1.0
+pandas
