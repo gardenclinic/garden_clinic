@@ -449,16 +449,6 @@ def sync_local_to_sheets():
         pass # Silently drop background errors to avoid disrupting runtime
 
 def fetch_all(q, p=()):
-    def fetch_one(q, p=()):
-    try:
-        with sqlite3.connect("clinic.db") as conn:
-            db = conn.cursor()
-            res = db.execute(q, p).fetchone()
-            return res if res else None
-    except sqlite3.OperationalError as e:
-        if "no such table" in str(e).lower():
-            return None
-        raise e
     try:
         with sqlite3.connect("clinic.db") as conn:
             db = conn.cursor()
