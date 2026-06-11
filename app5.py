@@ -16,8 +16,12 @@ scope = [
 ]
 
 try:
-    # Pull the nested TOML table as a dictionary directly
+    # Pull the nested TOML table as a dictionary
     gcp_dict = dict(st.secrets["gcp"])
+    
+    # CRITICAL FIX: Ensure literal \n characters become actual newlines for the PEM file
+    gcp_dict["private_key"] = gcp_dict["private_key"].replace('\\n', '\n')
+    
     creds = Credentials.from_service_account_info(gcp_dict, scopes=scope)
     gc = gspread.authorize(creds)
     sh = gc.open("Garden Clinic Data")
