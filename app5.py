@@ -11,26 +11,14 @@ import json
 # GOOGLE SHEETS CLOUD CONNECTION
 # ─────────────────────────────────────────────
 import streamlit as st
-import gspread
-from google.oauth2.service_account import Credentials
+# Change your import to the native Streamlit connections module:
+from streamlit.connections import GSheetsConnection
 
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive"
-]
+# Establish the connection
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-try:
-    # Routes straight to your isolated gcp_service_account block
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"], 
-        scopes=scope
-    )
-    gc = gspread.authorize(creds)
-    sh = gc.open("Garden Clinic Data")
-    worksheet = sh.sheet1
-    st.success("🟢 Connected to Google Sheets successfully!")
-except Exception as e:
-    st.error(f"🔴 Google Sheets Connection Error: {e}")
+# Read the data (adjust the spreadsheet name/URL as needed for your code)
+df = conn.read()
 # ─────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────
