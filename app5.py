@@ -282,85 +282,82 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# DATABASE (CLOUD-SYNC VERSION)
+# DATABASE (CLOUD-SYNC FILE VERSION)
 # ─────────────────────────────────────────────
-import sqlite3
+DB_FILE = "garden_clinic_v7.db"
 
-# Create a continuous cloud connection in the app memory
-if 'db_conn' not in st.session_state:
-    # 1. Open a fast temporary database inside memory
-    st.session_state.db_conn = sqlite3.connect(":memory:", check_same_thread=False)
-    st.session_state.db_conn.row_factory = sqlite3.Row
-    
-    # 2. Pull existing records from your Google Sheet tabs (if any exist yet)
-    if 'sh' in globals() and sh is not None:
-        try:
+# Pull data from Google Sheets into the local file ONLY ONCE when the app starts up
+if 'db_initialized' not in st.session_state:
+    try:
+        if 'sh' in globals() and sh is not None:
+            conn = sqlite3.connect(DB_FILE, check_same_thread=False)
             for ws in sh.worksheets():
                 if ws.title == "Sheet1" and len(sh.worksheets()) > 1:
                     continue
                 records = ws.get_all_records()
                 if records:
                     df = pd.DataFrame(records)
-                    df.to_sql(ws.title, st.session_state.db_conn, if_exists='replace', index=False)
-        except Exception as e:
-            pass
+                    df.to_sql(ws.title, conn, if_exists='replace', index=False)
+            conn.close()
+    except Exception as e:
+        pass
+    st.session_state.db_initialized = True
+
+def hash_password(pw): 
+    return hashlib.sha256(pw.encode()).hexdigest()
 
 def get_db():
-    return st.session_state.db_conn
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def sync_local_to_sheets():
-    """Pushes any new inputs/changes instantly up to your Google Sheet"""
+    """Pushes any updates from the local database file straight to Google Sheets"""
     if 'sh' not in globals() or sh is None:
         return
     try:
-        db = get_db()
-        cursor = db.cursor()
+        conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+        cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = [row[0] for row in cursor.fetchall()]
         
         for table in tables:
             if table.startswith('sqlite_'):
                 continue
-            # Read the updated table from memory
-            df = pd.read_sql(f"SELECT * FROM {table}", db)
+            df = pd.read_sql(f"SELECT * FROM {table}", conn)
             
-            # Find or create a matching tab in Google Sheets
             try:
                 ws = sh.worksheet(table)
             except gspread.WorksheetNotFound:
                 ws = sh.add_worksheet(title=table, rows="1000", cols="26")
             
             ws.clear()
-            
-            # Clean dates/numbers so Google Sheets accepts them cleanly
             for col in df.columns:
                 df[col] = df[col].astype(str).replace('None', '').replace('NaN', '')
             
-            # Upload everything
             upload_data = [df.columns.values.tolist()] + df.values.tolist()
             ws.update(upload_data)
             
-        # Clean up the default empty Sheet1 if it's no longer needed
         try:
             default_ws = sh.worksheet("Sheet1")
             if len(sh.worksheets()) > 1:
                 sh.del_worksheet(default_ws)
         except:
             pass
+        conn.close()
     except Exception as e:
         pass
-
-def hash_password(pw): 
-    return hashlib.sha256(pw.encode()).hexdigest()
 
 def fetch_all(q, p=()):
     db = get_db()
     res = db.execute(q, p).fetchall()
+    db.close()
     return res
 
 def fetch_one(q, p=()):
     db = get_db()
     res = db.execute(q, p).fetchone()
+    db.close()
     return res
 
 def execute_write(q, p=()):
@@ -368,56 +365,13 @@ def execute_write(q, p=()):
     try:
         with db: 
             db.execute(q, p)
-        # Save to the cloud sheet immediately after a change!
+        # Sync to Google Sheets immediately after writing locally!
         sync_local_to_sheets()
         return True
     except sqlite3.IntegrityError:
         return False
-
-
-def init_db():
-    db = get_db()
-    with db:
-        db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL)")
-        db.execute("CREATE TABLE IF NOT EXISTS patients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, phone TEXT, date_of_birth TEXT, gender TEXT, notes TEXT, created_at TEXT)")
-        db.execute("CREATE TABLE IF NOT EXISTS doctors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, specialty TEXT, comm_type TEXT NOT NULL, fixed_rate REAL DEFAULT 0.0)")
-        db.execute("CREATE TABLE IF NOT EXISTS employees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, role TEXT NOT NULL, salary REAL NOT NULL)")
-        db.execute("CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, category TEXT, price REAL NOT NULL, active INTEGER DEFAULT 1)")
-        db.execute("CREATE TABLE IF NOT EXISTS bundles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, price REAL NOT NULL, description TEXT)")
-        db.execute("""CREATE TABLE IF NOT EXISTS visits (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id INTEGER, doctor_id INTEGER, service_id INTEGER, bundle_id INTEGER,
-            visit_date TEXT, base_price REAL, discount_amount REAL, net_paid REAL,
-            payment_method TEXT DEFAULT 'Cash', notes TEXT
-        )""")
-        db.execute("CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT NOT NULL, category TEXT DEFAULT 'General', amount REAL NOT NULL, date TEXT NOT NULL)")
-        db.execute("CREATE TABLE IF NOT EXISTS appointments (id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, doctor_id INTEGER, appt_date TEXT, appt_time TEXT, reason TEXT, status TEXT DEFAULT 'Scheduled')")
-        db.execute("CREATE TABLE IF NOT EXISTS referrers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, phone TEXT, commission_rate REAL NOT NULL DEFAULT 0.0, notes TEXT, added_by TEXT, created_at TEXT)")
-        db.execute("CREATE TABLE IF NOT EXISTS subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, amount REAL NOT NULL, billing_day INTEGER DEFAULT 1, category TEXT DEFAULT 'Subscription', active INTEGER DEFAULT 1, added_by TEXT, created_at TEXT)")
-        db.execute("CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, action TEXT NOT NULL, details TEXT, timestamp TEXT NOT NULL)")
-
-        # migrations
-        for col, definition in [
-            ("notes TEXT", "ALTER TABLE visits ADD COLUMN notes TEXT"),
-            ("payment_method TEXT", "ALTER TABLE visits ADD COLUMN payment_method TEXT DEFAULT 'Cash'"),
-            ("specialty TEXT", "ALTER TABLE doctors ADD COLUMN specialty TEXT"),
-            ("category TEXT", "ALTER TABLE services ADD COLUMN category TEXT"),
-            ("active INTEGER", "ALTER TABLE services ADD COLUMN active INTEGER DEFAULT 1"),
-            ("description TEXT", "ALTER TABLE bundles ADD COLUMN description TEXT"),
-            ("date_of_birth TEXT", "ALTER TABLE patients ADD COLUMN date_of_birth TEXT"),
-            ("gender TEXT", "ALTER TABLE patients ADD COLUMN gender TEXT"),
-            ("patient_notes TEXT", "ALTER TABLE patients ADD COLUMN notes TEXT"),
-            ("created_at TEXT", "ALTER TABLE patients ADD COLUMN created_at TEXT"),
-            ("category TEXT expenses", "ALTER TABLE expenses ADD COLUMN category TEXT DEFAULT 'General'"),
-            ("referred_by TEXT visits", "ALTER TABLE visits ADD COLUMN referred_by TEXT"),
-            ("added_by TEXT visits", "ALTER TABLE visits ADD COLUMN added_by TEXT"),
-            ("added_by TEXT expenses", "ALTER TABLE expenses ADD COLUMN added_by TEXT"),
-        ]:
-            try: db.execute(definition)
-            except: pass
-    db.close()
-
-init_db()
+    finally:
+        db.close()
 
 # ─────────────────────────────────────────────
 # BELL SOUND HELPER
