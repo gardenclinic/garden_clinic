@@ -33,6 +33,17 @@ def sync_to_sheets(table_name: str, df: pd.DataFrame):
         return
     # Temporarily remove the try/except block to see the actual error
     _gsheets_conn.update(worksheet=table_name, data=df)
+    def sync_to_sheets(table_name: str, df: pd.DataFrame):
+    """Push a dataframe to a Google Sheet worksheet. Silent no-op if GSheets not configured."""
+    if not _gsheets_enabled or _gsheets_conn is None:
+        return
+    
+    # Removed try/except block to see the real error
+    _gsheets_conn.update(
+        spreadsheet="https://docs.google.com/spreadsheets/d/14x5xF6uIvCVo4NedB9KT4T81FHE9EM-QUnkI_x-_sbQ/edit?usp=sharing",
+        worksheet=table_name, 
+        data=df
+    )
 # ─────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────
