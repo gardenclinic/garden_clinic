@@ -336,7 +336,7 @@ def sync_local_to_sheets():
                 df[col] = df[col].astype(str).replace('None', '').replace('NaN', '')
             
             upload_data = [df.columns.values.tolist()] + df.values.tolist()
-            ws.update(upload_data)
+            ws.update(range_name="A1", values=upload_data)
             
         try:
             default_ws = sh.worksheet("Sheet1")
