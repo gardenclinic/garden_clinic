@@ -15,8 +15,12 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Pass the secret directly as a dictionary, bypassing json.loads()
+try:
     creds = Credentials.from_service_account_info(dict(st.secrets["gcp_json"]), scopes=scope)
+    gc = gspread.authorize(creds)
+    sh = gc.open("Garden Clinic Data")
+    worksheet = sh.sheet1
+except Exception as e:
     
     # 2. Authenticate cleanly using the dictionary data
     creds = Credentials.from_service_account_info(gcp_info, scopes=scope)
