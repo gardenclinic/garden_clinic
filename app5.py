@@ -13,14 +13,13 @@ import json
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
-# 1. Establish connection using secrets
+# 1. Establish the connection matching your [connections.gsheets] header
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 2. Pass your exact sheet URL into the read function
-spreadsheet_url = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE/edit?usp=sharing"
-df = conn.read(spreadsheet=spreadsheet_url)
+# 2. Read the spreadsheet URL that we stored directly in secrets
+df = conn.read()
 
-# 3. Display the data
+# 3. Display the results safely on the app screen
 st.dataframe(df)
 # ─────────────────────────────────────────────
 # PAGE CONFIG
