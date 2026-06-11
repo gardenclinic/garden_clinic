@@ -13,13 +13,18 @@ import json
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
-# 1. Establish the connection matching your [connections.gsheets] header
-conn = st.connection("gsheets", type=GSheetsConnection)
+# 1. Pull the raw secrets dictionary
+secrets_dict = dict(st.secrets["connections"]["gsheets"])
 
-# 2. Read the spreadsheet URL that we stored directly in secrets
+# 2. Convert literal "\n" strings into actual programming line breaks
+if "private_key" in secrets_dict:
+    secrets_dict["private_key"] = secrets_dict["private_key"].replace("\\n", "\n")
+
+# 3. Pass the cleaned dictionary directly into the connection tool
+conn = st.connection("gsheets", type=GSheetsConnection, **secrets_dict)
+
+# 4. Read and display the sheet data frame
 df = conn.read()
-
-# 3. Display the results safely on the app screen
 st.dataframe(df)
 # ─────────────────────────────────────────────
 # PAGE CONFIG
