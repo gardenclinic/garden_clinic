@@ -283,7 +283,7 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# DATABASE (SELF-HEALING & FLOATING-NAN PROOF)
+# DATABASE (UNIVERSAL SELF-HEALING CLOUD VERSION)
 # ─────────────────────────────────────────────
 import sqlite3
 import re
@@ -292,23 +292,36 @@ import pandas as pd
 DB_FILE = "garden_clinic_v7.db"
 
 def auto_patch_error(e, q):
-    """Automatically fixes missing column errors on the fly!"""
+    """Automatically fixes missing column errors on the fly for BOTH SELECT and INSERT statements!"""
     err_msg = str(e).lower()
+    col_name = None
+    tbl_name = None
+    
+    # Case 1: Triggered during a search/read (SELECT)
     if "no such column" in err_msg:
         col_match = re.search(r"no such column:\s*(\w+)", err_msg)
         if col_match:
             col_name = col_match.group(1)
-            tbl_match = re.search(r"(?:FROM|JOIN|INSERT\s+INTO|UPDATE)\s+(\w+)", q, re.IGNORECASE)
+            tbl_match = re.search(r"(?:from|join|insert\s+into|update)\s+(\w+)", q, re.IGNORECASE)
             if tbl_match:
                 tbl_name = tbl_match.group(1)
-                try:
-                    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-                    conn.execute(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} TEXT;")
-                    conn.commit()
-                    conn.close()
-                    return True
-                except:
-                    pass
+                
+    # Case 2: Triggered during a save/write (INSERT/UPDATE)
+    elif "has no column named" in err_msg:
+        match = re.search(r"table\s+(\w+)\s+has\s+no\s+column\s+named\s+(\w+)", err_msg)
+        if match:
+            tbl_name = match.group(1)
+            col_name = match.group(2)
+    
+    if col_name and tbl_name:
+        try:
+            conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+            conn.execute(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} TEXT;")
+            conn.commit()
+            conn.close()
+            return True
+        except:
+            pass
     return False
 
 if 'db_initialized' not in st.session_state:
@@ -322,14 +335,14 @@ if 'db_initialized' not in st.session_state:
         conn.execute("CREATE TABLE IF NOT EXISTS appointments (id TEXT, patient_id TEXT, date TEXT, time TEXT, status TEXT, notes TEXT);")
         conn.commit()
         
-        # 2. Force patch existing table if it was built without password_hash earlier
+        # 2. Safety patch for user tables
         try:
             conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT;")
             conn.commit()
         except:
             pass
             
-        # 3. Synchronize any structured data existing inside Google Sheets
+        # 3. Synchronize any existing data tables inside Google Sheets
         if 'sh' in globals() and sh is not None:
             for ws in sh.worksheets():
                 if ws.title == "Sheet1" and len(sh.worksheets()) > 1:
@@ -373,7 +386,7 @@ def sync_local_to_sheets():
             
             ws.clear()
             
-            # --- PURE PYTHON SANITIZATION PASS (Stops float 'nan' JSON crashes completely) ---
+            # Sanitizes float values to prevent JSON compliance issues
             headers = [str(col) for col in df.columns]
             clean_rows = []
             for row in df.values.tolist():
@@ -386,7 +399,6 @@ def sync_local_to_sheets():
                 clean_rows.append(clean_row)
             
             upload_data = [headers] + clean_rows
-            # ---------------------------------------------------------------------------------
             
             try:
                 ws.update(range_name="A1", values=upload_data)
