@@ -15,9 +15,8 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-try:
-    # 1. Gather the secrets structure into a clean dict
-    gcp_info = dict(st.secrets["gcp_json"])
+# Pass the secret directly as a dictionary, bypassing json.loads()
+    creds = Credentials.from_service_account_info(dict(st.secrets["gcp_json"]), scopes=scope)
     
     # 2. Authenticate cleanly using the dictionary data
     creds = Credentials.from_service_account_info(gcp_info, scopes=scope)
