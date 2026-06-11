@@ -18,10 +18,7 @@ scope = [
 try:
     creds = Credentials.from_service_account_info(dict(st.secrets["gcp_json"]), scopes=scope)
     gc = gspread.authorize(creds)
-    sh = gc.open("Garden Clinic Data")
-    worksheet = sh.sheet1
-except Exception as e:
-    st.error(f"🔴 Google Sheets Connection Error: {e}")
+    # ... rest of your code
 
 
     
