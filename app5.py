@@ -292,11 +292,35 @@ import pandas as pd
 DB_FILE = "garden_clinic_v7.db"
 
 def auto_patch_error(e, q):
-    """Automatically fixes missing column errors on the fly for BOTH SELECT and INSERT statements!"""
+    """Automatically fixes missing columns AND missing tables on the fly!"""
     err_msg = str(e).lower()
+    
+    # 1. Auto-Heal Missing Tables
+    if "no such table" in err_msg:
+        tbl_match = re.search(r"no such table:\s*(\w+)", err_msg)
+        if tbl_match:
+            tbl_name = tbl_match.group(1)
+            # If it's an insert query, parse and create it with all specified columns
+            insert_match = re.search(r"insert\s+into\s+" + tbl_name + r"\s*\(([^)]+)\)", q, re.IGNORECASE)
+            if insert_match:
+                cols = [c.strip() for c in insert_match.group(1).split(",")]
+                col_defs = ", ".join([f"{c} TEXT" for c in cols])
+                create_q = f"CREATE TABLE IF NOT EXISTS {tbl_name} ({col_defs});"
+            else:
+                create_q = f"CREATE TABLE IF NOT EXISTS {tbl_name} (id TEXT, name TEXT, role TEXT, salary TEXT);"
+            
+            try:
+                conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+                conn.execute(create_q)
+                conn.commit()
+                conn.close()
+                return True
+            except:
+                pass
+
+    # 2. Auto-Heal Missing Columns
     col_name = None
     tbl_name = None
-    
     if "no such column" in err_msg:
         col_match = re.search(r"no such column:\s*(\w+)", err_msg)
         if col_match:
@@ -325,10 +349,14 @@ def auto_patch_error(e, q):
 if 'db_initialized' not in st.session_state:
     try:
         conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+        # Initialize core system tables
         conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT, username TEXT, password TEXT, password_hash TEXT, role TEXT, name TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS patients (id TEXT, name TEXT, phone TEXT, age TEXT, gender TEXT, address TEXT, history TEXT, date TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS expenses (id TEXT, description TEXT, amount TEXT, date TEXT, category TEXT);")
         conn.execute("CREATE TABLE IF NOT EXISTS appointments (id TEXT, patient_id TEXT, date TEXT, time TEXT, status TEXT, notes TEXT);")
+        # Explicitly pre-build employee tables to prevent routing errors
+        conn.execute("CREATE TABLE IF NOT EXISTS staff (id TEXT, name TEXT, role TEXT, salary TEXT, title TEXT, date TEXT);")
+        conn.execute("CREATE TABLE IF NOT EXISTS employees (id TEXT, name TEXT, role TEXT, salary TEXT, title TEXT, date TEXT);")
         conn.commit()
         
         try:
@@ -410,7 +438,7 @@ def sync_local_to_sheets():
         st.error(f"🔴 Cloud Sync Failed: {e}")
 
 def fetch_all(q, p=()):
-    for _ in range(5):  # Increased capacity to handle multi-column adjustments
+    for _ in range(5):
         db = get_db()
         try:
             res = db.execute(q, p).fetchall()
@@ -420,13 +448,13 @@ def fetch_all(q, p=()):
             db.close()
             if auto_patch_error(e, q):
                 continue
-            if "no such table" in str(e):
+            if "no such table" in str(e).lower():
                 return []
             raise e
     return []
 
 def fetch_one(q, p=()):
-    for _ in range(5):  # Increased capacity to handle multi-column adjustments
+    for _ in range(5):
         db = get_db()
         try:
             res = db.execute(q, p).fetchone()
@@ -436,13 +464,13 @@ def fetch_one(q, p=()):
             db.close()
             if auto_patch_error(e, q):
                 continue
-            if "no such table" in str(e):
+            if "no such table" in str(e).lower():
                 return None
             raise e
     return None
 
 def execute_write(q, p=()):
-    for _ in range(5):  # Increased capacity to handle multi-column adjustments
+    for _ in range(5):
         db = get_db()
         try:
             with db:
