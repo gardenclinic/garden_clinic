@@ -8,13 +8,25 @@ import streamlit.components.v1 as components
 # ─────────────────────────────────────────────
 # GOOGLE SHEETS SYNC
 # ─────────────────────────────────────────────
+_gsheets_enabled = False
+_gsheets_conn = None
+
+try:
+    from streamlit_gsheets import GSheetsConnection
+    # st.connection reads secrets automatically from [connections.gsheets] in secrets.toml
+    _gsheets_conn = st.connection("gsheets", type=GSheetsConnection)
+    _gsheets_enabled = True
+except Exception:
+    pass  # GSheets not configured — app runs fine on local SQLite
+
 def sync_to_sheets(table_name: str, df: pd.DataFrame):
-    """Push a dataframe to a Google Sheet worksheet."""
+    """Push a dataframe to a Google Sheet worksheet. Silent no-op if GSheets not configured."""
     if not _gsheets_enabled or _gsheets_conn is None:
         return
-    # Temporarily remove the try/except block to see the actual error
-    _gsheets_conn.update(worksheet=table_name, data=df)
-
+    try:
+        _gsheets_conn.update(worksheet=table_name, data=df)
+    except Exception:
+        pass  # Never crash the app over a sync failure
 # ─────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────
