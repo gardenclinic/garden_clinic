@@ -283,7 +283,7 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# DATABASE (BULLETPROOF CLOUD VERSION)
+# DATABASE (AUTO-BUILD CLOUD VERSION)
 # ─────────────────────────────────────────────
 import sqlite3
 import re
@@ -291,8 +291,17 @@ DB_FILE = "garden_clinic_v7.db"
 
 if 'db_initialized' not in st.session_state:
     try:
+        conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+        
+        # 1. Automatically build core tables if they don't exist yet (prevents empty cloud crashes!)
+        conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT, username TEXT, password TEXT, role TEXT, name TEXT);")
+        conn.execute("CREATE TABLE IF NOT EXISTS patients (id TEXT, name TEXT, phone TEXT, age TEXT, gender TEXT, address TEXT, history TEXT, date TEXT);")
+        conn.execute("CREATE TABLE IF NOT EXISTS expenses (id TEXT, description TEXT, amount TEXT, date TEXT, category TEXT);")
+        conn.execute("CREATE TABLE IF NOT EXISTS appointments (id TEXT, patient_id TEXT, date TEXT, time TEXT, status TEXT, notes TEXT);")
+        conn.commit()
+        
+        # 2. Pull data from Google Sheets if any rows exist to overwrite local tables
         if 'sh' in globals() and sh is not None:
-            conn = sqlite3.connect(DB_FILE, check_same_thread=False)
             for ws in sh.worksheets():
                 if ws.title == "Sheet1" and len(sh.worksheets()) > 1:
                     continue
@@ -300,7 +309,7 @@ if 'db_initialized' not in st.session_state:
                 if records:
                     df = pd.DataFrame(records)
                     df.to_sql(ws.title, conn, if_exists='replace', index=False)
-            conn.close()
+        conn.close()
     except Exception as e:
         st.error(f"🔴 Local DB Init Error: {e}")
     st.session_state.db_initialized = True
@@ -388,23 +397,6 @@ def execute_write(q, p=()):
         db.close()
         return True
     except sqlite3.OperationalError as e:
-        if "no such table" in str(e):
-            # Magical dynamic table creator if the Google Sheet is empty!
-            match = re.search(r"INSERT\s+INTO\s+(\w+)\s*\((.*?)\)", q, re.IGNORECASE)
-            if match:
-                table_name = match.group(1)
-                columns = match.group(2).split(",")
-                col_defs = [f"{col.strip()} TEXT" for col in columns]
-                create_q = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(col_defs)});"
-                try:
-                    with db:
-                        db.execute(create_q)
-                        db.execute(q, p)
-                    sync_local_to_sheets()
-                    db.close()
-                    return True
-                except:
-                    pass
         db.close()
         return False
     except sqlite3.IntegrityError:
