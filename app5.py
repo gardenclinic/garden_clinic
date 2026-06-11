@@ -624,9 +624,9 @@ today_row = fetch_one("SELECT SUM(net_paid) as t, COUNT(*) as c FROM visits WHER
 today_revenue = today_row["t"] if today_row and today_row["t"] else 0.0
 today_visits = today_row["c"] if today_row else 0
 
-# Patient count
-patient_count = fetch_one("SELECT COUNT(*) as c FROM patients")["c"]
-
+# Access the first element of the returned tuple (index 0)
+patient_count_row = fetch_one("SELECT COUNT(*) FROM patients")
+patient_count = patient_count_row[0] if patient_count_row else 0
 # ─────────────────────────────────────────────
 # LOGIN
 # ─────────────────────────────────────────────
