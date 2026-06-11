@@ -20,8 +20,11 @@ scope = [
 ]
 
 try:
-    # Since secrets are flat in Step 1, dict(st.secrets) will parse perfectly
-    creds = Credentials.from_service_account_info(dict(st.secrets), scopes=scope)
+    # Target only the isolated gcp_service_account dictionary
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"], 
+        scopes=scope
+    )
     gc = gspread.authorize(creds)
     sh = gc.open("Garden Clinic Data")
     worksheet = sh.sheet1
