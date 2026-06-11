@@ -283,9 +283,10 @@ div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# DATABASE (DIAGNOSTIC VERSION)
+# DATABASE (BULLETPROOF CLOUD VERSION)
 # ─────────────────────────────────────────────
 import sqlite3
+import re
 DB_FILE = "garden_clinic_v7.db"
 
 if 'db_initialized' not in st.session_state:
@@ -315,7 +316,6 @@ def get_db():
 def sync_local_to_sheets():
     """Pushes any updates from the local database file straight to Google Sheets"""
     if 'sh' not in globals() or sh is None:
-        st.warning("⚠️ Cannot sync: Google Sheets connection is not active.")
         return
     try:
         conn = sqlite3.connect(DB_FILE, check_same_thread=False)
@@ -339,7 +339,6 @@ def sync_local_to_sheets():
             
             upload_data = [df.columns.values.tolist()] + df.values.tolist()
             
-            # This handles both old and new gspread versions automatically
             try:
                 ws.update(range_name="A1", values=upload_data)
             except:
@@ -358,27 +357,59 @@ def sync_local_to_sheets():
 
 def fetch_all(q, p=()):
     db = get_db()
-    res = db.execute(q, p).fetchall()
-    db.close()
-    return res
+    try:
+        res = db.execute(q, p).fetchall()
+        db.close()
+        return res
+    except sqlite3.OperationalError as e:
+        db.close()
+        if "no such table" in str(e):
+            return []
+        raise e
 
 def fetch_one(q, p=()):
     db = get_db()
-    res = db.execute(q, p).fetchone()
-    db.close()
-    return res
+    try:
+        res = db.execute(q, p).fetchone()
+        db.close()
+        return res
+    except sqlite3.OperationalError as e:
+        db.close()
+        if "no such table" in str(e):
+            return None
+        raise e
 
 def execute_write(q, p=()):
     db = get_db()
     try:
-        with db: 
+        with db:
             db.execute(q, p)
         sync_local_to_sheets()
-        return True
-    except sqlite3.IntegrityError:
-        return False
-    finally:
         db.close()
+        return True
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e):
+            # Magical dynamic table creator if the Google Sheet is empty!
+            match = re.search(r"INSERT\s+INTO\s+(\w+)\s*\((.*?)\)", q, re.IGNORECASE)
+            if match:
+                table_name = match.group(1)
+                columns = match.group(2).split(",")
+                col_defs = [f"{col.strip()} TEXT" for col in columns]
+                create_q = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(col_defs)});"
+                try:
+                    with db:
+                        db.execute(create_q)
+                        db.execute(q, p)
+                    sync_local_to_sheets()
+                    db.close()
+                    return True
+                except:
+                    pass
+        db.close()
+        return False
+    except sqlite3.IntegrityError:
+        db.close()
+        return False
 
 # ─────────────────────────────────────────────
 # BELL SOUND HELPER
