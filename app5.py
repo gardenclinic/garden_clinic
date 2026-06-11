@@ -10,17 +10,15 @@ import json
 # ─────────────────────────────────────────────
 # GOOGLE SHEETS CLOUD CONNECTION
 # ─────────────────────────────────────────────
-import streamlit as st
-import gspread
-from google.oauth2.service_account import Credentials
-
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
 try:
-    creds = Credentials.from_service_account_info(dict(st.secrets), scopes=scope)
+    # Pull the nested TOML table as a dictionary directly
+    gcp_dict = dict(st.secrets["gcp"])
+    creds = Credentials.from_service_account_info(gcp_dict, scopes=scope)
     gc = gspread.authorize(creds)
     sh = gc.open("Garden Clinic Data")
     worksheet = sh.sheet1
