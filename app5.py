@@ -8,25 +8,15 @@ import streamlit.components.v1 as components
 # ─────────────────────────────────────────────
 # GOOGLE SHEETS SYNC (OPTIONAL — won't crash if not configured)
 # ─────────────────────────────────────────────
-def sync_to_sheets(table_name: str, df: pd.DataFrame):
-    """Push a dataframe to a Google Sheet worksheet."""
-    if not _gsheets_enabled or _gsheets_conn is None:
-        return
-    # Removed try/except to see the actual error
-    _gsheets_conn.update(worksheet=table_name, data=df)
+_gsheets_enabled = False
+_gsheets_conn = None
 
-# Inside your sidebar sync button:
-if _gsheets_enabled:
-    if st.sidebar.button("☁️ Sync to Google Sheets", use_container_width=True):
-        try:
-            db_tmp = get_db()
-            for tbl in ["visits", "patients", "expenses", "doctors", "employees", "referrers", "subscriptions", "audit_log"]:
-                df_tbl = pd.read_sql(f"SELECT * FROM {tbl}", db_tmp)
-                sync_to_sheets(tbl, df_tbl)
-            db_tmp.close()
-            st.sidebar.success("Synced!")
-        except Exception as e:
-            st.sidebar.error(f"Sync failed: {e}")
+try:
+    from streamlit_gsheets import GSheetsConnection
+    _gsheets_conn = st.connection("gsheets", type=GSheetsConnection)
+    _gsheets_enabled = True
+except Exception:
+    pass
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG
