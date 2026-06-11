@@ -13,21 +13,15 @@ import json
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
-# 1. Establish the connection cleanly
-# Streamlit will automatically read your triple-quoted secrets in the background!
+# 1. Establish the connection cleanly using your secrets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 2. Read and display the sheet data frame
-df = conn.read()
-st.dataframe(df)
+# 2. Read the data by passing your exact URL right here
+# (Replace the link below with your actual Google Sheet link)
+df = conn.read(spreadsheet="https://docs.google.com/spreadsheets/d/YOUR_ACTUAL_SPREADSHEET_ID_HERE/edit?usp=sharing")
 
-# --- PAGE CONFIG (Keep your existing config below this) ---
-st.set_page_config(
-    page_title="Garden Clinic",
-    page_icon="🌿",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# 3. Display the data frame
+st.dataframe(df)
 # ─────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────
