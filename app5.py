@@ -277,7 +277,7 @@ if not st.session_state.logged_in:
                         log_action("System","Create Account",f"User: {ru.strip()} | Role: {rs}"); st.success("Account created.")
     st.stop()
 
-role = st.session_state.role; username = st.session_state.username
+role = st.session_state.get("role", ""); username = st.session_state.get("username", "")
 st.sidebar.markdown(f"""
 <div style="padding:20px 16px 16px;border-bottom:1px solid rgba(255,255,255,0.1);">
     <div style="font-size:1.4rem;font-weight:800;color:#FFFFFF;">🌿 Garden Clinic</div>
@@ -586,8 +586,13 @@ elif selected == "🖥️  Reception":
                 if st.button("Create Subscription & Print Receipt", key="btn_create_sub"):
                     if sub_plan.strip() and sub_price > 0:
                         sb_insert("patient_subscriptions",{"patient_id":p_map_sub[sub_patient],"plan_name":sub_plan.strip(),"plan_type":sub_type,"total_sessions":int(sub_sessions),"sessions_used":0,"price":sub_price,"start_date":str(sub_start),"end_date":str(sub_end),"status":"Active","added_by":username,"created_at":today_str})
+                        # Record payment as income in visits table
+                        docs_for_sub = sb_all("doctors", order="name")
+                        doc_id_sub = docs_for_sub[0]["id"] if docs_for_sub else None
+                        if doc_id_sub:
+                            sb_insert("visits",{"patient_id":p_map_sub[sub_patient],"doctor_id":doc_id_sub,"service_id":None,"bundle_id":None,"visit_date":today_str,"base_price":sub_price,"discount_amount":0,"net_paid":sub_price,"payment_method":"Subscription","notes":f"Subscription: {sub_plan.strip()}","referred_by":None,"added_by":username})
                         log_action(username,"Create Patient Subscription",f"{sub_patient} | {sub_plan} | ${sub_price}")
-                        play_ding(); st.success(f"Subscription created for {sub_patient}!")
+                        play_ding(); st.success(f"Subscription created for {sub_patient} and ${sub_price:.2f} recorded as income!")
                         st.session_state.sub_rcpt = {"patient":sub_patient,"item":sub_plan,"base":sub_price,"disc":0.0,"net":sub_price,"method":"Subscription","date":today_str,"doctor":"—"}
                     else: st.error("Plan name and price are required.")
                 if "sub_rcpt" in st.session_state:
