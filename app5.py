@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import hashlib
+import io
 from datetime import datetime, date
 import streamlit.components.v1 as components
 from supabase import create_client
@@ -49,12 +50,27 @@ button[data-testid="baseButton-primary"]:hover { background: #A93226 !important;
 [data-testid="stDataFrame"] { border-radius: 12px !important; overflow: hidden !important; border: 1.5px solid #DDE8E1 !important; }
 .stSuccess > div, .stError > div, .stWarning > div, .stInfo > div { border-radius: 10px !important; font-size: 0.88rem !important; }
 .section-label { font-size: 0.75rem; font-weight: 700; color: #5A7A65; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 12px; border-bottom: 1px solid #DDE8E1; padding-bottom: 8px; }
-.receipt-wrap { background: #FFFFFF; border: 1.5px dashed #0D3D2B; border-radius: 14px; padding: 28px; max-width: 400px; font-family: 'DM Mono', monospace; font-size: 0.82rem; color: #1A2E23; }
-.receipt-wrap h2 { text-align: center; margin: 0 0 2px; color: #0D3D2B; font-size: 1.1rem; font-family: 'DM Sans', sans-serif; font-weight: 800; }
-.receipt-wrap .receipt-sub { text-align: center; font-size: 0.72rem; color: #5A7A65; margin-bottom: 14px; font-family: 'DM Sans', sans-serif; }
-.receipt-row { display: flex; justify-content: space-between; margin: 5px 0; }
-.receipt-total { font-size: 1rem; font-weight: 700; color: #0D7A4E; border-top: 1px dashed #DDE8E1; padding-top: 10px; margin-top: 10px; }
-.receipt-footer { text-align: center; font-size: 0.7rem; color: #8EA898; margin-top: 14px; font-family: 'DM Sans', sans-serif; }
+.receipt-wrap { background: #FFFFFF; border-radius: 20px; padding: 0; max-width: 420px; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; color: #1A2E23; box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06); overflow: hidden; }
+.receipt-header { background: linear-gradient(135deg, #0D3D2B 0%, #1A5C3E 60%, #0D3D2B 100%); padding: 28px 28px 22px; text-align: center; position: relative; }
+.receipt-header::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 20px; background: #FFFFFF; border-radius: 20px 20px 0 0; }
+.receipt-clinic-name { font-size: 1.4rem; font-weight: 800; color: #FFFFFF; letter-spacing: 1px; margin: 0; }
+.receipt-clinic-sub { font-size: 0.72rem; color: #6FCF97; letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
+.receipt-gold-line { width: 40px; height: 2px; background: linear-gradient(90deg, #C9A84C, #F0D080, #C9A84C); margin: 10px auto; border-radius: 2px; }
+.receipt-body { padding: 8px 28px 28px; }
+.receipt-date-badge { background: #F0F4F2; border-radius: 8px; padding: 6px 12px; text-align: center; font-size: 0.75rem; color: #5A7A65; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 18px; }
+.receipt-section-title { font-size: 0.65rem; font-weight: 700; color: #8EA898; text-transform: uppercase; letter-spacing: 0.1em; margin: 16px 0 8px; }
+.receipt-row { display: flex; justify-content: space-between; align-items: center; margin: 7px 0; font-size: 0.88rem; }
+.receipt-row span:first-child { color: #5A7A65; }
+.receipt-row span:last-child { color: #1A2E23; font-weight: 600; }
+.receipt-divider { border: none; border-top: 1px solid #EEF2EF; margin: 14px 0; }
+.receipt-divider-dashed { border: none; border-top: 1.5px dashed #DDE8E1; margin: 14px 0; }
+.receipt-total-box { background: linear-gradient(135deg, #F0F9F4, #E8F5EE); border-radius: 12px; padding: 14px 18px; margin: 16px 0; border: 1px solid #C8E6D4; }
+.receipt-total-label { font-size: 0.72rem; color: #5A7A65; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.receipt-total-amount { font-family: 'DM Mono', monospace; font-size: 1.8rem; font-weight: 700; color: #0D3D2B; margin-top: 2px; }
+.receipt-discount { color: #C0392B !important; }
+.receipt-footer-area { text-align: center; padding-top: 6px; border-top: 1px solid #EEF2EF; margin-top: 16px; }
+.receipt-footer-text { font-size: 0.72rem; color: #8EA898; margin: 3px 0; }
+.receipt-footer-clinic { font-size: 0.75rem; color: #5A7A65; font-weight: 600; margin-top: 6px; }
 hr.dashed { border: none; border-top: 1px dashed #DDE8E1; margin: 12px 0; }
 .login-card { background: #FFFFFF; border: 1.5px solid #DDE8E1; border-radius: 18px; padding: 40px; max-width: 440px; margin: 60px auto 0; box-shadow: 0 8px 40px rgba(0,0,0,0.07); }
 .login-card h1 { color: #0D3D2B; text-align: center; margin: 0 0 4px; font-weight: 800; font-size: 1.8rem; }
@@ -216,6 +232,17 @@ def play_ding():
     g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+0.45);o.connect(g);g.connect(c.destination);
     o.start();o.stop(c.currentTime+0.45);}catch(e){}</script>""", height=0, width=0)
 
+def get_clinic_profile():
+    rows = sb_all("clinic_profile")
+    if rows: return rows[0]
+    return {"clinic_name": "Garden Clinic", "address": "", "phone": "", "email": "", "tagline": "Physical Therapy Center"}
+
+def to_excel(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Data")
+    return output.getvalue()
+
 def card(title, value, css_class="dark", subtitle=""):
     return f'<div class="card"><h3>{title}</h3><p class="big-num {css_class}">{value}</p>{f"<p class=sub>{subtitle}</p>" if subtitle else ""}</div>'
 
@@ -355,6 +382,26 @@ if selected == "📈  Dashboard":
     with c4: st.markdown(card("Doctor Commissions", f"${total_commissions:,.2f}", "dark", "Total owed to doctors"), unsafe_allow_html=True)
 
     st.markdown("---")
+    section_label("📅 Today's appointments")
+    today_appts = [a for a in get_appointments_joined() if a.get("Date") == today_str]
+    if today_appts:
+        cols = st.columns(min(len(today_appts), 4))
+        for i, a in enumerate(today_appts[:4]):
+            with cols[i % 4]:
+                status_color = {"Scheduled": "#F59E0B", "Completed": "#0D7A4E", "Cancelled": "#C0392B", "No-show": "#6B7280"}.get(a["Status"], "#F59E0B")
+                st.markdown(f"""<div class="card" style="border-left: 4px solid {status_color}; padding: 14px 16px;">
+                    <div style="font-size:0.7rem;color:#8EA898;font-weight:700;text-transform:uppercase;">{a['Time']}</div>
+                    <div style="font-size:1rem;font-weight:700;color:#0D3D2B;margin:4px 0;">{a['Patient']}</div>
+                    <div style="font-size:0.8rem;color:#5A7A65;">👨‍⚕️ {a['Doctor']}</div>
+                    <div style="font-size:0.75rem;color:#8EA898;margin-top:4px;">{a.get('Reason','')}</div>
+                    <span style="background:{status_color}20;color:{status_color};font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:6px;">{a['Status']}</span>
+                </div>""", unsafe_allow_html=True)
+        if len(today_appts) > 4:
+            st.info(f"+ {len(today_appts)-4} more appointments today. See full list in Appointments.")
+    else:
+        st.info("No appointments scheduled for today.")
+
+    st.markdown("---")
     ca, cb = st.columns([3,2])
     with ca:
         section_label("Revenue trend")
@@ -476,18 +523,38 @@ elif selected == "🖥️  Reception":
 
             if "rcpt" in st.session_state:
                 r = st.session_state.rcpt
+                cp = get_clinic_profile()
                 st.markdown(f"""<div class="receipt-wrap">
-                    <h2>🌿 Garden Clinic</h2><p class="receipt-sub">Official Receipt · {r['date']}</p>
-                    <hr class="dashed">
-                    <div class="receipt-row"><span>Patient</span><span>{r['patient']}</span></div>
-                    <div class="receipt-row"><span>Doctor</span><span>{r['doctor']}</span></div>
-                    <div class="receipt-row"><span>Service</span><span>{r['item']}</span></div>
-                    <div class="receipt-row"><span>Payment</span><span>{r['method']}</span></div>
-                    <hr class="dashed">
-                    <div class="receipt-row"><span>Base price</span><span>${r['base']:,.2f}</span></div>
-                    <div class="receipt-row" style="color:#C0392B;"><span>Discount</span><span>-${r['disc']:,.2f}</span></div>
-                    <div class="receipt-row receipt-total"><span>Total paid</span><span>${r['net']:,.2f}</span></div>
-                    <p class="receipt-footer">Thank you for visiting Garden Clinic</p>
+                    <div class="receipt-header">
+                        <div class="receipt-clinic-name">🌿 {cp.get('clinic_name','Garden Clinic')}</div>
+                        <div class="receipt-gold-line"></div>
+                        <div class="receipt-clinic-sub">{cp.get('tagline','Physical Therapy Center')}</div>
+                    </div>
+                    <div class="receipt-body">
+                        <div class="receipt-date-badge">📄 Official Receipt &nbsp;·&nbsp; {r['date']} &nbsp;·&nbsp; {datetime.now().strftime('%H:%M')}</div>
+                        <div class="receipt-section-title">Patient Information</div>
+                        <div class="receipt-row"><span>Patient Name</span><span>{r['patient']}</span></div>
+                        <div class="receipt-row"><span>Treating Doctor</span><span>{r['doctor']}</span></div>
+                        <hr class="receipt-divider">
+                        <div class="receipt-section-title">Service Details</div>
+                        <div class="receipt-row"><span>Service</span><span>{r['item']}</span></div>
+                        <div class="receipt-row"><span>Payment Method</span><span>{r['method']}</span></div>
+                        <hr class="receipt-divider">
+                        <div class="receipt-section-title">Payment Summary</div>
+                        <div class="receipt-row"><span>Base Price</span><span>${r['base']:,.2f}</span></div>
+                        <div class="receipt-row"><span class="receipt-discount">Discount Applied</span><span class="receipt-discount">− ${r['disc']:,.2f}</span></div>
+                        <div class="receipt-total-box">
+                            <div class="receipt-total-label">Total Paid</div>
+                            <div class="receipt-total-amount">${r['net']:,.2f}</div>
+                        </div>
+                        <div class="receipt-footer-area">
+                            {'<div class="receipt-footer-clinic">📍 ' + cp.get('address','') + '</div>' if cp.get('address') else ''}
+                            {'<div class="receipt-footer-clinic">📞 ' + cp.get('phone','') + '</div>' if cp.get('phone') else ''}
+                            {'<div class="receipt-footer-clinic">✉️ ' + cp.get('email','') + '</div>' if cp.get('email') else ''}
+                            <div class="receipt-footer-text" style="margin-top:10px;">Thank you for choosing {cp.get('clinic_name','Garden Clinic')}</div>
+                            <div class="receipt-footer-text">We wish you a speedy recovery 💚</div>
+                        </div>
+                    </div>
                 </div>""", unsafe_allow_html=True)
 
     with t2:
@@ -696,6 +763,35 @@ elif selected == "📊  Accounting":
             else: st.info("No referral commissions to record this month.")
     else: st.info("No referrers added yet. Add them in Settings → Referrers.")
 
+    st.markdown("---")
+    section_label("📥 Export reports to Excel")
+    ex1, ex2, ex3, ex4 = st.columns(4)
+    with ex1:
+        all_v_exp = sb_all("visits", order="visit_date", desc_order=True)
+        if all_v_exp:
+            df_exp_visits = pd.DataFrame([{"ID": v["id"], "Date": v["visit_date"], "Patient ID": v.get("patient_id",""), "Doctor ID": v.get("doctor_id",""), "Base Price": v.get("base_price",0), "Discount": v.get("discount_amount",0), "Net Paid": v.get("net_paid",0), "Method": v.get("payment_method",""), "Referred By": v.get("referred_by",""), "Added By": v.get("added_by","")} for v in all_v_exp])
+            st.download_button("⬇️ All Visits", data=to_excel(df_exp_visits), file_name=f"visits_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        else: st.button("⬇️ All Visits", disabled=True, use_container_width=True)
+    with ex2:
+        all_e_exp = sb_all("expenses", order="date", desc_order=True)
+        if all_e_exp:
+            df_exp_exp = pd.DataFrame([{"ID": e["id"], "Date": e["date"], "Description": e["description"], "Category": e.get("category",""), "Amount": e.get("amount",0), "Added By": e.get("added_by","")} for e in all_e_exp])
+            st.download_button("⬇️ All Expenses", data=to_excel(df_exp_exp), file_name=f"expenses_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        else: st.button("⬇️ All Expenses", disabled=True, use_container_width=True)
+    with ex3:
+        all_p_exp = sb_all("patients", order="name")
+        if all_p_exp:
+            df_exp_pat = pd.DataFrame([{"ID": p["id"], "Name": p["name"], "Phone": p.get("phone",""), "DOB": p.get("date_of_birth",""), "Gender": p.get("gender",""), "Notes": p.get("notes",""), "Registered": p.get("created_at","")} for p in all_p_exp])
+            st.download_button("⬇️ All Patients", data=to_excel(df_exp_pat), file_name=f"patients_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        else: st.button("⬇️ All Patients", disabled=True, use_container_width=True)
+    with ex4:
+        all_v_monthly = sb_all("visits")
+        if all_v_monthly:
+            df_monthly = pd.DataFrame([{"Month": v["visit_date"][:7], "Revenue": float(v.get("net_paid") or 0)} for v in all_v_monthly])
+            df_monthly = df_monthly.groupby("Month").agg(Revenue=("Revenue","sum"), Visits=("Revenue","count")).reset_index().sort_values("Month", ascending=False)
+            st.download_button("⬇️ Monthly Summary", data=to_excel(df_monthly), file_name=f"monthly_summary_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        else: st.button("⬇️ Monthly Summary", disabled=True, use_container_width=True)
+
 # ─────────────────────────────────────────────
 # ACCOUNTS (BOSS ONLY)
 # ─────────────────────────────────────────────
@@ -733,7 +829,7 @@ elif selected == "👥  Accounts":
 # ─────────────────────────────────────────────
 elif selected == "⚙️  Settings":
     page_header("Settings", "Configure doctors, staff, services, bundles, referrers, and subscriptions.")
-    s1,s2,s3,s4,s5,s6 = st.tabs(["Doctors","Staff & Payroll","Services","Bundles","🎯 Referrers","🔄 Subscriptions"])
+    s1,s2,s3,s4,s5,s6,s7 = st.tabs(["Doctors","Staff & Payroll","Services","Bundles","🎯 Referrers","🔄 Subscriptions","🏥 Clinic Profile"])
 
     with s1:
         section_label("Add doctor")
@@ -913,3 +1009,27 @@ elif selected == "⚙️  Settings":
                         sb_delete("subscriptions","name",del_sub); log_action(username,"Remove Subscription",del_sub)
                         play_ding(); st.success(f"Subscription '{del_sub}' removed."); st.rerun()
         else: st.info("No subscriptions added yet.")
+
+    with s7:
+        section_label("Clinic profile — shown on receipts")
+        st.info("💡 This information appears on every receipt printed for patients.")
+        cp = get_clinic_profile()
+        c1, c2 = st.columns(2)
+        with c1:
+            cp_name    = st.text_input("Clinic name",    value=cp.get("clinic_name","Garden Clinic"),             key="cp_name")
+            cp_tagline = st.text_input("Tagline / specialty", value=cp.get("tagline","Physical Therapy Center"),  key="cp_tagline")
+            cp_phone   = st.text_input("Phone number",   value=cp.get("phone",""),                                key="cp_phone")
+        with c2:
+            cp_address = st.text_input("Address",        value=cp.get("address",""),                              key="cp_address")
+            cp_email   = st.text_input("Email",          value=cp.get("email",""),                                key="cp_email")
+        if st.button("Save Clinic Profile", key="btn_save_clinic"):
+            existing = sb_all("clinic_profile")
+            data = {"clinic_name": cp_name, "tagline": cp_tagline, "phone": cp_phone, "address": cp_address, "email": cp_email}
+            if existing:
+                sb_update("clinic_profile", data, "id", existing[0]["id"])
+            else:
+                sb_insert("clinic_profile", data)
+            log_action(username, "Update Clinic Profile", cp_name)
+            play_ding()
+            st.success("Clinic profile saved! It will appear on all receipts.")
+            st.rerun()
