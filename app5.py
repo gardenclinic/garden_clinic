@@ -71,6 +71,10 @@ button[data-testid="baseButton-primary"]:hover { background: #A93226 !important;
 [data-testid="stMetricValue"] { font-family: 'DM Mono', monospace !important; font-size: 1.6rem !important; color: #0D3D2B !important; }
 .session-bar-wrap { background: #F0F4F2; border-radius: 8px; height: 10px; width: 100%; margin-top: 6px; overflow: hidden; }
 .session-bar-fill { height: 10px; border-radius: 8px; background: linear-gradient(90deg, #0D3D2B, #2ECC71); }
+.profile-summary { background: linear-gradient(135deg, #0D3D2B, #1A5C3E); color: #FFF; padding: 20px 24px; border-radius: 14px; margin-bottom: 18px; }
+.profile-name { font-size: 1.4rem; font-weight: 800; margin: 0; color: #FFF; }
+.profile-meta { font-size: 0.85rem; color: #6FCF97; margin-top: 4px; }
+@media print { [data-testid="stSidebar"], .stTabs [data-baseweb="tab-list"], .stButton, .pulse-bar { display: none !important; } }
 </style>
 """, unsafe_allow_html=True)
 
@@ -111,9 +115,10 @@ def sb_sum(table, col, filters=None): return sum(float(r.get(col) or 0) for r in
 def sb_count(table, filters=None): return len(sb_all(table, filters=filters))
 
 # ── JOINS ──
-def get_visits_joined(limit=100, patient_id=None):
+def get_visits_joined(limit=100, patient_id=None, start=None, end=None):
     visits = sb_all("visits", order="id", desc_order=True, limit=limit)
     if patient_id: visits = [v for v in visits if v.get("patient_id") == patient_id]
+    if start and end: visits = [v for v in visits if start <= v.get("visit_date","") <= end]
     if not visits: return []
     patients = {p["id"]: p["name"] for p in sb_all("patients")}
     doctors  = {d["id"]: d["name"] for d in sb_all("doctors")}
@@ -122,11 +127,10 @@ def get_visits_joined(limit=100, patient_id=None):
     result = []
     for v in visits:
         svc = services.get(v.get("service_id"),""); bnd = bundles.get(v.get("bundle_id"),"")
-        result.append({"id": v["id"], "Date": v.get("visit_date",""),
-            "Patient": patients.get(v.get("patient_id"),""), "Doctor": doctors.get(v.get("doctor_id"),""),
-            "Item": svc if svc else f"📦 {bnd}", "Base": float(v.get("base_price") or 0),
-            "Discount": float(v.get("discount_amount") or 0), "Paid": float(v.get("net_paid") or 0),
-            "Method": v.get("payment_method",""), "Notes": v.get("notes","")})
+        result.append({"id": v["id"], "Date": v.get("visit_date",""), "Patient": patients.get(v.get("patient_id"),""),
+            "Doctor": doctors.get(v.get("doctor_id"),""), "Item": svc if svc else f"📦 {bnd}",
+            "Base": float(v.get("base_price") or 0), "Discount": float(v.get("discount_amount") or 0),
+            "Paid": float(v.get("net_paid") or 0), "Method": v.get("payment_method",""), "Notes": v.get("notes","")})
     return result
 
 def get_appointments_joined():
@@ -139,15 +143,17 @@ def get_appointments_joined():
              "Reason": a.get("reason",""), "Status": a.get("status","")} for a in appts]
 
 def get_doc_commission_rate(doctor_id, visit_count, all_tiers):
-    tiers = sorted([t for t in all_tiers if t.get("doctor_id") == doctor_id],
-                   key=lambda x: int(x.get("min_visits") or 0), reverse=True)
+    tiers = sorted([t for t in all_tiers if t.get("doctor_id") == doctor_id], key=lambda x: int(x.get("min_visits") or 0), reverse=True)
     for t in tiers:
-        if visit_count >= int(t.get("min_visits") or 0):
-            return float(t.get("commission_rate") or 0) / 100.0
+        if visit_count >= int(t.get("min_visits") or 0): return float(t.get("commission_rate") or 0) / 100.0
     return 0.0
 
-def get_financials():
-    visits = sb_all("visits"); doctors = sb_all("doctors"); expenses_rows = sb_all("expenses")
+def get_financials(start=None, end=None):
+    visits = sb_all("visits")
+    if start and end: visits = [v for v in visits if start <= v.get("visit_date","") <= end]
+    doctors = sb_all("doctors")
+    expenses_rows = sb_all("expenses")
+    if start and end: expenses_rows = [e for e in expenses_rows if start <= e.get("date","") <= end]
     all_tiers = sb_all("doctor_commission_tiers")
     gross = sum(float(v.get("net_paid") or 0) for v in visits)
     total_exp = sum(float(e.get("amount") or 0) for e in expenses_rows)
@@ -190,11 +196,8 @@ def page_header(title, desc=""): st.markdown(f'<div class="page-header"><h1>{tit
 
 def render_receipt(r, cp):
     st.markdown(f"""<div class="receipt-wrap">
-        <div class="receipt-header">
-            <div class="receipt-clinic-name">🌿 {cp.get('clinic_name','Garden Clinic')}</div>
-            <div class="receipt-gold-line"></div>
-            <div class="receipt-clinic-sub">{cp.get('tagline','Physical Therapy Center')}</div>
-        </div>
+        <div class="receipt-header"><div class="receipt-clinic-name">🌿 {cp.get('clinic_name','Garden Clinic')}</div>
+            <div class="receipt-gold-line"></div><div class="receipt-clinic-sub">{cp.get('tagline','Physical Therapy Center')}</div></div>
         <div class="receipt-body">
             <div class="receipt-date-badge">📄 Official Receipt &nbsp;·&nbsp; {r['date']} &nbsp;·&nbsp; {datetime.now().strftime('%H:%M')}</div>
             <div class="receipt-section-title">Patient Information</div>
@@ -208,21 +211,14 @@ def render_receipt(r, cp):
             <div class="receipt-section-title">Payment Summary</div>
             <div class="receipt-row"><span>Base Price</span><span>${r['base']:,.2f}</span></div>
             <div class="receipt-row"><span class="receipt-discount">Discount Applied</span><span class="receipt-discount">− ${r['disc']:,.2f}</span></div>
-            <div class="receipt-total-box">
-                <div class="receipt-total-label">Total Paid</div>
-                <div class="receipt-total-amount">${r['net']:,.2f}</div>
-            </div>
+            <div class="receipt-total-box"><div class="receipt-total-label">Total Paid</div><div class="receipt-total-amount">${r['net']:,.2f}</div></div>
             <div class="receipt-footer-area">
                 {'<div class="receipt-footer-clinic">📍 ' + cp.get('address','') + '</div>' if cp.get('address') else ''}
                 {'<div class="receipt-footer-clinic">📞 ' + cp.get('phone','') + '</div>' if cp.get('phone') else ''}
                 {'<div class="receipt-footer-clinic">✉️ ' + cp.get('email','') + '</div>' if cp.get('email') else ''}
                 <div class="receipt-footer-text" style="margin-top:10px;">Thank you for choosing {cp.get('clinic_name','Garden Clinic')}</div>
-                <div class="receipt-footer-text">We wish you a speedy recovery 💚</div>
-            </div>
-        </div>
-    </div>""", unsafe_allow_html=True)
+                <div class="receipt-footer-text">We wish you a speedy recovery 💚</div></div></div></div>""", unsafe_allow_html=True)
 
-# ── AUTO PAYROLL ──
 def auto_payroll():
     month = datetime.now().strftime("%Y-%m"); tag = f"Monthly Payroll — {month}"
     if not sb_exists("expenses", "description", tag):
@@ -230,7 +226,6 @@ def auto_payroll():
         if total > 0: sb_insert("expenses", {"description": tag, "category": "Payroll", "amount": total, "date": f"{month}-01", "added_by": "System"})
 auto_payroll()
 
-# ── AUTO SUBSCRIPTIONS (expense) ──
 def auto_subscriptions():
     month = datetime.now().strftime("%Y-%m")
     for sub in sb_all("subscriptions", filters={"active": 1}):
@@ -240,7 +235,6 @@ def auto_subscriptions():
             sb_insert("expenses", {"description": tag, "category": "Subscription", "amount": float(sub["amount"]), "date": f"{month}-{day:02d}", "added_by": "System"})
 auto_subscriptions()
 
-# ── FINANCIALS ──
 gross_income, base_expenses, total_commissions, total_outflows, net_profit, doc_visits = get_financials()
 today_str = date.today().isoformat()
 tomorrow_str = (date.today() + timedelta(days=1)).isoformat()
@@ -277,7 +271,7 @@ if not st.session_state.logged_in:
                         log_action("System","Create Account",f"User: {ru.strip()} | Role: {rs}"); st.success("Account created.")
     st.stop()
 
-role = st.session_state.get("role", ""); username = st.session_state.get("username", "")
+role = st.session_state.get("role",""); username = st.session_state.get("username","")
 st.sidebar.markdown(f"""
 <div style="padding:20px 16px 16px;border-bottom:1px solid rgba(255,255,255,0.1);">
     <div style="font-size:1.4rem;font-weight:800;color:#FFFFFF;">🌿 Garden Clinic</div>
@@ -287,12 +281,11 @@ st.sidebar.markdown(f"""
     <div style="font-size:0.7rem;color:#6FCF97;text-transform:uppercase;letter-spacing:0.06em;">Signed in as</div>
     <div style="font-size:0.95rem;color:#FFFFFF;font-weight:600;margin-top:2px;">{username}</div>
     <div style="font-size:0.72rem;background:rgba(111,207,151,0.2);color:#6FCF97;display:inline-block;padding:2px 8px;border-radius:20px;margin-top:4px;font-weight:600;">{role}</div>
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 menu_map = {
-    "Boss": ["📈  Dashboard","🖥️  Reception","📊  Accounting","📅  Appointments","👥  Accounts","⚙️  Settings"],
-    "Reception & Accounting": ["🖥️  Reception","📊  Accounting","📅  Appointments"],
-    "Accounting": ["📊  Accounting"],
+    "Boss": ["📈  Dashboard","🖥️  Reception","📊  Accounting","📅  Appointments","📑  Reports","👥  Accounts","⚙️  Settings"],
+    "Reception & Accounting": ["🖥️  Reception","📊  Accounting","📅  Appointments","📑  Reports"],
+    "Accounting": ["📊  Accounting","📑  Reports"],
     "Reception": ["🖥️  Reception","📅  Appointments"],
 }
 menus = menu_map.get(role, [])
@@ -307,15 +300,13 @@ if selected == "📈  Dashboard":
     page_header("Executive Dashboard", f"Today is {date.today().strftime('%A, %B %d %Y')}")
     pulse_bar([("Today's Revenue",f"${today_revenue:,.0f}"),("Visits Today",str(today_visits_count)),("Total Patients",str(patient_count)),("All-Time Revenue",f"${gross_income:,.0f}"),("Net Profit",f"${net_profit:,.0f}")])
 
-    # Subscription expiry warnings
     all_pt_subs = sb_all("patient_subscriptions")
-    expiring = [s for s in all_pt_subs if s.get("status") == "Active" and s.get("end_date") in [today_str, tomorrow_str]]
+    expiring = [s for s in all_pt_subs if s.get("status")=="Active" and s.get("end_date") in [today_str, tomorrow_str]]
     if expiring:
         patients_map = {p["id"]: p["name"] for p in sb_all("patients")}
         for s in expiring:
-            pname = patients_map.get(s.get("patient_id"), "Unknown")
-            msg = f"⚠️ **{pname}** — subscription **'{s.get('plan_name','')}' expires {'TODAY' if s.get('end_date') == today_str else 'TOMORROW'}!**"
-            st.warning(msg)
+            pname = patients_map.get(s.get("patient_id"),"Unknown")
+            st.warning(f"⚠️ **{pname}** — subscription **'{s.get('plan_name','')}' expires {'TODAY' if s.get('end_date')==today_str else 'TOMORROW'}!**")
 
     c1,c2,c3,c4 = st.columns(4)
     with c1: st.markdown(card("Gross Revenue",f"${gross_income:,.2f}","green","All collected payments"), unsafe_allow_html=True)
@@ -324,7 +315,7 @@ if selected == "📈  Dashboard":
     with c4: st.markdown(card("Doctor Commissions",f"${total_commissions:,.2f}","dark","Total owed to doctors"), unsafe_allow_html=True)
 
     st.markdown("---"); section_label("📅 Today's appointments")
-    today_appts = [a for a in get_appointments_joined() if a.get("Date") == today_str]
+    today_appts = [a for a in get_appointments_joined() if a.get("Date")==today_str]
     if today_appts:
         cols = st.columns(min(len(today_appts),4))
         for i, a in enumerate(today_appts[:4]):
@@ -367,7 +358,7 @@ if selected == "📈  Dashboard":
     st.markdown("---"); section_label("Activity audit log")
     af = st.selectbox("Filter by action",["All","New Visit","New Patient","Remove Patient","Add Expense","Delete Expense","Add Referrer","Remove Referrer","Referral Commission Paid"], key="audit_filter")
     audit_rows = sb_all("audit_log", order="id", desc_order=True, limit=200)
-    if af != "All": audit_rows = [r for r in audit_rows if r.get("action") == af]
+    if af != "All": audit_rows = [r for r in audit_rows if r.get("action")==af]
     if audit_rows:
         st.dataframe(pd.DataFrame([{"Time":r["timestamp"],"User":r["username"],"Action":r["action"],"Details":r.get("details","")} for r in audit_rows]), use_container_width=True, hide_index=True)
     else: st.info("No activity recorded yet.")
@@ -376,10 +367,9 @@ if selected == "📈  Dashboard":
 # RECEPTION
 # ════════════════════════════════════════════
 elif selected == "🖥️  Reception":
-    page_header("Reception Desk", "Checkout, patients, sessions, subscriptions, and gym check-in.")
+    page_header("Reception Desk", "Checkout, patients, sessions, subscriptions, and quick view.")
     pulse_bar([("Today's Revenue",f"${today_revenue:,.0f}"),("Visits Today",str(today_visits_count)),("Total Patients",str(patient_count))])
 
-    # Subscription expiry warnings at reception too
     all_pt_subs = sb_all("patient_subscriptions")
     expiring_rec = [s for s in all_pt_subs if s.get("status")=="Active" and s.get("end_date") in [today_str, tomorrow_str]]
     if expiring_rec:
@@ -388,7 +378,7 @@ elif selected == "🖥️  Reception":
             pname = patients_map_r.get(s.get("patient_id"),"Unknown")
             st.warning(f"⚠️ **{pname}** subscription **'{s.get('plan_name','')}'** expires {'TODAY' if s.get('end_date')==today_str else 'TOMORROW'}!")
 
-    t1,t2,t3,t4,t5,t6,t7,t8,t9 = st.tabs(["Checkout","Patient Records","Add Patient","Edit Patient","Sessions","Subscriptions","🏋️ Gym Check-in","Visit History","Delete/Edit Visit"])
+    t1,t2,tQ,t3,t4,t5,t6,t7,t8,t9 = st.tabs(["Checkout","Patient Records","👤 Quick View","Add Patient","Edit Patient","Sessions","Subscriptions","🏋️ Gym Check-in","Visit History","Delete/Edit Visit"])
 
     # ── CHECKOUT ──
     with t1:
@@ -413,13 +403,11 @@ elif selected == "🖥️  Reception":
                         s_map = {f"{s['name']}  —  ${float(s['price']):.2f}": (s["id"],float(s["price"]),s["name"]) for s in services_db}
                         chosen = st.selectbox("Service", list(s_map.keys()))
                         srv_id, base_price, chosen_item_name = s_map[chosen]
-                    else: st.error("No services configured.")
                 else:
                     if bundles_db:
                         b_map = {f"{b['name']}  —  ${float(b['price']):.2f}": (b["id"],float(b["price"]),b["name"]) for b in bundles_db}
                         chosen = st.selectbox("Bundle", list(b_map.keys()))
                         bnd_id, base_price, chosen_item_name = b_map[chosen]
-                    else: st.error("No bundles configured.")
                 disc_type = st.radio("Discount", ["None","Fixed ($)","Percent (%)"], horizontal=True)
                 disc_val  = st.number_input("Discount value", min_value=0.0, step=1.0)
             final_due = base_price
@@ -437,25 +425,27 @@ elif selected == "🖥️  Reception":
                 else:
                     disc_amt = base_price - final_due
                     sb_insert("visits",{"patient_id":p_map[target_p],"doctor_id":d_map[chosen_doc],"service_id":srv_id,"bundle_id":bnd_id,"visit_date":today_str,"base_price":base_price,"discount_amount":disc_amt,"net_paid":final_due,"payment_method":payment_method,"notes":visit_notes,"referred_by":referred_by_val,"added_by":username})
-                    # Auto increment sessions_done
+                    # Auto-mark today's appointment as Completed
+                    todays_appts = sb_all("appointments", filters={"patient_id": p_map[target_p], "appt_date": today_str, "status": "Scheduled"})
+                    for ap in todays_appts:
+                        sb_update("appointments", {"status": "Completed"}, "id", ap["id"])
+                    # Session count
                     sess = sb_one("patient_sessions", filters={"patient_id": p_map[target_p]})
                     if sess:
                         new_done = int(sess.get("sessions_done") or 0) + 1
                         sb_update("patient_sessions", {"sessions_done": new_done}, "id", sess["id"])
                         total_s = int(sess.get("total_sessions") or 0)
                         if total_s > 0 and new_done >= total_s:
-                            st.balloons()
-                            st.success(f"🎉 {target_p} has completed all {total_s} sessions!")
+                            st.balloons(); st.success(f"🎉 {target_p} has completed all {total_s} sessions!")
                     log_action(username,"New Visit",f"Patient: {target_p} | Doctor: {chosen_doc} | Paid: ${final_due:.2f} | Via: {how_found}")
-                    play_ding(); st.success("Visit saved.")
+                    play_ding(); st.success("Visit saved. Today's appointment marked Completed if existed.")
                     st.session_state.rcpt = {"patient":target_p,"doctor":chosen_doc,"item":chosen_item_name,"base":base_price,"disc":disc_amt,"net":final_due,"method":payment_method,"date":today_str}
-            if "rcpt" in st.session_state:
-                render_receipt(st.session_state.rcpt, get_clinic_profile())
+            if "rcpt" in st.session_state: render_receipt(st.session_state.rcpt, get_clinic_profile())
 
     # ── PATIENT RECORDS ──
     with t2:
         section_label("All patients")
-        search = st.text_input("Search by name or phone", placeholder="Type to filter...")
+        search = st.text_input("🔍 Search by name or phone", placeholder="Type to filter...", key="t2_search")
         all_p = sb_all("patients", order="name")
         if search: all_p = [p for p in all_p if search.lower() in (p.get("name","")).lower() or search in (p.get("phone","") or "")]
         if all_p:
@@ -467,6 +457,47 @@ elif selected == "🖥️  Reception":
                     sb_delete("patients","name",del_target); log_action(username,"Remove Patient",del_target)
                     play_ding(); st.success(f"Removed {del_target}."); st.rerun()
         else: st.info("No patients found.")
+
+    # ── PATIENT QUICK VIEW ──
+    with tQ:
+        section_label("👤 Patient quick view — full profile in one place")
+        all_p_qv = sb_all("patients", order="name")
+        if all_p_qv:
+            qv_search = st.text_input("🔍 Search patient", placeholder="Start typing name or phone...", key="qv_search")
+            filtered = [p for p in all_p_qv if not qv_search or qv_search.lower() in (p.get("name","")).lower() or qv_search in (p.get("phone","") or "")]
+            if filtered:
+                qv_sel = st.selectbox("Select patient", [p["name"] for p in filtered], key="qv_sel")
+                pat = next(p for p in filtered if p["name"]==qv_sel)
+                pid = pat["id"]
+                # Profile card
+                st.markdown(f'<div class="profile-summary"><h2 class="profile-name">{pat["name"]}</h2><div class="profile-meta">📞 {pat.get("phone","—")} · 🎂 {pat.get("date_of_birth","—")} · {pat.get("gender","—")}</div></div>', unsafe_allow_html=True)
+                # Stats
+                visits_p = get_visits_joined(limit=1000, patient_id=pid)
+                total_spent = sum(v["Paid"] for v in visits_p)
+                last_visit = visits_p[0]["Date"] if visits_p else "Never"
+                sess_p = sb_one("patient_sessions", filters={"patient_id": pid})
+                next_appt = next((a for a in get_appointments_joined() if a.get("Patient")==qv_sel and a.get("Status")=="Scheduled" and a.get("Date") >= today_str), None)
+                sub_active = next((s for s in sb_all("patient_subscriptions", filters={"patient_id":pid, "status":"Active"})), None)
+                m1,m2,m3,m4 = st.columns(4)
+                m1.metric("Total Visits", len(visits_p))
+                m2.metric("Total Spent", f"${total_spent:,.0f}")
+                m3.metric("Last Visit", last_visit)
+                m4.metric("Next Appointment", next_appt["Date"] if next_appt else "—")
+                if sess_p:
+                    done = int(sess_p.get("sessions_done") or 0); total = int(sess_p.get("total_sessions") or 0)
+                    rem = max(0, total-done); pct = int((done/total*100)) if total>0 else 0
+                    section_label("Therapy sessions progress")
+                    st.markdown(f'**{done} of {total} done** · {rem} remaining')
+                    st.markdown(f'<div class="session-bar-wrap"><div class="session-bar-fill" style="width:{pct}%;"></div></div>', unsafe_allow_html=True)
+                if sub_active:
+                    section_label("Active subscription")
+                    st.info(f"📅 **{sub_active.get('plan_name','')}** · Expires {sub_active.get('end_date','')} · {sub_active.get('sessions_used',0)}/{sub_active.get('total_sessions','∞')} sessions")
+                if pat.get("notes"):
+                    section_label("Medical notes"); st.markdown(f"_{pat.get('notes')}_")
+                if visits_p:
+                    section_label("Recent visits")
+                    st.dataframe(pd.DataFrame(visits_p[:10]), use_container_width=True, hide_index=True)
+        else: st.info("No patients registered yet.")
 
     # ── ADD PATIENT ──
     with t3:
@@ -490,54 +521,53 @@ elif selected == "🖥️  Reception":
     # ── EDIT PATIENT ──
     with t4:
         section_label("Edit patient profile")
+        ep_search = st.text_input("🔍 Search patient to edit", key="ep_search")
         all_p_edit = sb_all("patients", order="name")
+        if ep_search: all_p_edit = [p for p in all_p_edit if ep_search.lower() in (p.get("name","")).lower()]
         if all_p_edit:
-            edit_p_name = st.selectbox("Select patient to edit", ["— select —"]+[p["name"] for p in all_p_edit], key="edit_p_sel")
+            edit_p_name = st.selectbox("Select patient", ["— select —"]+[p["name"] for p in all_p_edit], key="edit_p_sel")
             if edit_p_name != "— select —":
-                pat = next(p for p in all_p_edit if p["name"] == edit_p_name)
+                pat = next(p for p in all_p_edit if p["name"]==edit_p_name)
                 c1,c2 = st.columns(2)
                 with c1:
-                    new_name   = st.text_input("Full name",   value=pat.get("name",""),         key="ep_name")
-                    new_phone  = st.text_input("Phone",       value=pat.get("phone","") or "",   key="ep_phone")
-                    new_dob    = st.text_input("Date of birth", value=pat.get("date_of_birth","") or "", key="ep_dob")
+                    new_name = st.text_input("Full name", value=pat.get("name",""), key="ep_name")
+                    new_phone = st.text_input("Phone", value=pat.get("phone","") or "", key="ep_phone")
+                    new_dob = st.text_input("Date of birth", value=pat.get("date_of_birth","") or "", key="ep_dob")
                 with c2:
-                    gender_opts = ["Prefer not to say","Male","Female","Other"]
-                    cur_gender  = pat.get("gender","Prefer not to say") or "Prefer not to say"
-                    new_gender  = st.selectbox("Gender", gender_opts, index=gender_opts.index(cur_gender) if cur_gender in gender_opts else 0, key="ep_gender")
-                    new_notes   = st.text_area("Notes", value=pat.get("notes","") or "", height=100, key="ep_notes")
+                    gopts = ["Prefer not to say","Male","Female","Other"]
+                    cg = pat.get("gender","Prefer not to say") or "Prefer not to say"
+                    new_gender = st.selectbox("Gender", gopts, index=gopts.index(cg) if cg in gopts else 0, key="ep_gender")
+                    new_notes = st.text_area("Notes", value=pat.get("notes","") or "", height=100, key="ep_notes")
                 if st.button("Save Changes", key="btn_edit_patient"):
                     sb_update("patients",{"name":new_name.strip(),"phone":new_phone.strip(),"date_of_birth":new_dob.strip(),"gender":new_gender,"notes":new_notes.strip()},"id",pat["id"])
                     log_action(username,"Edit Patient",f"Updated: {edit_p_name} → {new_name.strip()}")
                     play_ding(); st.success("Patient profile updated!"); st.rerun()
-        else: st.info("No patients registered yet.")
+        else: st.info("No patients found.")
 
     # ── SESSIONS ──
     with t5:
         section_label("Patient session tracker")
-        st.info("💡 Set how many total sessions a patient needs. Sessions done increase automatically every checkout.")
+        st.info("💡 Set total sessions a patient needs. Sessions done auto-increase every checkout.")
+        s_search = st.text_input("🔍 Search patient", key="sess_search")
         all_p_sess = sb_all("patients", order="name")
+        if s_search: all_p_sess = [p for p in all_p_sess if s_search.lower() in (p.get("name","")).lower()]
         if all_p_sess:
             sel_p_sess = st.selectbox("Select patient", ["— select —"]+[p["name"] for p in all_p_sess], key="sess_p_sel")
             if sel_p_sess != "— select —":
-                pid = next(p["id"] for p in all_p_sess if p["name"] == sel_p_sess)
+                pid = next(p["id"] for p in all_p_sess if p["name"]==sel_p_sess)
                 sess = sb_one("patient_sessions", filters={"patient_id": pid})
                 if sess:
-                    done = int(sess.get("sessions_done") or 0)
-                    total = int(sess.get("total_sessions") or 0)
-                    remaining = max(0, total - done)
-                    pct = int((done / total * 100)) if total > 0 else 0
+                    done = int(sess.get("sessions_done") or 0); total = int(sess.get("total_sessions") or 0)
+                    rem = max(0, total-done); pct = int((done/total*100)) if total>0 else 0
                     cc1,cc2,cc3 = st.columns(3)
-                    cc1.metric("Total Sessions", total)
-                    cc2.metric("Sessions Done", done)
-                    cc3.metric("Remaining", remaining)
+                    cc1.metric("Total Sessions", total); cc2.metric("Sessions Done", done); cc3.metric("Remaining", rem)
                     st.markdown(f'<div class="session-bar-wrap"><div class="session-bar-fill" style="width:{pct}%;"></div></div><p style="font-size:0.78rem;color:#5A7A65;margin-top:4px;">{pct}% complete</p>', unsafe_allow_html=True)
-                    if remaining == 0 and total > 0:
-                        st.success(f"🎉 {sel_p_sess} has completed all {total} sessions!")
+                    if rem == 0 and total > 0: st.success(f"🎉 {sel_p_sess} has completed all {total} sessions!")
                     st.markdown("---"); section_label("Update sessions")
                     c1,c2 = st.columns(2)
                     with c1:
                         new_total = st.number_input("Total sessions needed", min_value=0, step=1, value=total, key="sess_total")
-                        new_done  = st.number_input("Sessions done (override)", min_value=0, step=1, value=done, key="sess_done")
+                        new_done = st.number_input("Sessions done (override)", min_value=0, step=1, value=done, key="sess_done")
                     with c2:
                         new_sess_notes = st.text_area("Notes", value=sess.get("notes","") or "", height=80, key="sess_notes")
                     if st.button("Update Session Plan", key="btn_update_sess"):
@@ -548,68 +578,64 @@ elif selected == "🖥️  Reception":
                         sb_delete("patient_sessions","id",sess["id"])
                         st.success("Session plan removed."); st.rerun()
                 else:
-                    st.info(f"No session plan set for {sel_p_sess} yet.")
-                    section_label("Create session plan")
+                    st.info(f"No session plan set for {sel_p_sess} yet."); section_label("Create session plan")
                     c1,c2 = st.columns(2)
                     with c1: new_total_s = st.number_input("Total sessions needed", min_value=1, step=1, value=10, key="new_sess_total")
-                    with c2: new_sess_n  = st.text_area("Notes (injury, treatment plan)", height=80, key="new_sess_notes")
+                    with c2: new_sess_n = st.text_area("Notes (injury, treatment plan)", height=80, key="new_sess_notes")
                     if st.button("Create Session Plan", key="btn_create_sess"):
                         sb_insert("patient_sessions",{"patient_id":pid,"total_sessions":new_total_s,"sessions_done":0,"notes":new_sess_n,"added_by":username,"created_at":today_str})
                         log_action(username,"Create Session Plan",f"{sel_p_sess}: {new_total_s} sessions")
-                        play_ding(); st.success(f"Session plan created for {sel_p_sess}!"); st.rerun()
-        else: st.info("No patients registered yet.")
+                        play_ding(); st.success(f"Session plan created!"); st.rerun()
+        else: st.info("No patients found.")
 
-    # ── PATIENT SUBSCRIPTIONS ──
+    # ── SUBSCRIPTIONS ──
     with t6:
         section_label("Patient subscriptions")
         all_p_sub = sb_all("patients", order="name")
         if all_p_sub:
             sub_tabs = st.tabs(["Create Subscription","View & Manage"])
             with sub_tabs[0]:
-                section_label("Create new subscription")
                 p_map_sub = {p["name"]: p["id"] for p in all_p_sub}
                 c1,c2 = st.columns(2)
                 with c1:
                     sub_patient = st.selectbox("Patient", list(p_map_sub.keys()), key="sub_pat_sel")
-                    sub_plan    = st.text_input("Plan name (e.g. Monthly Gym, Weekly Physio)", key="sub_plan_name")
-                    sub_type    = st.selectbox("Plan type", ["Monthly","Weekly","Custom (days)"], key="sub_plan_type")
+                    sub_plan = st.text_input("Plan name", key="sub_plan_name")
+                    sub_type = st.selectbox("Plan type", ["Monthly","Weekly","Custom (days)"], key="sub_plan_type")
                 with c2:
-                    sub_price   = st.number_input("Price ($)", min_value=0.0, step=5.0, key="sub_price")
+                    sub_price = st.number_input("Price ($)", min_value=0.0, step=5.0, key="sub_price")
                     sub_sessions = st.number_input("Total sessions included (0 = unlimited)", min_value=0, step=1, value=0, key="sub_sessions")
-                    sub_start   = st.date_input("Start date", value=date.today(), key="sub_start")
-                    if sub_type == "Monthly":   sub_end = sub_start + timedelta(days=30)
-                    elif sub_type == "Weekly":  sub_end = sub_start + timedelta(days=7)
+                    sub_start = st.date_input("Start date", value=date.today(), key="sub_start")
+                    if sub_type == "Monthly": sub_end = sub_start + timedelta(days=30)
+                    elif sub_type == "Weekly": sub_end = sub_start + timedelta(days=7)
                     else:
-                        sub_days = st.number_input("Number of days", min_value=1, step=1, value=30, key="sub_days")
+                        sub_days = st.number_input("Days", min_value=1, step=1, value=30, key="sub_days")
                         sub_end = sub_start + timedelta(days=int(sub_days))
                     st.info(f"Expires: **{sub_end}**")
                 if st.button("Create Subscription & Print Receipt", key="btn_create_sub"):
                     if sub_plan.strip() and sub_price > 0:
                         sb_insert("patient_subscriptions",{"patient_id":p_map_sub[sub_patient],"plan_name":sub_plan.strip(),"plan_type":sub_type,"total_sessions":int(sub_sessions),"sessions_used":0,"price":sub_price,"start_date":str(sub_start),"end_date":str(sub_end),"status":"Active","added_by":username,"created_at":today_str})
-                        # Record payment as income in visits table
                         docs_for_sub = sb_all("doctors", order="name")
                         doc_id_sub = docs_for_sub[0]["id"] if docs_for_sub else None
                         if doc_id_sub:
                             sb_insert("visits",{"patient_id":p_map_sub[sub_patient],"doctor_id":doc_id_sub,"service_id":None,"bundle_id":None,"visit_date":today_str,"base_price":sub_price,"discount_amount":0,"net_paid":sub_price,"payment_method":"Subscription","notes":f"Subscription: {sub_plan.strip()}","referred_by":None,"added_by":username})
                         log_action(username,"Create Patient Subscription",f"{sub_patient} | {sub_plan} | ${sub_price}")
-                        play_ding(); st.success(f"Subscription created for {sub_patient} and ${sub_price:.2f} recorded as income!")
+                        play_ding(); st.success(f"Subscription created and ${sub_price:.2f} recorded as income!")
                         st.session_state.sub_rcpt = {"patient":sub_patient,"item":sub_plan,"base":sub_price,"disc":0.0,"net":sub_price,"method":"Subscription","date":today_str,"doctor":"—"}
-                    else: st.error("Plan name and price are required.")
-                if "sub_rcpt" in st.session_state:
-                    render_receipt(st.session_state.sub_rcpt, get_clinic_profile())
-
+                    else: st.error("Plan name and price required.")
+                if "sub_rcpt" in st.session_state: render_receipt(st.session_state.sub_rcpt, get_clinic_profile())
             with sub_tabs[1]:
-                section_label("All active subscriptions")
+                section_label("All subscriptions")
+                sm_search = st.text_input("🔍 Search by patient name", key="sm_search")
                 all_subs_pt = sb_all("patient_subscriptions", order="end_date")
+                pmap2 = {p["id"]: p["name"] for p in all_p_sub}
+                if sm_search: all_subs_pt = [s for s in all_subs_pt if sm_search.lower() in (pmap2.get(s.get("patient_id"),"")).lower()]
                 if all_subs_pt:
-                    pmap2 = {p["id"]: p["name"] for p in all_p_sub}
                     rows_sub = []
                     for s in all_subs_pt:
                         pname = pmap2.get(s.get("patient_id"),"")
-                        total_s = int(s.get("total_sessions") or 0)
-                        used_s  = int(s.get("sessions_used") or 0)
-                        remaining_s = (total_s - used_s) if total_s > 0 else "∞"
-                        rows_sub.append({"Patient":pname,"Plan":s.get("plan_name",""),"Type":s.get("plan_type",""),"Price":f"${float(s.get('price') or 0):,.2f}","Sessions":f"{used_s}/{total_s if total_s>0 else '∞'}","Remaining":remaining_s,"Start":s.get("start_date",""),"Expires":s.get("end_date",""),"Status":s.get("status",""),"id":s["id"]})
+                        total_s = int(s.get("total_sessions") or 0); used_s = int(s.get("sessions_used") or 0)
+                        rem_s = (total_s - used_s) if total_s>0 else "∞"
+                        rows_sub.append({"Patient":pname,"Plan":s.get("plan_name",""),"Type":s.get("plan_type",""),"Price":f"${float(s.get('price') or 0):,.2f}","Sessions":f"{used_s}/{total_s if total_s>0 else '∞'}","Remaining":rem_s,"Start":s.get("start_date",""),"Expires":s.get("end_date",""),"Status":s.get("status",""),"id":s["id"]})
                     st.dataframe(pd.DataFrame(rows_sub).drop(columns=["id"]), use_container_width=True, hide_index=True)
                     st.markdown("---"); section_label("Update subscription")
                     sub_opts = {f"{r['Patient']} — {r['Plan']} (expires {r['Expires']})": r["id"] for r in rows_sub}
@@ -617,127 +643,123 @@ elif selected == "🖥️  Reception":
                     if chosen_sub != "— select —":
                         sid = sub_opts[chosen_sub]
                         c1,c2,c3 = st.columns(3)
-                        with c1:
-                            new_sub_status = st.selectbox("Status", ["Active","Expired","Cancelled"], key="sub_status_sel")
-                        with c2:
-                            new_sub_end = st.text_input("Extend end date (YYYY-MM-DD)", key="sub_end_edit")
-                        with c3:
-                            new_total_sub = st.number_input("Update total sessions", min_value=0, step=1, key="sub_total_edit")
+                        with c1: new_sub_status = st.selectbox("Status",["Active","Expired","Cancelled"], key="sub_status_sel")
+                        with c2: new_sub_end = st.text_input("Extend end date (YYYY-MM-DD)", key="sub_end_edit")
+                        with c3: new_total_sub = st.number_input("Update total sessions", min_value=0, step=1, key="sub_total_edit")
                         if st.button("Update Subscription", key="btn_upd_sub"):
                             upd = {"status": new_sub_status}
                             if new_sub_end.strip(): upd["end_date"] = new_sub_end.strip()
                             if new_total_sub > 0: upd["total_sessions"] = new_total_sub
                             sb_update("patient_subscriptions", upd, "id", sid)
                             log_action(username,"Update Subscription",f"ID #{sid} → {new_sub_status}")
-                            play_ding(); st.success("Subscription updated!"); st.rerun()
+                            play_ding(); st.success("Updated!"); st.rerun()
                         if st.button("Delete Subscription", type="primary", key="btn_del_sub"):
-                            sb_delete("patient_subscriptions","id",sid)
-                            st.success("Subscription deleted."); st.rerun()
-                else: st.info("No subscriptions created yet.")
-        else: st.info("No patients registered yet.")
+                            sb_delete("patient_subscriptions","id",sid); st.success("Deleted."); st.rerun()
+                else: st.info("No subscriptions yet.")
+        else: st.info("No patients yet.")
 
     # ── GYM CHECK-IN ──
     with t7:
         section_label("🏋️ Gym check-in — one click")
-        st.info("💡 For subscription patients who come daily. No receipt needed — just click check-in.")
+        st.info("💡 For subscription patients who come daily. No receipt — just click check-in.")
         all_p_checkin = sb_all("patients", order="name")
         active_subs_map = {}
         for s in sb_all("patient_subscriptions", filters={"status":"Active"}):
             active_subs_map.setdefault(s["patient_id"], []).append(s)
         patients_with_sub = [p for p in all_p_checkin if p["id"] in active_subs_map]
         if patients_with_sub:
-            ci_patient = st.selectbox("Select patient", ["— select —"]+[p["name"] for p in patients_with_sub], key="checkin_sel")
+            ci_search = st.text_input("🔍 Search patient", key="ci_search")
+            filtered_ci = [p for p in patients_with_sub if not ci_search or ci_search.lower() in (p.get("name","")).lower()]
+            ci_patient = st.selectbox("Select patient", ["— select —"]+[p["name"] for p in filtered_ci], key="checkin_sel")
             if ci_patient != "— select —":
-                pid_ci = next(p["id"] for p in patients_with_sub if p["name"] == ci_patient)
+                pid_ci = next(p["id"] for p in filtered_ci if p["name"]==ci_patient)
                 subs_for_pat = active_subs_map[pid_ci]
                 for s in subs_for_pat:
-                    total_s = int(s.get("total_sessions") or 0)
-                    used_s  = int(s.get("sessions_used") or 0)
-                    remaining_s = (total_s - used_s) if total_s > 0 else "∞"
-                    st.markdown(f"""<div class="card" style="border-left:4px solid #0D3D2B;">
-                        <strong>{s.get('plan_name','')}</strong> · Expires {s.get('end_date','')} · Sessions: {used_s}/{total_s if total_s>0 else '∞'} · Remaining: {remaining_s}
-                    </div>""", unsafe_allow_html=True)
+                    total_s = int(s.get("total_sessions") or 0); used_s = int(s.get("sessions_used") or 0)
+                    rem_s = (total_s - used_s) if total_s>0 else "∞"
+                    st.markdown(f'<div class="card" style="border-left:4px solid #0D3D2B;"><strong>{s.get("plan_name","")}</strong> · Expires {s.get("end_date","")} · Sessions: {used_s}/{total_s if total_s>0 else "∞"} · Remaining: {rem_s}</div>', unsafe_allow_html=True)
                 if st.button(f"✅ Check In {ci_patient}", use_container_width=True, key="btn_checkin"):
-                    # Use first active sub
                     sub_to_use = subs_for_pat[0]
                     new_used = int(sub_to_use.get("sessions_used") or 0) + 1
                     sb_update("patient_subscriptions",{"sessions_used":new_used},"id",sub_to_use["id"])
                     sb_insert("gym_checkins",{"subscription_id":sub_to_use["id"],"patient_id":pid_ci,"checkin_date":today_str,"added_by":username})
                     log_action(username,"Gym Check-in",f"{ci_patient} | {sub_to_use.get('plan_name','')}")
                     play_ding(); st.success(f"✅ {ci_patient} checked in! Session {new_used} recorded.")
-                    # Check if expired
                     total_ci = int(sub_to_use.get("total_sessions") or 0)
                     if total_ci > 0 and new_used >= total_ci:
-                        st.warning(f"⚠️ {ci_patient} has used all {total_ci} sessions in this subscription!")
-        else: st.info("No patients with active subscriptions found. Create a subscription first in the Subscriptions tab.")
+                        st.warning(f"⚠️ {ci_patient} has used all {total_ci} sessions!")
+        else: st.info("No patients with active subscriptions. Create one in Subscriptions tab.")
 
     # ── VISIT HISTORY ──
     with t8:
         section_label("Patient visit history")
+        vh_search = st.text_input("🔍 Search patient", key="vh_search")
         patients_all = sb_all("patients", order="name")
+        if vh_search: patients_all = [p for p in patients_all if vh_search.lower() in (p.get("name","")).lower()]
         if patients_all:
             lookup_p = st.selectbox("Select patient", ["— select —"]+[p["name"] for p in patients_all])
             if lookup_p != "— select —":
-                pid = next(p["id"] for p in patients_all if p["name"] == lookup_p)
+                pid = next(p["id"] for p in patients_all if p["name"]==lookup_p)
                 hist = get_visits_joined(limit=500, patient_id=pid)
                 if hist:
                     total_spent = sum(h["Paid"] for h in hist)
-                    cc1,cc2 = st.columns(2)
-                    cc1.metric("Total visits", len(hist)); cc2.metric("Total spent", f"${total_spent:,.2f}")
+                    cc1,cc2 = st.columns(2); cc1.metric("Total visits", len(hist)); cc2.metric("Total spent", f"${total_spent:,.2f}")
                     st.dataframe(pd.DataFrame(hist), use_container_width=True, hide_index=True)
                 else: st.info(f"No visits recorded for {lookup_p}.")
-        else: st.info("No patients registered yet.")
+        else: st.info("No patients found.")
 
     # ── DELETE / EDIT VISIT ──
     with t9:
-        ed1, ed2 = st.tabs(["Delete Visit", "Edit Visit"])
+        ed1, ed2 = st.tabs(["Delete Visit","Edit Visit"])
         with ed1:
-            section_label("Delete a visit record")
-            st.warning("⚠️ Use this to correct data entry errors only.")
-            all_visits_j = get_visits_joined(limit=100)
+            section_label("Delete a visit record"); st.warning("⚠️ Use to correct data entry errors only.")
+            dv_search = st.text_input("🔍 Search visits by patient", key="dv_search")
+            all_visits_j = get_visits_joined(limit=200)
+            if dv_search: all_visits_j = [v for v in all_visits_j if dv_search.lower() in v.get("Patient","").lower()]
             if all_visits_j:
                 st.dataframe(pd.DataFrame(all_visits_j), use_container_width=True, hide_index=True)
                 void_id = st.number_input("Visit ID to delete", min_value=1, step=1, key="void_id")
                 if st.button("Delete Visit", type="primary", key="btn_del_visit"):
-                    sb_delete("visits","id",void_id)
-                    log_action(username,"Delete Visit",f"Visit ID #{void_id}")
+                    sb_delete("visits","id",void_id); log_action(username,"Delete Visit",f"Visit #{void_id}")
                     play_ding(); st.success(f"Visit #{void_id} deleted."); st.rerun()
-            else: st.info("No visits recorded yet.")
+            else: st.info("No visits found.")
         with ed2:
             section_label("Edit a visit")
-            all_visits_j2 = get_visits_joined(limit=100)
+            ev_search = st.text_input("🔍 Search visits by patient", key="ev_search")
+            all_visits_j2 = get_visits_joined(limit=200)
+            if ev_search: all_visits_j2 = [v for v in all_visits_j2 if ev_search.lower() in v.get("Patient","").lower()]
             if all_visits_j2:
                 visit_opts = {f"#{v['id']} · {v['Date']} · {v['Patient']} · {v['Item']} · ${v['Paid']:.2f}": v["id"] for v in all_visits_j2}
-                chosen_v = st.selectbox("Select visit to edit", ["— select —"]+list(visit_opts.keys()), key="edit_v_sel")
+                chosen_v = st.selectbox("Select visit", ["— select —"]+list(visit_opts.keys()), key="edit_v_sel")
                 if chosen_v != "— select —":
-                    vid = visit_opts[chosen_v]
-                    visit_rec = sb_one("visits", filters={"id": vid})
+                    vid = visit_opts[chosen_v]; visit_rec = sb_one("visits", filters={"id": vid})
                     if visit_rec:
                         c1,c2 = st.columns(2)
                         with c1:
-                            new_v_date   = st.text_input("Visit date (YYYY-MM-DD)", value=visit_rec.get("visit_date",""), key="ev_date")
-                            new_v_base   = st.number_input("Base price", min_value=0.0, step=1.0, value=float(visit_rec.get("base_price") or 0), key="ev_base")
-                            new_v_disc   = st.number_input("Discount", min_value=0.0, step=1.0, value=float(visit_rec.get("discount_amount") or 0), key="ev_disc")
+                            new_v_date = st.text_input("Visit date", value=visit_rec.get("visit_date",""), key="ev_date")
+                            new_v_base = st.number_input("Base price", min_value=0.0, step=1.0, value=float(visit_rec.get("base_price") or 0), key="ev_base")
+                            new_v_disc = st.number_input("Discount", min_value=0.0, step=1.0, value=float(visit_rec.get("discount_amount") or 0), key="ev_disc")
                         with c2:
-                            new_v_paid   = st.number_input("Net paid", min_value=0.0, step=1.0, value=float(visit_rec.get("net_paid") or 0), key="ev_paid")
-                            new_v_method = st.selectbox("Payment method", ["Cash","Card","Insurance","Transfer"], index=["Cash","Card","Insurance","Transfer"].index(visit_rec.get("payment_method","Cash") or "Cash"), key="ev_method")
-                            new_v_notes  = st.text_area("Notes", value=visit_rec.get("notes","") or "", height=80, key="ev_notes")
+                            new_v_paid = st.number_input("Net paid", min_value=0.0, step=1.0, value=float(visit_rec.get("net_paid") or 0), key="ev_paid")
+                            mopts = ["Cash","Card","Insurance","Transfer","Subscription"]
+                            cm = visit_rec.get("payment_method","Cash") or "Cash"
+                            new_v_method = st.selectbox("Payment method", mopts, index=mopts.index(cm) if cm in mopts else 0, key="ev_method")
+                            new_v_notes = st.text_area("Notes", value=visit_rec.get("notes","") or "", height=80, key="ev_notes")
                         if st.button("Save Visit Changes", key="btn_edit_visit"):
                             sb_update("visits",{"visit_date":new_v_date,"base_price":new_v_base,"discount_amount":new_v_disc,"net_paid":new_v_paid,"payment_method":new_v_method,"notes":new_v_notes},"id",vid)
                             log_action(username,"Edit Visit",f"Visit #{vid} updated")
                             play_ding(); st.success(f"Visit #{vid} updated!"); st.rerun()
-            else: st.info("No visits recorded yet.")
+            else: st.info("No visits found.")
 
 # ════════════════════════════════════════════
 # APPOINTMENTS
 # ════════════════════════════════════════════
 elif selected == "📅  Appointments":
-    page_header("Appointments", "Schedule and manage upcoming patient appointments.")
-    ta1,ta2 = st.tabs(["Schedule","View All"])
+    page_header("Appointments", "Schedule and manage appointments.")
+    ta1,ta2,ta3 = st.tabs(["Schedule","View All","🖨️ Print Today"])
     with ta1:
-        section_label("Book new appointment")
         patients_db = sb_all("patients", order="name"); docs_db = sb_all("doctors", order="name")
-        if not patients_db or not docs_db: st.warning("You need at least one patient and one doctor.")
+        if not patients_db or not docs_db: st.warning("Need at least one patient and one doctor.")
         else:
             p_map = {p["name"]: p["id"] for p in patients_db}; d_map = {d["name"]: d["id"] for d in docs_db}
             c1,c2 = st.columns(2)
@@ -746,10 +768,11 @@ elif selected == "📅  Appointments":
             if st.button("Book Appointment"):
                 sb_insert("appointments",{"patient_id":p_map[ap_patient],"doctor_id":d_map[ap_doctor],"appt_date":str(ap_date),"appt_time":str(ap_time),"reason":ap_reason,"status":"Scheduled"})
                 log_action(username,"Book Appointment",f"{ap_patient} with {ap_doctor} on {ap_date}")
-                play_ding(); st.success(f"Appointment booked for {ap_patient} on {ap_date} at {ap_time}.")
+                play_ding(); st.success(f"Appointment booked.")
     with ta2:
-        section_label("All appointments")
+        ap_search = st.text_input("🔍 Search by patient or doctor", key="ap_search")
         all_appts = get_appointments_joined()
+        if ap_search: all_appts = [a for a in all_appts if ap_search.lower() in (a.get("Patient","")+" "+a.get("Doctor","")).lower()]
         if all_appts:
             st.dataframe(pd.DataFrame(all_appts), use_container_width=True, hide_index=True)
             st.markdown("---"); section_label("Update status")
@@ -759,27 +782,57 @@ elif selected == "📅  Appointments":
             if st.button("Update Status"):
                 sb_update("appointments",{"status":new_status},"id",upd_id)
                 log_action(username,"Update Appointment",f"Appt #{upd_id} → {new_status}")
-                play_ding(); st.success(f"Appointment #{upd_id} updated."); st.rerun()
-        else: st.info("No appointments booked yet.")
+                play_ding(); st.success(f"Updated."); st.rerun()
+        else: st.info("No appointments yet.")
+    with ta3:
+        section_label("🖨️ Print today's appointments")
+        today_appts_p = [a for a in get_appointments_joined() if a.get("Date")==today_str]
+        if today_appts_p:
+            cp = get_clinic_profile()
+            print_html = f"""<div style="background:white;padding:30px;font-family:'DM Sans',sans-serif;color:#1A2E23;max-width:800px;">
+                <div style="text-align:center;border-bottom:3px solid #0D3D2B;padding-bottom:14px;margin-bottom:20px;">
+                    <h1 style="margin:0;color:#0D3D2B;">🌿 {cp.get('clinic_name','Garden Clinic')}</h1>
+                    <p style="margin:4px 0 0 0;color:#5A7A65;font-size:0.9rem;">Daily Appointments Schedule</p>
+                    <p style="margin:6px 0 0 0;font-weight:700;color:#0D3D2B;">{date.today().strftime('%A, %B %d, %Y')}</p>
+                </div>
+                <table style="width:100%;border-collapse:collapse;font-size:0.95rem;">
+                    <thead><tr style="background:#0D3D2B;color:white;"><th style="padding:10px;text-align:left;">Time</th><th style="padding:10px;text-align:left;">Patient</th><th style="padding:10px;text-align:left;">Doctor</th><th style="padding:10px;text-align:left;">Reason</th><th style="padding:10px;text-align:left;">Status</th></tr></thead>
+                    <tbody>"""
+            for a in today_appts_p:
+                print_html += f'<tr style="border-bottom:1px solid #DDE8E1;"><td style="padding:10px;">{a["Time"]}</td><td style="padding:10px;font-weight:600;">{a["Patient"]}</td><td style="padding:10px;">{a["Doctor"]}</td><td style="padding:10px;">{a.get("Reason","—")}</td><td style="padding:10px;">{a["Status"]}</td></tr>'
+            print_html += f'</tbody></table><p style="text-align:center;margin-top:20px;color:#8EA898;font-size:0.8rem;">Total appointments today: {len(today_appts_p)}</p></div>'
+            st.markdown(print_html, unsafe_allow_html=True)
+            st.info("💡 Use **Ctrl+P** (or Cmd+P) to print this page or save as PDF.")
+        else: st.info("No appointments scheduled for today.")
 
 # ════════════════════════════════════════════
-# ACCOUNTING
+# ACCOUNTING (with date range)
 # ════════════════════════════════════════════
 elif selected == "📊  Accounting":
     page_header("Accounting", "Revenue, expenses, and financial health.")
-    pulse_bar([("Gross Revenue",f"${gross_income:,.0f}"),("Total Expenses",f"${total_outflows:,.0f}"),("Net Profit",f"${net_profit:,.0f}"),("Doctor Commissions",f"${total_commissions:,.0f}")])
-    c1,c2,c3 = st.columns(3)
-    with c1: st.markdown(card("Gross Revenue",f"${gross_income:,.2f}","green"), unsafe_allow_html=True)
-    with c2: st.markdown(card("Total Outflows",f"${total_outflows:,.2f}","red"),  unsafe_allow_html=True)
-    with c3: st.markdown(card("Net Profit",f"${net_profit:,.2f}","dark"),         unsafe_allow_html=True)
+    section_label("📅 Date range filter")
+    use_range = st.checkbox("Filter by date range", key="acc_use_range")
+    if use_range:
+        rc1,rc2 = st.columns(2)
+        with rc1: start_d = st.date_input("From", value=date.today().replace(day=1), key="acc_start")
+        with rc2: end_d = st.date_input("To", value=date.today(), key="acc_end")
+        g_, e_, c_, o_, n_, _ = get_financials(start=str(start_d), end=str(end_d))
+        st.info(f"Showing data from **{start_d}** to **{end_d}**")
+    else:
+        g_, e_, c_, o_, n_ = gross_income, base_expenses, total_commissions, total_outflows, net_profit
+    pulse_bar([("Gross Revenue",f"${g_:,.0f}"),("Total Expenses",f"${o_:,.0f}"),("Net Profit",f"${n_:,.0f}"),("Doctor Commissions",f"${c_:,.0f}")])
+    cc1,cc2,cc3 = st.columns(3)
+    with cc1: st.markdown(card("Gross Revenue",f"${g_:,.2f}","green"), unsafe_allow_html=True)
+    with cc2: st.markdown(card("Total Outflows",f"${o_:,.2f}","red"), unsafe_allow_html=True)
+    with cc3: st.markdown(card("Net Profit",f"${n_:,.2f}","dark"), unsafe_allow_html=True)
     st.markdown("---")
     ac1,ac2 = st.columns(2)
     with ac1:
         section_label("Expenses breakdown")
         payroll_total = sum(float(e.get("amount") or 0) for e in sb_all("expenses") if e.get("category")=="Payroll")
-        other_exp = base_expenses - payroll_total
-        if total_outflows > 0:
-            df_e = pd.DataFrame({"Category":["Other Expenses","Payroll","Doctor Commissions"],"Amount ($)":[other_exp,payroll_total,total_commissions]}).set_index("Category")
+        other_exp = e_ - payroll_total
+        if o_ > 0:
+            df_e = pd.DataFrame({"Category":["Other Expenses","Payroll","Doctor Commissions"],"Amount ($)":[other_exp,payroll_total,c_]}).set_index("Category")
             st.bar_chart(df_e, y="Amount ($)", color="#C0392B", height=220)
         else: st.info("No expense data yet.")
     with ac2:
@@ -793,12 +846,15 @@ elif selected == "📊  Accounting":
     ae1,ae2 = st.columns([3,2])
     with ae1:
         section_label("Expense log")
+        exp_search = st.text_input("🔍 Search expenses", key="exp_search")
         filter_cat = st.selectbox("Filter by category",["All","General","Payroll","Supplies","Utilities","Rent","Equipment","Marketing","Subscription","Other"], key="acc_filter_cat")
         all_exp = sb_all("expenses", order="id", desc_order=True)
+        
         if filter_cat != "All": all_exp = [e for e in all_exp if e.get("category")==filter_cat]
+        if exp_search: all_exp = [e for e in all_exp if exp_search.lower() in (e.get("description","")).lower()]
         if all_exp:
             st.dataframe(pd.DataFrame([{"id":e["id"],"Date":e["date"],"Category":e.get("category",""),"Description":e["description"],"Amount":float(e.get("amount") or 0),"Added By":e.get("added_by","")} for e in all_exp]), use_container_width=True, hide_index=True)
-        else: st.info("No expenses recorded.")
+        else: st.info("No expenses found.")
     with ae2:
         section_label("Add expense")
         with st.form("expense_form"):
@@ -809,7 +865,6 @@ elif selected == "📊  Accounting":
                     sb_insert("expenses",{"description":e_desc,"category":e_cat,"amount":e_amt,"date":str(e_date),"added_by":username})
                     log_action(username,"Add Expense",f"{e_desc} | ${e_amt:.2f} | {e_cat}")
                     play_ding(); st.success("Expense added."); st.rerun()
-                else: st.error("Description and amount are required.")
     st.markdown("---"); section_label("Edit or delete expense")
     del_exp_list = sb_all("expenses", order="id", desc_order=True, limit=100)
     if del_exp_list:
@@ -822,7 +877,7 @@ elif selected == "📊  Accounting":
                 with c1: new_e_desc = st.text_input("Description", value=exp_rec.get("description",""), key="ee_desc")
                 with c2:
                     cat_opts = ["General","Payroll","Supplies","Utilities","Rent","Equipment","Marketing","Subscription","Other"]
-                    cur_cat  = exp_rec.get("category","General") or "General"
+                    cur_cat = exp_rec.get("category","General") or "General"
                     new_e_cat = st.selectbox("Category", cat_opts, index=cat_opts.index(cur_cat) if cur_cat in cat_opts else 0, key="ee_cat")
                 with c3: new_e_amt = st.number_input("Amount ($)", min_value=0.0, step=1.0, value=float(exp_rec.get("amount") or 0), key="ee_amt")
                 cc1,cc2 = st.columns(2)
@@ -830,13 +885,11 @@ elif selected == "📊  Accounting":
                     if st.button("Save Expense Changes", key="btn_edit_exp"):
                         sb_update("expenses",{"description":new_e_desc,"category":new_e_cat,"amount":new_e_amt},"id",eid)
                         log_action(username,"Edit Expense",f"Expense #{eid} updated")
-                        play_ding(); st.success("Expense updated."); st.rerun()
+                        play_ding(); st.success("Updated."); st.rerun()
                 with cc2:
                     if st.button("Delete Expense", type="primary", key="btn_del_exp"):
-                        sb_delete("expenses","id",eid)
-                        log_action(username,"Delete Expense",f"Deleted #{eid}: {chosen_ed_exp}")
-                        play_ding(); st.success("Expense deleted."); st.rerun()
-    else: st.info("No expenses to edit.")
+                        sb_delete("expenses","id",eid); log_action(username,"Delete Expense",f"Deleted #{eid}")
+                        play_ding(); st.success("Deleted."); st.rerun()
     st.markdown("---"); section_label("Referral commissions owed this month")
     current_month = datetime.now().strftime("%Y-%m")
     all_refs = sb_all("referrers", order="name")
@@ -856,7 +909,7 @@ elif selected == "📊  Accounting":
                 if not sb_exists("expenses","description",tag):
                     sb_insert("expenses",{"description":tag,"category":"Marketing","amount":total_ref_comm,"date":f"{current_month}-01","added_by":username})
                     log_action(username,"Referral Commission Paid",f"${total_ref_comm:.2f} for {current_month}")
-                    play_ding(); st.success(f"${total_ref_comm:,.2f} recorded as expense."); st.rerun()
+                    play_ding(); st.success(f"${total_ref_comm:,.2f} recorded."); st.rerun()
                 else: st.warning("Already recorded for this month.")
             else: st.info("No referral commissions this month.")
     else: st.info("No referrers added yet.")
@@ -881,10 +934,7 @@ elif selected == "📊  Accounting":
             st.download_button("⬇️ All Patients", data=to_excel(df_ep), file_name=f"patients_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
         else: st.button("⬇️ All Patients", disabled=True, use_container_width=True)
     with ex4:
-        if all_v_exp if 'all_v_exp' in dir() else False:
-            all_v_m = all_v_exp
-        else:
-            all_v_m = sb_all("visits")
+        all_v_m = sb_all("visits")
         if all_v_m:
             df_em = pd.DataFrame([{"Month":v["visit_date"][:7],"Revenue":float(v.get("net_paid") or 0)} for v in all_v_m])
             df_em = df_em.groupby("Month").agg(Revenue=("Revenue","sum"),Visits=("Revenue","count")).reset_index().sort_values("Month",ascending=False)
@@ -892,10 +942,113 @@ elif selected == "📊  Accounting":
         else: st.button("⬇️ Monthly Summary", disabled=True, use_container_width=True)
 
 # ════════════════════════════════════════════
+# REPORTS
+# ════════════════════════════════════════════
+elif selected == "📑  Reports":
+    page_header("Reports", "Daily summary, top patients, top services, and doctor monthly reports.")
+    rep_tabs = st.tabs(["📅 Daily Report","🏆 Top Patients","💎 Top Services","👨‍⚕️ Doctor Monthly"])
+
+    with rep_tabs[0]:
+        section_label("Daily report")
+        rep_date = st.date_input("Report date", value=date.today(), key="dr_date")
+        rep_date_str = str(rep_date)
+        day_visits = [v for v in sb_all("visits") if v.get("visit_date")==rep_date_str]
+        day_revenue = sum(float(v.get("net_paid") or 0) for v in day_visits)
+        day_expenses = sum(float(e.get("amount") or 0) for e in sb_all("expenses") if e.get("date")==rep_date_str)
+        unique_pat = len(set(v.get("patient_id") for v in day_visits))
+        mc1,mc2,mc3,mc4 = st.columns(4)
+        mc1.metric("Total Revenue", f"${day_revenue:,.2f}")
+        mc2.metric("Total Visits", len(day_visits))
+        mc3.metric("Unique Patients", unique_pat)
+        mc4.metric("Expenses That Day", f"${day_expenses:,.2f}")
+        st.markdown("---"); section_label("Visits that day")
+        if day_visits:
+            patients_dr = {p["id"]: p["name"] for p in sb_all("patients")}
+            doctors_dr  = {d["id"]: d["name"] for d in sb_all("doctors")}
+            services_dr = {s["id"]: s["name"] for s in sb_all("services")}
+            bundles_dr  = {b["id"]: b["name"] for b in sb_all("bundles")}
+            rows_dr = []
+            for v in day_visits:
+                svc_d = services_dr.get(v.get("service_id"),""); bnd_d = bundles_dr.get(v.get("bundle_id"),"")
+                rows_dr.append({"Patient":patients_dr.get(v.get("patient_id"),""),"Doctor":doctors_dr.get(v.get("doctor_id"),""),"Item":svc_d if svc_d else f"📦 {bnd_d}","Paid":f"${float(v.get('net_paid') or 0):,.2f}","Method":v.get("payment_method","")})
+            st.dataframe(pd.DataFrame(rows_dr), use_container_width=True, hide_index=True)
+            section_label("Doctor breakdown that day")
+            doc_dr = {}
+            for v in day_visits:
+                did = v.get("doctor_id")
+                doc_dr[did] = doc_dr.get(did, {"visits":0,"revenue":0.0})
+                doc_dr[did]["visits"] += 1
+                doc_dr[did]["revenue"] += float(v.get("net_paid") or 0)
+            doctors_dr2 = {d["id"]: d["name"] for d in sb_all("doctors")}
+            rows_dd = [{"Doctor":doctors_dr2.get(did,""),"Visits":info["visits"],"Revenue":f"${info['revenue']:,.2f}"} for did,info in doc_dr.items()]
+            st.dataframe(pd.DataFrame(rows_dd), use_container_width=True, hide_index=True)
+        else: st.info("No visits that day.")
+
+    with rep_tabs[1]:
+        section_label("🏆 Top patients")
+        tp_period = st.selectbox("Period", ["This month","This year","All time"], key="tp_period")
+        all_v_tp = sb_all("visits")
+        if tp_period == "This month": cm = datetime.now().strftime("%Y-%m"); all_v_tp = [v for v in all_v_tp if (v.get("visit_date") or "")[:7]==cm]
+        elif tp_period == "This year": cy = datetime.now().strftime("%Y"); all_v_tp = [v for v in all_v_tp if (v.get("visit_date") or "")[:4]==cy]
+        patient_totals = {}
+        for v in all_v_tp:
+            pid = v.get("patient_id")
+            if pid:
+                if pid not in patient_totals: patient_totals[pid] = {"visits":0,"spent":0.0}
+                patient_totals[pid]["visits"] += 1
+                patient_totals[pid]["spent"] += float(v.get("net_paid") or 0)
+        patients_tp = {p["id"]: p["name"] for p in sb_all("patients")}
+        rows_tp = sorted([{"Patient":patients_tp.get(pid,""),"Visits":info["visits"],"Total Spent":info["spent"]} for pid,info in patient_totals.items()], key=lambda x: x["Total Spent"], reverse=True)
+        if rows_tp:
+            df_tp = pd.DataFrame(rows_tp[:20])
+            df_tp["Total Spent"] = df_tp["Total Spent"].apply(lambda x: f"${x:,.2f}")
+            st.dataframe(df_tp, use_container_width=True, hide_index=True)
+        else: st.info("No data for selected period.")
+
+    with rep_tabs[2]:
+        section_label("💎 Top services")
+        ts_period = st.selectbox("Period", ["This month","This year","All time"], key="ts_period")
+        all_v_ts = sb_all("visits")
+        if ts_period == "This month": cm2 = datetime.now().strftime("%Y-%m"); all_v_ts = [v for v in all_v_ts if (v.get("visit_date") or "")[:7]==cm2]
+        elif ts_period == "This year": cy2 = datetime.now().strftime("%Y"); all_v_ts = [v for v in all_v_ts if (v.get("visit_date") or "")[:4]==cy2]
+        services_ts = {s["id"]: s["name"] for s in sb_all("services")}
+        bundles_ts  = {b["id"]: b["name"] for b in sb_all("bundles")}
+        svc_totals = {}
+        for v in all_v_ts:
+            sid = v.get("service_id"); bid = v.get("bundle_id")
+            item = services_ts.get(sid) if sid else (f"📦 {bundles_ts.get(bid,'')}" if bid else "Other")
+            if item not in svc_totals: svc_totals[item] = {"count":0,"revenue":0.0}
+            svc_totals[item]["count"] += 1
+            svc_totals[item]["revenue"] += float(v.get("net_paid") or 0)
+        rows_ts = sorted([{"Service / Bundle":k,"Times Sold":v["count"],"Total Revenue":v["revenue"]} for k,v in svc_totals.items()], key=lambda x: x["Total Revenue"], reverse=True)
+        if rows_ts:
+            df_ts = pd.DataFrame(rows_ts)
+            df_ts["Total Revenue"] = df_ts["Total Revenue"].apply(lambda x: f"${x:,.2f}")
+            st.dataframe(df_ts, use_container_width=True, hide_index=True)
+        else: st.info("No data for selected period.")
+
+    with rep_tabs[3]:
+        section_label("👨‍⚕️ Doctor monthly report")
+        dm_month = st.text_input("Month (YYYY-MM)", value=datetime.now().strftime("%Y-%m"), key="dm_month")
+        all_v_dm = [v for v in sb_all("visits") if (v.get("visit_date") or "")[:7]==dm_month]
+        doctors_dm = sb_all("doctors", order="name")
+        all_tiers_dm = sb_all("doctor_commission_tiers")
+        rows_dm = []
+        for d in doctors_dm:
+            doc_v = [v for v in all_v_dm if v.get("doctor_id")==d["id"]]
+            rev = sum(float(v.get("net_paid") or 0) for v in doc_v)
+            all_doc_v = [v for v in sb_all("visits") if v.get("doctor_id")==d["id"]]
+            rate = get_doc_commission_rate(d["id"], len(all_doc_v), all_tiers_dm)
+            comm = rev * rate
+            rows_dm.append({"Doctor":d["name"],"Visits This Month":len(doc_v),"Revenue":f"${rev:,.2f}","Commission Rate":f"{rate*100:.1f}%","Commission Due":f"${comm:,.2f}"})
+        if rows_dm: st.dataframe(pd.DataFrame(rows_dm), use_container_width=True, hide_index=True)
+        else: st.info("No data for this month.")
+
+# ════════════════════════════════════════════
 # ACCOUNTS
 # ════════════════════════════════════════════
 elif selected == "👥  Accounts":
-    page_header("Accounts", "Manage user access and review activity logs.")
+    page_header("Accounts", "Manage users and activity logs.")
     accounts = sb_all("users"); st.metric("Total user accounts", len(accounts))
     at1,at2 = st.tabs(["Profiles & Access","Activity Log"])
     with at1:
@@ -908,16 +1061,19 @@ elif selected == "👥  Accounts":
             if st.button("Delete Account", type="primary", key="btn_del_account"):
                 if target_del != "— select —":
                     sb_delete("users","username",target_del); log_action(username,"Delete Account",f"Removed: {target_del}")
-                    play_ding(); st.success(f"Account '{target_del}' removed."); st.rerun()
-        else: st.info("No accounts found.")
+                    play_ding(); st.success(f"Account removed."); st.rerun()
+        else: st.info("No accounts.")
     with at2:
-        section_label("Audit log by user"); pf = ["All"]+[u["username"] for u in accounts]
+        section_label("Audit log by user")
+        al_search = st.text_input("🔍 Search action details", key="al_search")
+        pf = ["All"]+[u["username"] for u in accounts]
         chosen_user = st.selectbox("Filter by user", pf, key="acc_audit_user_filter")
         audit_r = sb_all("audit_log", order="id", desc_order=True, limit=400)
         if chosen_user != "All": audit_r = [r for r in audit_r if r.get("username")==chosen_user]
+        if al_search: audit_r = [r for r in audit_r if al_search.lower() in (r.get("action","")+" "+r.get("details","")).lower()]
         if audit_r:
             st.dataframe(pd.DataFrame([{"Time":r["timestamp"],"User":r["username"],"Action":r["action"],"Details":r.get("details","")} for r in audit_r]), use_container_width=True, hide_index=True)
-        else: st.info("No activity recorded yet.")
+        else: st.info("No activity yet.")
 
 # ════════════════════════════════════════════
 # SETTINGS
@@ -935,8 +1091,7 @@ elif selected == "⚙️  Settings":
                 if sb_exists("doctors","name",d_name.strip()): st.error("Already exists.")
                 else:
                     sb_insert("doctors",{"name":d_name.strip(),"specialty":d_spec.strip(),"comm_type":"tiered","fixed_rate":0})
-                    log_action(username,"Add Doctor",d_name.strip()); play_ding(); st.success(f"Doctor '{d_name}' added."); st.rerun()
-            else: st.error("Doctor name required.")
+                    log_action(username,"Add Doctor",d_name.strip()); play_ding(); st.success(f"Doctor added."); st.rerun()
         st.markdown("---"); section_label("Current doctors")
         all_docs = sb_all("doctors", order="name")
         if all_docs:
@@ -946,12 +1101,12 @@ elif selected == "⚙️  Settings":
                 if del_doc != "— select —":
                     doc_id = next(d["id"] for d in all_docs if d["name"]==del_doc)
                     sb_delete("doctors","name",del_doc); sb_delete("doctor_commission_tiers","doctor_id",doc_id)
-                    log_action(username,"Remove Doctor",del_doc); play_ding(); st.success(f"Doctor '{del_doc}' removed."); st.rerun()
-        else: st.info("No doctors added yet.")
+                    log_action(username,"Remove Doctor",del_doc); play_ding(); st.success(f"Removed."); st.rerun()
+        else: st.info("No doctors yet.")
 
     with s2:
         section_label("💰 Commission tiers — per doctor")
-        st.info("💡 Set custom commission tiers for each doctor. The highest tier the doctor qualifies for is applied. Example: 3% at 5+ visits, 7% at 15+ visits.")
+        st.info("💡 Custom tiers per doctor. Highest qualifying tier applies. E.g. 3% at 5+ visits, 7% at 15+.")
         all_docs_t = sb_all("doctors", order="name")
         if all_docs_t:
             sel_doc_tier = st.selectbox("Select doctor", ["— select —"]+[d["name"] for d in all_docs_t], key="tier_doc_sel")
@@ -960,22 +1115,20 @@ elif selected == "⚙️  Settings":
                 existing_tiers = sorted(sb_all("doctor_commission_tiers", filters={"doctor_id": doc_id_t}), key=lambda x: int(x.get("min_visits") or 0))
                 if existing_tiers:
                     section_label(f"Current tiers for {sel_doc_tier}")
-                    st.dataframe(pd.DataFrame([{"id":t["id"],"Min Visits":t["min_visits"],"Commission Rate (%)":t["commission_rate"]} for t in existing_tiers]), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.DataFrame([{"id":t["id"],"Min Visits":t["min_visits"],"Rate (%)":t["commission_rate"]} for t in existing_tiers]), use_container_width=True, hide_index=True)
                     del_tier_id = st.number_input("Delete tier by ID", min_value=1, step=1, key="del_tier_id")
                     if st.button("Delete Tier", type="primary", key="btn_del_tier"):
-                        sb_delete("doctor_commission_tiers","id",del_tier_id)
-                        play_ding(); st.success("Tier deleted."); st.rerun()
-                else:
-                    st.info(f"No tiers set for {sel_doc_tier} yet. Add one below.")
+                        sb_delete("doctor_commission_tiers","id",del_tier_id); play_ding(); st.success("Deleted."); st.rerun()
+                else: st.info(f"No tiers for {sel_doc_tier} yet.")
                 st.markdown("---"); section_label("Add new tier")
                 c1,c2 = st.columns(2)
-                with c1: new_min = st.number_input("Minimum visits to qualify", min_value=1, step=1, value=10, key="tier_min")
+                with c1: new_min = st.number_input("Minimum visits", min_value=1, step=1, value=10, key="tier_min")
                 with c2: new_rate = st.number_input("Commission rate (%)", min_value=0.0, max_value=100.0, step=0.5, value=3.0, key="tier_rate")
                 if st.button("Add Tier", key="btn_add_tier"):
                     sb_insert("doctor_commission_tiers",{"doctor_id":doc_id_t,"min_visits":int(new_min),"commission_rate":new_rate})
-                    log_action(username,"Add Commission Tier",f"{sel_doc_tier}: {new_min}+ visits = {new_rate}%")
-                    play_ding(); st.success(f"Tier added: {new_min}+ visits = {new_rate}%"); st.rerun()
-        else: st.info("Add doctors first in the Doctors tab.")
+                    log_action(username,"Add Commission Tier",f"{sel_doc_tier}: {new_min}+ = {new_rate}%")
+                    play_ding(); st.success(f"Tier added."); st.rerun()
+        else: st.info("Add doctors first.")
 
     with s3:
         section_label("Add staff member")
@@ -983,15 +1136,14 @@ elif selected == "⚙️  Settings":
         with c1: emp_name = st.text_input("Full name")
         with c2: emp_role = st.text_input("Role / title")
         with c3: emp_salary = st.number_input("Monthly salary ($)", min_value=0.0, step=100.0)
-        st.info("💡 Staff salaries auto-post as an expense on the 1st of each month.")
+        st.info("💡 Salaries auto-post as expense on the 1st of each month.")
         if st.button("Add Staff Member"):
             if emp_name.strip() and emp_role.strip():
                 if sb_exists("employees","name",emp_name.strip()): st.error("Already exists.")
                 else:
                     sb_insert("employees",{"name":emp_name.strip(),"role":emp_role.strip(),"salary":emp_salary})
                     log_action(username,"Add Staff",f"{emp_name.strip()} | ${emp_salary}")
-                    play_ding(); st.success(f"{emp_name} added to payroll."); st.rerun()
-            else: st.error("Name and role are required.")
+                    play_ding(); st.success(f"Added."); st.rerun()
         st.markdown("---"); section_label("Current staff")
         all_emp = sb_all("employees", order="name")
         if all_emp:
@@ -1001,14 +1153,14 @@ elif selected == "⚙️  Settings":
             if st.button("Remove Employee", type="primary"):
                 if del_emp != "— select —":
                     sb_delete("employees","name",del_emp); log_action(username,"Remove Staff",del_emp)
-                    play_ding(); st.success(f"Removed {del_emp}."); st.rerun()
-        else: st.info("No staff added yet.")
+                    play_ding(); st.success("Removed."); st.rerun()
+        else: st.info("No staff yet.")
 
     with s4:
         section_label("Add service")
         c1,c2,c3 = st.columns(3)
         with c1: s_name = st.text_input("Service name")
-        with c2: s_cat  = st.selectbox("Category",["General","Consultation","Procedure","Therapy","Diagnostic","Other"])
+        with c2: s_cat = st.selectbox("Category",["General","Consultation","Procedure","Therapy","Diagnostic","Other"])
         with c3: s_price = st.number_input("Price ($)", min_value=0.0, step=10.0)
         if st.button("Add Service"):
             if s_name.strip():
@@ -1016,8 +1168,7 @@ elif selected == "⚙️  Settings":
                 else:
                     sb_insert("services",{"name":s_name.strip(),"category":s_cat,"price":s_price,"active":1})
                     log_action(username,"Add Service",f"{s_name.strip()} | ${s_price}")
-                    play_ding(); st.success(f"Service '{s_name}' added."); st.rerun()
-            else: st.error("Service name required.")
+                    play_ding(); st.success(f"Added."); st.rerun()
         st.markdown("---"); section_label("Current services")
         all_svc = sb_all("services", order="name")
         if all_svc:
@@ -1026,8 +1177,8 @@ elif selected == "⚙️  Settings":
             if st.button("Remove Service", type="primary"):
                 if del_svc != "— select —":
                     sb_delete("services","name",del_svc); log_action(username,"Remove Service",del_svc)
-                    play_ding(); st.success(f"Service '{del_svc}' removed."); st.rerun()
-        else: st.info("No services added yet.")
+                    play_ding(); st.success("Removed."); st.rerun()
+        else: st.info("No services yet.")
 
     with s5:
         section_label("Create bundle")
@@ -1040,8 +1191,7 @@ elif selected == "⚙️  Settings":
                 else:
                     sb_insert("bundles",{"name":b_name.strip(),"price":b_price,"description":b_desc.strip()})
                     log_action(username,"Create Bundle",f"{b_name.strip()} | ${b_price}")
-                    play_ding(); st.success(f"Bundle '{b_name}' created."); st.rerun()
-            else: st.error("Name and price required.")
+                    play_ding(); st.success(f"Created."); st.rerun()
         st.markdown("---"); section_label("Current bundles")
         all_bundles = sb_all("bundles", order="name")
         if all_bundles:
@@ -1050,14 +1200,13 @@ elif selected == "⚙️  Settings":
             if st.button("Remove Bundle", type="primary"):
                 if del_bnd != "— select —":
                     sb_delete("bundles","name",del_bnd); log_action(username,"Remove Bundle",del_bnd)
-                    play_ding(); st.success(f"Bundle '{del_bnd}' removed."); st.rerun()
-        else: st.info("No bundles created yet.")
+                    play_ding(); st.success("Removed."); st.rerun()
+        else: st.info("No bundles yet.")
 
     with s6:
         section_label("Add referrer / influencer")
-        st.info("💡 Add anyone who promotes the clinic. Select their name at checkout to track commissions.")
         c1,c2 = st.columns(2)
-        with c1: ref_name = st.text_input("Referrer full name", key="ref_name_input"); ref_phone = st.text_input("Phone", key="ref_phone_input")
+        with c1: ref_name = st.text_input("Name", key="ref_name_input"); ref_phone = st.text_input("Phone", key="ref_phone_input")
         with c2: ref_rate = st.number_input("Commission rate (%)", min_value=0.0, max_value=100.0, step=1.0, value=10.0, key="ref_rate_input"); ref_notes = st.text_area("Notes", height=80, key="ref_notes_input")
         if st.button("Add Referrer", key="btn_add_referrer"):
             if ref_name.strip():
@@ -1065,8 +1214,7 @@ elif selected == "⚙️  Settings":
                 else:
                     sb_insert("referrers",{"name":ref_name.strip(),"phone":ref_phone.strip(),"commission_rate":ref_rate,"notes":ref_notes.strip(),"added_by":username,"created_at":today_str})
                     log_action(username,"Add Referrer",f"{ref_name} at {ref_rate}%")
-                    play_ding(); st.success(f"Referrer '{ref_name}' added."); st.rerun()
-            else: st.error("Name required.")
+                    play_ding(); st.success(f"Added."); st.rerun()
         st.markdown("---"); section_label("Current referrers")
         all_refs = sb_all("referrers", order="name")
         if all_refs:
@@ -1075,29 +1223,27 @@ elif selected == "⚙️  Settings":
             if st.button("Remove Referrer", type="primary", key="btn_del_referrer"):
                 if del_ref != "— select —":
                     sb_delete("referrers","name",del_ref); log_action(username,"Remove Referrer",del_ref)
-                    play_ding(); st.success(f"Referrer '{del_ref}' removed."); st.rerun()
-        else: st.info("No referrers added yet.")
+                    play_ding(); st.success("Removed."); st.rerun()
+        else: st.info("No referrers yet.")
 
     with s7:
         section_label("Add monthly subscription (expense)")
-        st.info("💡 These are your clinic's recurring costs (software, ads etc). Auto-posted as expenses each month.")
         c1,c2,c3 = st.columns(3)
-        with c1: sub_name = st.text_input("Subscription name", key="sub_name_input"); sub_cat = st.selectbox("Category",["Subscription","Marketing","Software","Utilities","Other"], key="sub_cat_select")
+        with c1: sub_name = st.text_input("Name", key="sub_name_input"); sub_cat = st.selectbox("Category",["Subscription","Marketing","Software","Utilities","Other"], key="sub_cat_select")
         with c2: sub_amount = st.number_input("Monthly amount ($)", min_value=0.0, step=5.0, key="sub_amount_input"); sub_day = st.number_input("Billing day", min_value=1, max_value=28, step=1, value=1, key="sub_day_input")
-        with c3: st.markdown("<br>", unsafe_allow_html=True); st.markdown("Auto-posts as expense each month on billing day.")
+        with c3: st.markdown("<br>", unsafe_allow_html=True); st.markdown("Auto-posts each month.")
         if st.button("Add Subscription", key="btn_add_subscription"):
             if sub_name.strip() and sub_amount > 0:
                 if sb_exists("subscriptions","name",sub_name.strip()): st.error("Already exists.")
                 else:
                     sb_insert("subscriptions",{"name":sub_name.strip(),"amount":sub_amount,"billing_day":int(sub_day),"category":sub_cat,"active":1,"added_by":username,"created_at":today_str})
                     log_action(username,"Add Subscription",f"{sub_name} ${sub_amount}/mo")
-                    play_ding(); st.success(f"Subscription '{sub_name}' added."); st.rerun()
-            else: st.error("Name and amount required.")
+                    play_ding(); st.success(f"Added."); st.rerun()
         st.markdown("---"); section_label("Active subscriptions")
         all_subs = sb_all("subscriptions", order="name")
         if all_subs:
             st.dataframe(pd.DataFrame(all_subs), use_container_width=True, hide_index=True)
-            st.markdown(f"**Total active monthly: ${sum(float(s.get('amount') or 0) for s in all_subs if s.get('active')==1):,.2f}/month**")
+            st.markdown(f"**Total active: ${sum(float(s.get('amount') or 0) for s in all_subs if s.get('active')==1):,.2f}/month**")
             c1,c2 = st.columns(2)
             with c1:
                 toggle_sub = st.selectbox("Pause / activate", ["— select —"]+[s["name"] for s in all_subs], key="toggle_sub_select")
@@ -1106,31 +1252,30 @@ elif selected == "⚙️  Settings":
                         cur = next((s.get("active",1) for s in all_subs if s["name"]==toggle_sub),1)
                         sb_update("subscriptions",{"active":0 if cur else 1},"name",toggle_sub)
                         log_action(username,"Toggle Subscription",f"{toggle_sub} → {'Paused' if cur else 'Active'}")
-                        play_ding(); st.success(f"'{toggle_sub}' is now {'paused' if cur else 'active'}."); st.rerun()
+                        play_ding(); st.success("Toggled."); st.rerun()
             with c2:
                 del_sub = st.selectbox("Remove subscription", ["— select —"]+[s["name"] for s in all_subs], key="del_sub_select")
                 if st.button("Remove Subscription", type="primary", key="btn_del_subscription"):
                     if del_sub != "— select —":
                         sb_delete("subscriptions","name",del_sub); log_action(username,"Remove Subscription",del_sub)
-                        play_ding(); st.success(f"Subscription '{del_sub}' removed."); st.rerun()
-        else: st.info("No subscriptions added yet.")
+                        play_ding(); st.success("Removed."); st.rerun()
+        else: st.info("No subscriptions yet.")
 
     with s8:
         section_label("Clinic profile — shown on receipts")
-        st.info("💡 This information appears on every receipt.")
         cp = get_clinic_profile()
         c1,c2 = st.columns(2)
         with c1:
-            cp_name    = st.text_input("Clinic name",    value=cp.get("clinic_name","Garden Clinic"), key="cp_name")
-            cp_tagline = st.text_input("Tagline",         value=cp.get("tagline","Physical Therapy Center"), key="cp_tagline")
-            cp_phone   = st.text_input("Phone number",   value=cp.get("phone","") or "", key="cp_phone")
+            cp_name = st.text_input("Clinic name", value=cp.get("clinic_name","Garden Clinic"), key="cp_name")
+            cp_tagline = st.text_input("Tagline", value=cp.get("tagline","Physical Therapy Center"), key="cp_tagline")
+            cp_phone = st.text_input("Phone", value=cp.get("phone","") or "", key="cp_phone")
         with c2:
-            cp_address = st.text_input("Address",        value=cp.get("address","") or "", key="cp_address")
-            cp_email   = st.text_input("Email",          value=cp.get("email","") or "",   key="cp_email")
+            cp_address = st.text_input("Address", value=cp.get("address","") or "", key="cp_address")
+            cp_email = st.text_input("Email", value=cp.get("email","") or "", key="cp_email")
         if st.button("Save Clinic Profile", key="btn_save_clinic"):
             existing = sb_all("clinic_profile")
             data = {"clinic_name":cp_name,"tagline":cp_tagline,"phone":cp_phone,"address":cp_address,"email":cp_email}
             if existing: sb_update("clinic_profile",data,"id",existing[0]["id"])
             else: sb_insert("clinic_profile",data)
             log_action(username,"Update Clinic Profile",cp_name)
-            play_ding(); st.success("Clinic profile saved!"); st.rerun()
+            play_ding(); st.success("Saved!"); st.rerun()
