@@ -387,7 +387,7 @@ if not st.session_state.logged_in:
                 else: st.warning("⚠️ Add doctors in Settings first.")
             code = st.text_input("Admin code", type="password")
             if st.button("Create Account", use_container_width=True):
-                if code != "1011": st.error("Invalid admin code.")
+                if code != "1011": st.error("ASK MR.HARYAD TO CRATE ACCOUNT FOR YOU.")
                 elif rs == "Doctor" and not linked_doc_id: st.error("Please add and link a doctor.")
                 elif ru and rp:
                     if sb_exists("users","username",ru.strip()): st.error("Username already taken.")
