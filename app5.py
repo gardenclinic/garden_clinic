@@ -387,7 +387,7 @@ if not st.session_state.logged_in:
                 else: st.warning("⚠️ Add doctors in Settings first.")
             code = st.text_input("Admin code", type="password")
             if st.button("Create Account", use_container_width=True):
-                if code != "1011": st.error("ASK MR.HARYAD TO CRATE ACCOUNT FOR YOU.")
+                if code != "1011": st.error("Invalid admin code.")
                 elif rs == "Doctor" and not linked_doc_id: st.error("Please add and link a doctor.")
                 elif ru and rp:
                     if sb_exists("users","username",ru.strip()): st.error("Username already taken.")
@@ -1031,3 +1031,521 @@ elif selected == "🖥️  Reception":
                         if st.button("Save", key="btn_edit_visit"):
                             sb_update("visits",{"visit_date":new_v_date,"base_price":new_v_base,"discount_amount":new_v_disc,"net_paid":new_v_paid,"payment_method":new_v_method,"notes":new_v_notes},"id",vid)
                             play_ding(); st.success("Updated."); st.rerun()
+
+# ═══════════════════════════════════════════════
+# APPOINTMENTS
+# ═══════════════════════════════════════════════
+elif selected == "📅  Appointments":
+    page_header("Schedule", "Appointments", "Booking and management.")
+    ta1,ta2,ta3 = st.tabs(["Book","View All","Print Today"])
+    with ta1:
+        patients_db = sb_all("patients", order="name"); docs_db = sb_all("doctors", order="name")
+        if not patients_db or not docs_db: st.warning("Need at least one patient and one doctor.")
+        else:
+            p_map = {p["name"]: p["id"] for p in patients_db}; d_map = {d["name"]: d["id"] for d in docs_db}
+            c1,c2 = st.columns(2)
+            with c1: ap_patient = st.selectbox("Patient", list(p_map.keys())); ap_doctor = st.selectbox("Doctor", list(d_map.keys()))
+            with c2: ap_date = st.date_input("Date", value=date.today()); ap_time = st.time_input("Time"); ap_reason = st.text_input("Reason")
+            if st.button("Book Appointment"):
+                sb_insert("appointments",{"patient_id":p_map[ap_patient],"doctor_id":d_map[ap_doctor],"appt_date":str(ap_date),"appt_time":str(ap_time),"reason":ap_reason,"status":"Scheduled"})
+                log_action(username,"Book Appointment",f"{ap_patient} with {ap_doctor}")
+                play_ding(); st.success("Booked.")
+    with ta2:
+        ap_search = st.text_input("Search", key="ap_search")
+        all_appts = get_appointments_joined()
+        if ap_search: all_appts = [a for a in all_appts if ap_search.lower() in (a.get("Patient","")+" "+a.get("Doctor","")).lower()]
+        if all_appts:
+            st.dataframe(pd.DataFrame(all_appts), use_container_width=True, hide_index=True)
+            c1,c2 = st.columns(2)
+            with c1: upd_id = st.number_input("Appointment ID", min_value=1, step=1)
+            with c2: new_status = st.selectbox("Status", ["Scheduled","Completed","Cancelled","No-show"])
+            if st.button("Update Status"):
+                sb_update("appointments",{"status":new_status},"id",upd_id); play_ding(); st.success("Updated."); st.rerun()
+    with ta3:
+        today_appts_p = [a for a in get_appointments_joined() if a.get("Date")==today_str]
+        if today_appts_p:
+            cp = get_clinic_profile()
+            print_html = f'<div style="background:#FBF8F1;padding:32px;font-family:Inter,sans-serif;color:#1F2924;max-width:800px;border-radius:4px;border:1px solid #D8CFB8;"><div style="text-align:center;border-bottom:2px solid #C47649;padding-bottom:16px;margin-bottom:22px;"><h1 style="margin:0;font-family:Fraunces,serif;font-style:italic;color:#1F2924;font-weight:500;">{cp.get("clinic_name","Garden Clinic")}</h1><p style="margin:6px 0 0 0;color:#C47649;font-size:0.72rem;letter-spacing:0.25em;text-transform:uppercase;font-weight:600;">Daily Appointments</p><p style="margin:10px 0 0 0;font-weight:600;color:#1F2924;">{date.today().strftime("%A, %B %d, %Y")}</p></div><table style="width:100%;border-collapse:collapse;font-size:0.95rem;"><thead><tr style="background:#1F2924;color:#FBF8F1;"><th style="padding:12px;text-align:left;">Time</th><th style="padding:12px;text-align:left;">Patient</th><th style="padding:12px;text-align:left;">Doctor</th><th style="padding:12px;text-align:left;">Reason</th><th style="padding:12px;text-align:left;">Status</th></tr></thead><tbody>'
+            for a in today_appts_p:
+                print_html += f'<tr style="border-bottom:1px solid #E5DCC4;"><td style="padding:12px;">{a["Time"]}</td><td style="padding:12px;font-weight:600;font-family:Fraunces,serif;font-style:italic;">{a["Patient"]}</td><td style="padding:12px;">{a["Doctor"]}</td><td style="padding:12px;">{a.get("Reason","—")}</td><td style="padding:12px;">{a["Status"]}</td></tr>'
+            print_html += f'</tbody></table><p style="text-align:center;margin-top:22px;color:#8A7E60;font-size:0.8rem;font-style:italic;font-family:Fraunces,serif;">Total appointments: {len(today_appts_p)}</p></div>'
+            st.markdown(print_html, unsafe_allow_html=True)
+            st.info("💡 Press **Ctrl+P** to print or save as PDF.")
+        else: st.info("No appointments today.")
+
+# ═══════════════════════════════════════════════
+# ACCOUNTING
+# ═══════════════════════════════════════════════
+elif selected == "📊  Accounting":
+    page_header("Finance", "Accounting", "Revenue, expenses, and financial health.")
+    section_label("Date Range")
+    use_range = st.checkbox("Filter by date range", key="acc_use_range")
+    if use_range:
+        rc1,rc2 = st.columns(2)
+        with rc1: start_d = st.date_input("From", value=date.today().replace(day=1), key="acc_start")
+        with rc2: end_d = st.date_input("To", value=date.today(), key="acc_end")
+        g_, e_, c_, o_, n_, _ = get_financials(start=str(start_d), end=str(end_d))
+        st.info(f"**{start_d}** → **{end_d}**")
+    else:
+        g_, e_, c_, o_, n_ = gross_income, base_expenses, total_commissions, total_outflows, net_profit
+    pulse_bar([("Gross Revenue",fmt(g_)),("Total Expenses",fmt(o_)),("Net Profit",fmt(n_)),("Doctor Commissions",fmt(c_))])
+    cc1,cc2,cc3 = st.columns(3)
+    with cc1: st.markdown(card("Gross Revenue", fmt(g_),"green"), unsafe_allow_html=True)
+    with cc2: st.markdown(card("Total Outflows", fmt(o_),"red"), unsafe_allow_html=True)
+    with cc3: st.markdown(card("Net Profit", fmt(n_),"dark"), unsafe_allow_html=True)
+    ac1,ac2 = st.columns(2)
+    with ac1:
+        section_label("Expenses Breakdown")
+        payroll_total = sum(float(e.get("amount") or 0) for e in sb_all("expenses") if e.get("category")=="Payroll")
+        other_exp = e_ - payroll_total
+        if o_ > 0:
+            df_e = pd.DataFrame({"Category":["Other","Payroll","Commissions"],"Amount":[other_exp,payroll_total,c_]}).set_index("Category")
+            st.bar_chart(df_e, y="Amount", color="#C47649", height=240)
+    with ac2:
+        section_label("Daily Revenue")
+        all_v = sb_all("visits", order="visit_date")
+        if all_v:
+            df_v = pd.DataFrame([{"Date":v["visit_date"],"Revenue":float(v.get("net_paid") or 0)} for v in all_v])
+            st.line_chart(df_v.groupby("Date").sum(), y="Revenue", color="#4A6752", height=240)
+    ae1,ae2 = st.columns([3,2])
+    with ae1:
+        section_label("Expense Log")
+        exp_search = st.text_input("Search", key="exp_search")
+        filter_cat = st.selectbox("Category",["All","General","Payroll","Supplies","Utilities","Rent","Equipment","Marketing","Subscription","Other"], key="acc_filter_cat")
+        all_exp = sb_all("expenses", order="id", desc_order=True)
+        if filter_cat != "All": all_exp = [e for e in all_exp if e.get("category")==filter_cat]
+        if exp_search: all_exp = [e for e in all_exp if exp_search.lower() in (e.get("description","")).lower()]
+        if all_exp:
+            df_exp = pd.DataFrame([{"id":e["id"],"Date":e["date"],"Category":e.get("category",""),"Description":e["description"],"Amount":fmt(e.get("amount") or 0),"Added By":e.get("added_by","")} for e in all_exp])
+            st.dataframe(df_exp, use_container_width=True, hide_index=True)
+    with ae2:
+        section_label("Add Expense")
+        with st.form("expense_form"):
+            e_desc = st.text_input("Description"); e_cat = st.selectbox("Category",["General","Supplies","Utilities","Rent","Equipment","Marketing","Other"])
+            e_amt = st.number_input("Amount (IQD)", min_value=0.0, step=1000.0); e_date = st.date_input("Date", value=date.today())
+            if st.form_submit_button("Add Expense"):
+                if e_desc and e_amt > 0:
+                    sb_insert("expenses",{"description":e_desc,"category":e_cat,"amount":e_amt,"date":str(e_date),"added_by":username})
+                    log_action(username,"Add Expense",f"{e_desc} | {fmt(e_amt)}")
+                    play_ding(); st.success("Added."); st.rerun()
+    section_label("Edit / Delete Expense")
+    del_exp_list = sb_all("expenses", order="id", desc_order=True, limit=100)
+    if del_exp_list:
+        ed_exp_opts = {f"#{e['id']} · {e['date']} · {e['description']} · {fmt(e.get('amount') or 0)}": e["id"] for e in del_exp_list}
+        chosen_ed_exp = st.selectbox("Select", ["— select —"]+list(ed_exp_opts.keys()), key="ed_exp_sel")
+        if chosen_ed_exp != "— select —":
+            eid = ed_exp_opts[chosen_ed_exp]; exp_rec = sb_one("expenses", filters={"id": eid})
+            if exp_rec:
+                c1,c2,c3 = st.columns(3)
+                with c1: new_e_desc = st.text_input("Description", value=exp_rec.get("description",""), key="ee_desc")
+                with c2:
+                    cat_opts = ["General","Payroll","Supplies","Utilities","Rent","Equipment","Marketing","Subscription","Other"]
+                    cur_cat = exp_rec.get("category","General") or "General"
+                    new_e_cat = st.selectbox("Category", cat_opts, index=cat_opts.index(cur_cat) if cur_cat in cat_opts else 0, key="ee_cat")
+                with c3: new_e_amt = st.number_input("Amount", min_value=0.0, step=1000.0, value=float(exp_rec.get("amount") or 0), key="ee_amt")
+                cc1,cc2 = st.columns(2)
+                with cc1:
+                    if st.button("Save", key="btn_edit_exp"):
+                        sb_update("expenses",{"description":new_e_desc,"category":new_e_cat,"amount":new_e_amt},"id",eid)
+                        play_ding(); st.success("Updated."); st.rerun()
+                with cc2:
+                    if st.button("Delete", type="primary", key="btn_del_exp"):
+                        sb_delete("expenses","id",eid); play_ding(); st.success("Deleted."); st.rerun()
+    section_label("Referral Commissions This Month")
+    current_month = datetime.now().strftime("%Y-%m")
+    all_refs = sb_all("referrers", order="name")
+    if all_refs:
+        all_v_month = [v for v in sb_all("visits") if (v.get("visit_date") or "")[:7]==current_month]
+        ref_rows = []; total_ref_comm = 0.0
+        for ref in all_refs:
+            v_via = [v for v in all_v_month if v.get("referred_by")==ref["name"]]
+            rev = sum(float(v.get("net_paid") or 0) for v in v_via)
+            comm = rev*(float(ref.get("commission_rate") or 0)/100.0); total_ref_comm += comm
+            ref_rows.append({"Referrer":ref["name"],"Rate":f"{ref.get('commission_rate')}%","Visits":len(v_via),"Revenue":fmt(rev),"Due":fmt(comm)})
+        st.dataframe(pd.DataFrame(ref_rows), use_container_width=True, hide_index=True)
+        st.markdown(f"**Total: {fmt(total_ref_comm)}**")
+        if st.button("Mark Paid"):
+            if total_ref_comm > 0:
+                tag = f"Referral Commissions — {current_month}"
+                if not sb_exists("expenses","description",tag):
+                    sb_insert("expenses",{"description":tag,"category":"Marketing","amount":total_ref_comm,"date":f"{current_month}-01","added_by":username})
+                    play_ding(); st.success(f"Recorded."); st.rerun()
+    section_label("Export to Excel")
+    ex1,ex2,ex3,ex4 = st.columns(4)
+    with ex1:
+        all_v_exp = sb_all("visits", order="visit_date", desc_order=True)
+        if all_v_exp:
+            df_ev = pd.DataFrame([{"ID":v["id"],"Date":v["visit_date"],"Paid":v.get("net_paid",0),"Method":v.get("payment_method","")} for v in all_v_exp])
+            st.download_button("Visits", data=to_excel(df_ev), file_name=f"visits_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    with ex2:
+        all_e_exp = sb_all("expenses", order="date", desc_order=True)
+        if all_e_exp:
+            df_ee = pd.DataFrame([{"ID":e["id"],"Date":e["date"],"Description":e["description"],"Category":e.get("category",""),"Amount":e.get("amount",0)} for e in all_e_exp])
+            st.download_button("Expenses", data=to_excel(df_ee), file_name=f"expenses_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    with ex3:
+        all_p_exp = sb_all("patients", order="name")
+        if all_p_exp:
+            df_ep = pd.DataFrame([{"Name":p["name"],"Phone":p.get("phone",""),"Gender":p.get("gender",""),"DOB":p.get("date_of_birth","")} for p in all_p_exp])
+            st.download_button("Patients", data=to_excel(df_ep), file_name=f"patients_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    with ex4:
+        all_v_m = sb_all("visits")
+        if all_v_m:
+            df_em = pd.DataFrame([{"Month":v["visit_date"][:7],"Revenue":float(v.get("net_paid") or 0)} for v in all_v_m])
+            df_em = df_em.groupby("Month").agg(Revenue=("Revenue","sum"),Visits=("Revenue","count")).reset_index().sort_values("Month",ascending=False)
+            st.download_button("Monthly", data=to_excel(df_em), file_name=f"monthly_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
+# ═══════════════════════════════════════════════
+# REPORTS
+# ═══════════════════════════════════════════════
+elif selected == "📑  Reports":
+    page_header("Insights", "Reports", "Daily summary, top patients, services, and doctor monthly.")
+    rep_tabs = st.tabs(["Daily Report","Top Patients","Top Services","Doctor Monthly"])
+    with rep_tabs[0]:
+        rep_date = st.date_input("Date", value=date.today(), key="dr_date")
+        rep_date_str = str(rep_date)
+        day_visits = [v for v in sb_all("visits") if v.get("visit_date")==rep_date_str]
+        day_revenue = sum(float(v.get("net_paid") or 0) for v in day_visits)
+        day_expenses = sum(float(e.get("amount") or 0) for e in sb_all("expenses") if e.get("date")==rep_date_str)
+        unique_pat = len(set(v.get("patient_id") for v in day_visits))
+        mc1,mc2,mc3,mc4 = st.columns(4)
+        mc1.metric("Revenue", fmt(day_revenue))
+        mc2.metric("Visits", len(day_visits))
+        mc3.metric("Unique Patients", unique_pat)
+        mc4.metric("Expenses", fmt(day_expenses))
+        if day_visits:
+            section_label("Visits That Day")
+            patients_dr = {p["id"]: p["name"] for p in sb_all("patients")}
+            doctors_dr  = {d["id"]: d["name"] for d in sb_all("doctors")}
+            services_dr = {s["id"]: s["name"] for s in sb_all("services")}
+            bundles_dr  = {b["id"]: b["name"] for b in sb_all("bundles")}
+            rows_dr = []
+            for v in day_visits:
+                svc_d = services_dr.get(v.get("service_id"),""); bnd_d = bundles_dr.get(v.get("bundle_id"),"")
+                rows_dr.append({"Patient":patients_dr.get(v.get("patient_id"),""),"Doctor":doctors_dr.get(v.get("doctor_id"),""),"Item":svc_d if svc_d else (f"📦 {bnd_d}" if bnd_d else "—"),"Paid":fmt(v.get('net_paid') or 0),"Method":v.get("payment_method","")})
+            st.dataframe(pd.DataFrame(rows_dr), use_container_width=True, hide_index=True)
+    with rep_tabs[1]:
+        tp_period = st.selectbox("Period", ["This month","This year","All time"], key="tp_period")
+        all_v_tp = sb_all("visits")
+        if tp_period == "This month": cm = datetime.now().strftime("%Y-%m"); all_v_tp = [v for v in all_v_tp if (v.get("visit_date") or "")[:7]==cm]
+        elif tp_period == "This year": cy = datetime.now().strftime("%Y"); all_v_tp = [v for v in all_v_tp if (v.get("visit_date") or "")[:4]==cy]
+        patient_totals = {}
+        for v in all_v_tp:
+            pid = v.get("patient_id")
+            if pid:
+                if pid not in patient_totals: patient_totals[pid] = {"visits":0,"spent":0.0}
+                patient_totals[pid]["visits"] += 1
+                patient_totals[pid]["spent"] += float(v.get("net_paid") or 0)
+        patients_tp = {p["id"]: p["name"] for p in sb_all("patients")}
+        rows_tp = sorted([{"Patient":patients_tp.get(pid,""),"Visits":info["visits"],"Total Spent":info["spent"]} for pid,info in patient_totals.items()], key=lambda x: x["Total Spent"], reverse=True)
+        if rows_tp:
+            df_tp = pd.DataFrame(rows_tp[:20])
+            df_tp["Total Spent"] = df_tp["Total Spent"].apply(fmt)
+            st.dataframe(df_tp, use_container_width=True, hide_index=True)
+    with rep_tabs[2]:
+        ts_period = st.selectbox("Period", ["This month","This year","All time"], key="ts_period")
+        all_v_ts = sb_all("visits")
+        if ts_period == "This month": cm2 = datetime.now().strftime("%Y-%m"); all_v_ts = [v for v in all_v_ts if (v.get("visit_date") or "")[:7]==cm2]
+        elif ts_period == "This year": cy2 = datetime.now().strftime("%Y"); all_v_ts = [v for v in all_v_ts if (v.get("visit_date") or "")[:4]==cy2]
+        services_ts = {s["id"]: s["name"] for s in sb_all("services")}
+        bundles_ts  = {b["id"]: b["name"] for b in sb_all("bundles")}
+        svc_totals = {}
+        for v in all_v_ts:
+            sid = v.get("service_id"); bid = v.get("bundle_id")
+            item = services_ts.get(sid) if sid else (f"📦 {bundles_ts.get(bid,'')}" if bid else "Other")
+            if item not in svc_totals: svc_totals[item] = {"count":0,"revenue":0.0}
+            svc_totals[item]["count"] += 1
+            svc_totals[item]["revenue"] += float(v.get("net_paid") or 0)
+        rows_ts = sorted([{"Service":k,"Times Sold":v["count"],"Total Revenue":v["revenue"]} for k,v in svc_totals.items()], key=lambda x: x["Total Revenue"], reverse=True)
+        if rows_ts:
+            df_ts = pd.DataFrame(rows_ts)
+            df_ts["Total Revenue"] = df_ts["Total Revenue"].apply(fmt)
+            st.dataframe(df_ts, use_container_width=True, hide_index=True)
+    with rep_tabs[3]:
+        dm_month = st.text_input("Month (YYYY-MM)", value=datetime.now().strftime("%Y-%m"), key="dm_month")
+        all_v_dm = [v for v in sb_all("visits") if (v.get("visit_date") or "")[:7]==dm_month]
+        doctors_dm = sb_all("doctors", order="name")
+        all_tiers_dm = sb_all("doctor_commission_tiers")
+        rows_dm = []
+        for d in doctors_dm:
+            doc_v = [v for v in all_v_dm if v.get("doctor_id")==d["id"]]
+            rev = sum(float(v.get("net_paid") or 0) for v in doc_v)
+            all_doc_v = [v for v in sb_all("visits") if v.get("doctor_id")==d["id"]]
+            rate = get_doc_commission_rate(d["id"], len(all_doc_v), all_tiers_dm)
+            comm = rev * rate
+            rows_dm.append({"Doctor":d["name"],"Visits":len(doc_v),"Revenue":fmt(rev),"Rate":f"{rate*100:.1f}%","Commission":fmt(comm)})
+        if rows_dm: st.dataframe(pd.DataFrame(rows_dm), use_container_width=True, hide_index=True)
+
+# ═══════════════════════════════════════════════
+# RESEARCH
+# ═══════════════════════════════════════════════
+elif selected == "🔬  Research":
+    page_header("Outcomes", "Research", "Track patient outcomes for research and marketing.")
+    all_forms_r = sb_all("doctor_intake_form")
+    rp = st.selectbox("Period", ["All time","This year","This month","Custom"], key="research_period")
+    if rp == "All time": filtered_forms = all_forms_r
+    elif rp == "This year":
+        cy_r = datetime.now().strftime("%Y")
+        filtered_forms = [f for f in all_forms_r if (f.get("filled_date") or "")[:4]==cy_r]
+    elif rp == "This month":
+        cm_r = datetime.now().strftime("%Y-%m")
+        filtered_forms = [f for f in all_forms_r if (f.get("filled_date") or "")[:7]==cm_r]
+    else:
+        rc1,rc2 = st.columns(2)
+        with rc1: r_start = st.date_input("From", value=date.today().replace(month=1, day=1), key="r_start")
+        with rc2: r_end = st.date_input("To", value=date.today(), key="r_end")
+        filtered_forms = [f for f in all_forms_r if str(r_start) <= (f.get("filled_date") or "") <= str(r_end)]
+    total_treated = len(filtered_forms)
+    relieved = len([f for f in filtered_forms if f.get("outcome") == "Successfully Relieved"])
+    partial = len([f for f in filtered_forms if f.get("outcome") == "Partially Improved"])
+    no_improv = len([f for f in filtered_forms if f.get("outcome") == "No Improvement"])
+    pending = len([f for f in filtered_forms if f.get("outcome") in ["Pending", None, ""]])
+    success_rate = (relieved/total_treated*100) if total_treated>0 else 0
+    improvement_rate = ((relieved+partial)/total_treated*100) if total_treated>0 else 0
+    pulse_bar([("Total Patients",str(total_treated)),("Successfully Relieved",str(relieved)),("Success Rate",f"{success_rate:.1f}%"),("Improvement Rate",f"{improvement_rate:.1f}%")])
+    c1,c2,c3,c4 = st.columns(4)
+    with c1: st.markdown(card("Relieved", str(relieved), "green", f"{success_rate:.1f}% success"), unsafe_allow_html=True)
+    with c2: st.markdown(card("Improved", str(partial), "dark", "Partial recovery"), unsafe_allow_html=True)
+    with c3: st.markdown(card("No Improvement", str(no_improv), "red", "Need different approach"), unsafe_allow_html=True)
+    with c4: st.markdown(card("Pending", str(pending), "dark", "Still in treatment"), unsafe_allow_html=True)
+    section_label("Marketing Narrative")
+    narrative = ""
+    if total_treated > 0:
+        narrative = f"In this period, we successfully treated <strong>{total_treated} patients</strong>. Of those, <strong>{relieved} ({success_rate:.1f}%)</strong> experienced full pain relief, and <strong>{relieved+partial} ({improvement_rate:.1f}%)</strong> showed measurable improvement. This data reflects our commitment to evidence-based, results-driven physical therapy care."
+    st.markdown(f'<div class="card" style="padding:28px 32px;"><div style="font-family:Fraunces,serif;font-size:1.2rem;font-style:italic;color:#1F2924;line-height:1.7;">{narrative if narrative else "No data yet for this period."}</div></div>', unsafe_allow_html=True)
+    section_label("By Doctor")
+    doctors_r = sb_all("doctors", order="name")
+    rows_dr = []
+    for d in doctors_r:
+        d_forms = [f for f in filtered_forms if f.get("doctor_id")==d["id"]]
+        d_treated = len(d_forms)
+        d_relieved = len([f for f in d_forms if f.get("outcome")=="Successfully Relieved"])
+        d_rate = (d_relieved/d_treated*100) if d_treated>0 else 0
+        rows_dr.append({"Doctor":d["name"],"Patients":d_treated,"Relieved":d_relieved,"Success Rate":f"{d_rate:.1f}%"})
+    if rows_dr: st.dataframe(pd.DataFrame(rows_dr), use_container_width=True, hide_index=True)
+    section_label("By Body Area")
+    body_stats = {}
+    for f in filtered_forms:
+        area = f.get("body_area","") or "Unknown"
+        if area not in body_stats: body_stats[area] = {"total":0,"relieved":0,"pain_before":[],"pain_after":[]}
+        body_stats[area]["total"] += 1
+        if f.get("outcome")=="Successfully Relieved": body_stats[area]["relieved"] += 1
+        if f.get("pain_before") is not None: body_stats[area]["pain_before"].append(f.get("pain_before",0))
+        if f.get("pain_after") is not None: body_stats[area]["pain_after"].append(f.get("pain_after",0))
+    rows_ba = []
+    for k,v in body_stats.items():
+        avg_before = sum(v["pain_before"])/len(v["pain_before"]) if v["pain_before"] else 0
+        avg_after = sum(v["pain_after"])/len(v["pain_after"]) if v["pain_after"] else 0
+        rows_ba.append({"Body Area":k,"Cases":v["total"],"Relieved":v["relieved"],"Success Rate":f"{(v['relieved']/v['total']*100) if v['total']>0 else 0:.1f}%","Avg Pain Before":f"{avg_before:.1f}/10","Avg Pain After":f"{avg_after:.1f}/10"})
+    rows_ba = sorted(rows_ba, key=lambda x: x["Cases"], reverse=True)
+    if rows_ba: st.dataframe(pd.DataFrame(rows_ba), use_container_width=True, hide_index=True)
+    section_label("Export Research Data")
+    if filtered_forms:
+        patients_r_map = {p["id"]: p["name"] for p in sb_all("patients")}
+        doctors_r_map = {d["id"]: d["name"] for d in doctors_r}
+        df_research = pd.DataFrame([{"Date":f.get("filled_date",""),"Patient":patients_r_map.get(f.get("patient_id"),""),"Doctor":doctors_r_map.get(f.get("doctor_id"),""),"Body Area":f.get("body_area",""),"Problem":f.get("problem",""),"Pain Before":f.get("pain_before",0),"Pain After":f.get("pain_after",0),"Sessions":f.get("sessions_needed",0),"Outcome":f.get("outcome","Pending")} for f in filtered_forms])
+        st.download_button("Export to Excel", data=to_excel(df_research), file_name=f"research_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
+# ═══════════════════════════════════════════════
+# ACCOUNTS
+# ═══════════════════════════════════════════════
+elif selected == "👥  Accounts":
+    page_header("Users", "Accounts", "Manage user access and review activity logs.")
+    accounts = sb_all("users"); st.metric("Total accounts", len(accounts))
+    at1,at2 = st.tabs(["Profiles","Activity Log"])
+    with at1:
+        section_label("All Accounts")
+        doctors_acc_map = {d["id"]: d["name"] for d in sb_all("doctors")}
+        if accounts:
+            rows_acc = [{"id":u["id"],"username":u["username"],"role":u["role"],"Linked Doctor":doctors_acc_map.get(u.get("linked_doctor_id"),"—") if u.get("role")=="Doctor" else "—"} for u in accounts]
+            st.dataframe(pd.DataFrame(rows_acc), use_container_width=True, hide_index=True)
+            killable = ["— select —"]+[u["username"] for u in accounts if u["username"]!=username]
+            target_del = st.selectbox("Remove", killable, key="burn_user_select")
+            if st.button("Delete Account", type="primary", key="btn_del_account"):
+                if target_del != "— select —":
+                    sb_delete("users","username",target_del); play_ding(); st.success("Removed."); st.rerun()
+    with at2:
+        al_search = st.text_input("Search", key="al_search")
+        pf = ["All"]+[u["username"] for u in accounts]
+        chosen_user = st.selectbox("Filter by user", pf, key="acc_audit_user_filter")
+        audit_r = sb_all("audit_log", order="id", desc_order=True, limit=400)
+        if chosen_user != "All": audit_r = [r for r in audit_r if r.get("username")==chosen_user]
+        if al_search: audit_r = [r for r in audit_r if al_search.lower() in (r.get("action","")+" "+r.get("details","")).lower()]
+        if audit_r:
+            st.dataframe(pd.DataFrame([{"Time":r["timestamp"],"User":r["username"],"Action":r["action"],"Details":r.get("details","")} for r in audit_r]), use_container_width=True, hide_index=True)
+
+# ═══════════════════════════════════════════════
+# SETTINGS
+# ═══════════════════════════════════════════════
+elif selected == "⚙️  Settings":
+    page_header("Configure", "Settings", "Doctors, commissions, staff, services, and more.")
+    s1,s2,s3,s4,s5,s6,s7,s8 = st.tabs(["Doctors","Commission","Staff","Services","Bundles","Referrers","Subscriptions","Clinic Profile"])
+    with s1:
+        section_label("Add Doctor")
+        c1,c2 = st.columns(2)
+        with c1: d_name = st.text_input("Doctor name"); d_spec = st.text_input("Specialty")
+        if st.button("Add Doctor"):
+            if d_name.strip():
+                if sb_exists("doctors","name",d_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("doctors",{"name":d_name.strip(),"specialty":d_spec.strip(),"comm_type":"tiered","fixed_rate":0})
+                    play_ding(); st.success("Added."); st.rerun()
+        section_label("Current Doctors")
+        all_docs = sb_all("doctors", order="name")
+        if all_docs:
+            st.dataframe(pd.DataFrame(all_docs), use_container_width=True, hide_index=True)
+            del_doc = st.selectbox("Remove", ["— select —"]+[d["name"] for d in all_docs])
+            if st.button("Remove Doctor", type="primary"):
+                if del_doc != "— select —":
+                    doc_id = next(d["id"] for d in all_docs if d["name"]==del_doc)
+                    sb_delete("doctors","name",del_doc); sb_delete("doctor_commission_tiers","doctor_id",doc_id)
+                    play_ding(); st.success("Removed."); st.rerun()
+    with s2:
+        section_label("Commission Tiers Per Doctor")
+        st.info("Highest qualifying tier applies. E.g. 3% at 5+ visits, 7% at 15+.")
+        all_docs_t = sb_all("doctors", order="name")
+        if all_docs_t:
+            sel_doc_tier = st.selectbox("Select doctor", ["— select —"]+[d["name"] for d in all_docs_t], key="tier_doc_sel")
+            if sel_doc_tier != "— select —":
+                doc_id_t = next(d["id"] for d in all_docs_t if d["name"]==sel_doc_tier)
+                existing_tiers = sorted(sb_all("doctor_commission_tiers", filters={"doctor_id": doc_id_t}), key=lambda x: int(x.get("min_visits") or 0))
+                if existing_tiers:
+                    st.dataframe(pd.DataFrame([{"id":t["id"],"Min Visits":t["min_visits"],"Rate (%)":t["commission_rate"]} for t in existing_tiers]), use_container_width=True, hide_index=True)
+                    del_tier_id = st.number_input("Delete tier ID", min_value=1, step=1, key="del_tier_id")
+                    if st.button("Delete Tier", type="primary", key="btn_del_tier"):
+                        sb_delete("doctor_commission_tiers","id",del_tier_id); play_ding(); st.success("Deleted."); st.rerun()
+                c1,c2 = st.columns(2)
+                with c1: new_min = st.number_input("Min visits", min_value=1, step=1, value=10, key="tier_min")
+                with c2: new_rate = st.number_input("Rate (%)", min_value=0.0, max_value=100.0, step=0.5, value=3.0, key="tier_rate")
+                if st.button("Add Tier", key="btn_add_tier"):
+                    sb_insert("doctor_commission_tiers",{"doctor_id":doc_id_t,"min_visits":int(new_min),"commission_rate":new_rate})
+                    play_ding(); st.success("Added."); st.rerun()
+    with s3:
+        section_label("Add Staff")
+        c1,c2,c3 = st.columns(3)
+        with c1: emp_name = st.text_input("Name")
+        with c2: emp_role = st.text_input("Role")
+        with c3: emp_salary = st.number_input("Salary (IQD)", min_value=0.0, step=50000.0)
+        if st.button("Add Staff"):
+            if emp_name.strip() and emp_role.strip():
+                if sb_exists("employees","name",emp_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("employees",{"name":emp_name.strip(),"role":emp_role.strip(),"salary":emp_salary})
+                    play_ding(); st.success("Added."); st.rerun()
+        section_label("Current Staff")
+        all_emp = sb_all("employees", order="name")
+        if all_emp:
+            df_emp = pd.DataFrame([{"id":e["id"],"name":e["name"],"role":e.get("role",""),"salary":fmt(e.get("salary"))} for e in all_emp])
+            st.dataframe(df_emp, use_container_width=True, hide_index=True)
+            st.markdown(f"**Monthly payroll: {fmt(sum(float(e.get('salary') or 0) for e in all_emp))}**")
+            del_emp = st.selectbox("Remove", ["— select —"]+[e["name"] for e in all_emp])
+            if st.button("Remove Employee", type="primary"):
+                if del_emp != "— select —":
+                    sb_delete("employees","name",del_emp); play_ding(); st.success("Removed."); st.rerun()
+    with s4:
+        section_label("Add Service")
+        c1,c2,c3 = st.columns(3)
+        with c1: s_name = st.text_input("Service name")
+        with c2: s_cat = st.selectbox("Category",["General","Consultation","Procedure","Therapy","Diagnostic","Other"])
+        with c3: s_price = st.number_input("Price (IQD)", min_value=0.0, step=5000.0)
+        if st.button("Add Service"):
+            if s_name.strip():
+                if sb_exists("services","name",s_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("services",{"name":s_name.strip(),"category":s_cat,"price":s_price,"active":1})
+                    play_ding(); st.success("Added."); st.rerun()
+        section_label("Current Services")
+        all_svc = sb_all("services", order="name")
+        if all_svc:
+            df_svc = pd.DataFrame([{"id":s["id"],"name":s["name"],"category":s.get("category",""),"price":fmt(s.get("price"))} for s in all_svc])
+            st.dataframe(df_svc, use_container_width=True, hide_index=True)
+            del_svc = st.selectbox("Remove", ["— select —"]+[s["name"] for s in all_svc])
+            if st.button("Remove Service", type="primary"):
+                if del_svc != "— select —":
+                    sb_delete("services","name",del_svc); play_ding(); st.success("Removed."); st.rerun()
+    with s5:
+        section_label("Create Bundle")
+        c1,c2 = st.columns(2)
+        with c1: b_name = st.text_input("Bundle name"); b_price = st.number_input("Price (IQD)", min_value=0.0, step=10000.0)
+        with c2: b_desc = st.text_area("Description", height=90)
+        if st.button("Create Bundle"):
+            if b_name.strip() and b_price > 0:
+                if sb_exists("bundles","name",b_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("bundles",{"name":b_name.strip(),"price":b_price,"description":b_desc.strip()})
+                    play_ding(); st.success("Created."); st.rerun()
+        section_label("Current Bundles")
+        all_bundles = sb_all("bundles", order="name")
+        if all_bundles:
+            df_b = pd.DataFrame([{"id":b["id"],"name":b["name"],"price":fmt(b.get("price")),"description":b.get("description","")} for b in all_bundles])
+            st.dataframe(df_b, use_container_width=True, hide_index=True)
+            del_bnd = st.selectbox("Remove", ["— select —"]+[b["name"] for b in all_bundles])
+            if st.button("Remove Bundle", type="primary"):
+                if del_bnd != "— select —":
+                    sb_delete("bundles","name",del_bnd); play_ding(); st.success("Removed."); st.rerun()
+    with s6:
+        section_label("Add Referrer")
+        c1,c2 = st.columns(2)
+        with c1: ref_name = st.text_input("Name", key="ref_name_input"); ref_phone = st.text_input("Phone", key="ref_phone_input")
+        with c2: ref_rate = st.number_input("Commission (%)", min_value=0.0, max_value=100.0, step=1.0, value=10.0, key="ref_rate_input"); ref_notes = st.text_area("Notes", height=80, key="ref_notes_input")
+        if st.button("Add Referrer", key="btn_add_referrer"):
+            if ref_name.strip():
+                if sb_exists("referrers","name",ref_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("referrers",{"name":ref_name.strip(),"phone":ref_phone.strip(),"commission_rate":ref_rate,"notes":ref_notes.strip(),"added_by":username,"created_at":today_str})
+                    play_ding(); st.success("Added."); st.rerun()
+        section_label("Current Referrers")
+        all_refs = sb_all("referrers", order="name")
+        if all_refs:
+            st.dataframe(pd.DataFrame(all_refs), use_container_width=True, hide_index=True)
+            del_ref = st.selectbox("Remove", ["— select —"]+[r["name"] for r in all_refs], key="del_ref_select")
+            if st.button("Remove Referrer", type="primary", key="btn_del_referrer"):
+                if del_ref != "— select —":
+                    sb_delete("referrers","name",del_ref); play_ding(); st.success("Removed."); st.rerun()
+    with s7:
+        section_label("Add Monthly Subscription (Clinic Expense)")
+        c1,c2,c3 = st.columns(3)
+        with c1: sub_name = st.text_input("Name", key="sub_name_input"); sub_cat = st.selectbox("Category",["Subscription","Marketing","Software","Utilities","Other"], key="sub_cat_select")
+        with c2: sub_amount = st.number_input("Amount (IQD)", min_value=0.0, step=5000.0, key="sub_amount_input"); sub_day = st.number_input("Billing day", min_value=1, max_value=28, step=1, value=1, key="sub_day_input")
+        with c3: st.markdown("<br>", unsafe_allow_html=True); st.markdown("Auto-posts monthly.")
+        if st.button("Add Subscription", key="btn_add_subscription"):
+            if sub_name.strip() and sub_amount > 0:
+                if sb_exists("subscriptions","name",sub_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("subscriptions",{"name":sub_name.strip(),"amount":sub_amount,"billing_day":int(sub_day),"category":sub_cat,"active":1,"added_by":username,"created_at":today_str})
+                    play_ding(); st.success("Added."); st.rerun()
+        section_label("Active Subscriptions")
+        all_subs = sb_all("subscriptions", order="name")
+        if all_subs:
+            df_s = pd.DataFrame([{"id":s["id"],"name":s["name"],"amount":fmt(s.get("amount")),"billing_day":s.get("billing_day",1),"category":s.get("category",""),"active":s.get("active",1)} for s in all_subs])
+            st.dataframe(df_s, use_container_width=True, hide_index=True)
+            st.markdown(f"**Total: {fmt(sum(float(s.get('amount') or 0) for s in all_subs if s.get('active')==1))}/month**")
+            c1,c2 = st.columns(2)
+            with c1:
+                toggle_sub = st.selectbox("Pause / activate", ["— select —"]+[s["name"] for s in all_subs], key="toggle_sub_select")
+                if st.button("Toggle", key="btn_toggle_sub"):
+                    if toggle_sub != "— select —":
+                        cur = next((s.get("active",1) for s in all_subs if s["name"]==toggle_sub),1)
+                        sb_update("subscriptions",{"active":0 if cur else 1},"name",toggle_sub)
+                        play_ding(); st.success("Toggled."); st.rerun()
+            with c2:
+                del_sub = st.selectbox("Remove", ["— select —"]+[s["name"] for s in all_subs], key="del_sub_select")
+                if st.button("Remove Subscription", type="primary", key="btn_del_subscription"):
+                    if del_sub != "— select —":
+                        sb_delete("subscriptions","name",del_sub); play_ding(); st.success("Removed."); st.rerun()
+    with s8:
+        section_label("Clinic Profile (Shown on Receipts)")
+        cp = get_clinic_profile()
+        c1,c2 = st.columns(2)
+        with c1:
+            cp_name = st.text_input("Clinic name", value=cp.get("clinic_name","Garden Clinic"), key="cp_name")
+            cp_tagline = st.text_input("Tagline", value=cp.get("tagline","Physical Therapy Center"), key="cp_tagline")
+            cp_phone = st.text_input("Phone", value=cp.get("phone","") or "", key="cp_phone")
+        with c2:
+            cp_address = st.text_input("Address", value=cp.get("address","") or "", key="cp_address")
+            cp_email = st.text_input("Email", value=cp.get("email","") or "", key="cp_email")
+        if st.button("Save Clinic Profile", key="btn_save_clinic"):
+            existing = sb_all("clinic_profile")
+            data = {"clinic_name":cp_name,"tagline":cp_tagline,"phone":cp_phone,"address":cp_address,"email":cp_email}
+            if existing: sb_update("clinic_profile",data,"id",existing[0]["id"])
+            else: sb_insert("clinic_profile",data)
+            play_ding(); st.success("Saved!"); st.rerun()
