@@ -207,7 +207,9 @@ def sb_one(table, filters):
     r = sb_all(table, filters=filters); return r[0] if r else None
 def sb_insert(table, data):
     try: get_sb().table(table).insert(data).execute(); return True
-    except: return False
+    except Exception as e:
+        st.error(f"Database error on {table}: {e}")
+        return False
 def sb_delete(table, col, val):
     try: get_sb().table(table).delete().eq(col, val).execute(); return True
     except: return False
