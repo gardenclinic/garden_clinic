@@ -1,13 +1,10 @@
 import streamlit as st
 import pandas as pd
+import hashlib
 import io
 from datetime import datetime, date, timedelta
 import streamlit.components.v1 as components
-
-# Import from new utility modules
-from db import sb_all, sb_one, sb_insert, sb_delete, sb_update, sb_exists, sb_sum, sb_count, get_sb
-from auth import hash_password, log_action, get_user_context, verify_login, create_user, logout, require_linked_doctor, get_linked_doctor
-from constants import TABLES, ROLES, VALID_ROLES, CLINIC_DEFAULTS, CURRENCY, BODY_AREAS, OUTCOME_OPTIONS, PAYMENT_METHODS, EXPENSE_CATEGORIES, APPOINTMENT_STATUSES, GENDER_OPTIONS, OVERDUE_DAYS, APPOINTMENT_COLORS, PAYMENT_ICONS
+from supabase import create_client
 
 st.set_page_config(page_title="Garden Clinic", page_icon="🌿", layout="wide", initial_sidebar_state="expanded")
 
@@ -18,7 +15,7 @@ st.set_page_config(page_title="Garden Clinic", page_icon="🌿", layout="wide", 
 # ═══════════════════════════════════════════════
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 *, *::before, *::after { box-sizing: border-box; }
 html, body, .stApp { background: #F2F5F1 !important; color: #0D1F14 !important; font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important; }
 [data-testid="stAppViewContainer"] { position: relative; z-index: 1; }
@@ -34,20 +31,20 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #0D
 /* PAGE HEADER */
 .page-header { margin-bottom: 32px; padding-top: 8px; }
 .page-header .kicker { font-size: 0.68rem; color: #C9A84C; letter-spacing: 0.28em; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; font-family: 'Plus Jakarta Sans', sans-serif; }
-.page-header h1 { font-family: 'Cormorant Garamond', serif !important; font-size: 3rem !important; font-weight: 600 !important; color: #0D1F14 !important; margin: 0 !important; font-style: italic; letter-spacing: -0.025em; }
+.page-header h1 { font-family: 'Cormorant Garamond', serif !important; font-size: 3rem !important; font-weight: 600 !important; color: #0D1F14 !important; margin: 0 !important; font-style: italic; letter-spacing: -0.02em !important; line-height: 1.05 !important; }
 .page-header p { font-size: 0.9rem; color: #6B8A72; margin: 8px 0 0 0; font-weight: 400; }
 
 /* PULSE BAR */
-.pulse-bar { background: linear-gradient(135deg, #0D3D2B 0%, #1A5C3E 100%); border-radius: 20px; padding: 22px 32px; display: flex; gap: 44px; flex-wrap: wrap; align-items: center; margin-bottom: 32px; box-shadow: 0 4px 16px rgba(13,61,43,0.08); }
+.pulse-bar { background: linear-gradient(135deg, #0D3D2B 0%, #1A5C3E 100%); border-radius: 20px; padding: 22px 32px; display: flex; gap: 44px; flex-wrap: wrap; align-items: center; margin-bottom: 32px; box-shadow: 0 8px 32px rgba(13,61,43,0.18); }
 .pulse-stat { display: flex; flex-direction: column; }
 .pulse-label { font-size: 0.65rem; color: #6FCF97; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; font-family: 'Plus Jakarta Sans', sans-serif; }
 .pulse-value { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 500; color: #FFFFFF; margin-top: 4px; letter-spacing: -0.02em; }
 .pulse-divider { width: 1px; background: rgba(255,255,255,0.12); height: 40px; align-self: center; }
 
 /* CARDS */
-.card { background: #FFFFFF; border: 1px solid #DDE8E1; border-radius: 20px; padding: 24px 26px; margin-bottom: 18px; transition: all 0.25s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 2px 8px rgba(13,31,20,0.04); }
+.card { background: #FFFFFF; border: 1px solid #DDE8E1; border-radius: 20px; padding: 24px 26px; margin-bottom: 18px; transition: all 0.25s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 2px 8px rgba(13,31,20,0.05); }
 .card:hover { border-color: #0D3D2B; box-shadow: 0 8px 28px rgba(13,61,43,0.1); transform: translateY(-2px); }
-.card h3 { font-family: 'Plus Jakarta Sans', sans-serif !important; margin: 0 0 8px 0; font-size: 0.68rem; color: #6B8A72 !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.card h3 { font-family: 'Plus Jakarta Sans', sans-serif !important; margin: 0 0 8px 0; font-size: 0.68rem; color: #6B8A72 !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; }
 .card .big-num { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 500; margin: 0; }
 .card .big-num.green { color: #1A7A4E; }
 .card .big-num.red { color: #C0392B; }
@@ -55,19 +52,19 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #0D
 .card .sub { font-size: 0.78rem; color: #9AB5A0; margin-top: 8px; font-family: 'Plus Jakarta Sans', sans-serif; }
 
 /* TABS */
-.stTabs [data-baseweb="tab-list"] { background: #FFFFFF !important; border-radius: 16px !important; padding: 5px !important; border: 1px solid #DDE8E1 !important; gap: 4px !important; margin-bottom: 20px !important; }
-.stTabs button[data-baseweb="tab"] { background: transparent !important; border: none !important; color: #6B8A72 !important; font-size: 0.82rem !important; font-weight: 600 !important; padding: 9px 18px !important; border-radius: 12px !important; transition: all 0.2s !important; }
+.stTabs [data-baseweb="tab-list"] { background: #FFFFFF !important; border-radius: 16px !important; padding: 5px !important; border: 1px solid #DDE8E1 !important; gap: 4px !important; margin-bottom: 24px !important; }
+.stTabs button[data-baseweb="tab"] { background: transparent !important; border: none !important; color: #6B8A72 !important; font-size: 0.82rem !important; font-weight: 600 !important; padding: 9px 18px !important; border-radius: 12px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; transition: all 0.2s !important; }
 .stTabs button[data-baseweb="tab"]:hover { background: #F2F5F1 !important; color: #0D1F14 !important; }
 .stTabs button[aria-selected="true"] { background: #0D3D2B !important; color: #FFFFFF !important; font-weight: 700 !important; border: none !important; box-shadow: 0 2px 8px rgba(13,61,43,0.25) !important; }
 
 /* BUTTONS */
-.stButton > button { background: #0D3D2B !important; color: #FFFFFF !important; border: none !important; border-radius: 50px !important; font-weight: 600 !important; font-size: 0.85rem !important; padding: 10px 24px !important; transition: all 0.2s !important; }
+.stButton > button { background: #0D3D2B !important; color: #FFFFFF !important; border: none !important; border-radius: 50px !important; font-weight: 600 !important; font-size: 0.85rem !important; padding: 12px 28px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.02em !important; transition: all 0.25s !important; box-shadow: 0 2px 10px rgba(13,61,43,0.2) !important; }
 .stButton > button:hover { background: #1A5C3E !important; transform: translateY(-2px) !important; box-shadow: 0 8px 24px rgba(13,61,43,0.28) !important; }
 button[data-testid="baseButton-primary"] { background: #C0392B !important; box-shadow: 0 2px 10px rgba(192,57,43,0.25) !important; }
 button[data-testid="baseButton-primary"]:hover { background: #A93226 !important; }
 
 /* INPUTS */
-.stTextInput > div > div > input, .stNumberInput > div > div > input, .stDateInput > div > div > input { background: #FAFCFA !important; border-radius: 14px !important; border: 1.5px solid #DDE8E1 !important; color: #0D1F14 !important; padding: 10px 14px !important; }
+.stTextInput > div > div > input, .stNumberInput > div > div > input, .stDateInput > div > div > input { background: #FAFCFA !important; border-radius: 14px !important; border: 1.5px solid #DDE8E1 !important; font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.9rem !important; color: #0D1F14 !important; padding: 12px 16px !important; transition: all 0.2s !important; }
 .stTextInput > div > div > input:focus, .stNumberInput > div > div > input:focus { border-color: #0D3D2B !important; background: #FFFFFF !important; box-shadow: 0 0 0 4px rgba(13,61,43,0.08) !important; }
 .stSelectbox > div > div > div { background: #FAFCFA !important; border-radius: 14px !important; border: 1.5px solid #DDE8E1 !important; color: #0D1F14 !important; }
 .stTextArea textarea { background: #FAFCFA !important; border-radius: 14px !important; border: 1.5px solid #DDE8E1 !important; font-family: 'Plus Jakarta Sans', sans-serif !important; color: #0D1F14 !important; }
@@ -87,7 +84,7 @@ label, .stRadio label span, .stCheckbox label { color: #0D1F14 !important; }
 .stInfo > div { background: #EEF4FF !important; border: 1.5px solid #3B82F6 !important; color: #1E3A8A !important; border-radius: 14px !important; }
 
 /* SECTION LABEL */
-.section-label { font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.68rem; font-weight: 700; color: #1A5C3E; text-transform: uppercase; letter-spacing: 0.22em; margin: 28px 0 16px 0; display: flex; align-items: center; gap: 12px; }
+.section-label { font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.68rem; font-weight: 700; color: #1A5C3E; text-transform: uppercase; letter-spacing: 0.22em; margin: 28px 0 16px; display: flex; align-items: center; gap: 10px; }
 .section-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, #DDE8E1, transparent); }
 
 /* METRICS */
@@ -121,7 +118,7 @@ label, .stRadio label span, .stCheckbox label { color: #0D1F14 !important; }
 .tag-pending { background: #FDF8EC; color: #7B6020; border: 1px solid rgba(201,168,76,0.2); }
 
 /* RECEIPT */
-.receipt-wrap { background: #FFFFFF; border-radius: 24px; padding: 0; max-width: 440px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; color: #0D1F14; box-shadow: 0 20px 60px rgba(13,31,20,0.12); }
+.receipt-wrap { background: #FFFFFF; border-radius: 24px; padding: 0; max-width: 440px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; color: #0D1F14; box-shadow: 0 20px 60px rgba(13,31,20,0.15); overflow: hidden; border: 1px solid #DDE8E1; }
 .receipt-header { background: linear-gradient(135deg, #0D3D2B 0%, #1A5C3E 60%, #0D3D2B 100%); padding: 40px 28px 28px; text-align: center; position: relative; overflow: hidden; }
 .receipt-header::before { content: ''; position: absolute; top: -40px; right: -40px; width: 160px; height: 160px; background: radial-gradient(circle, rgba(201,168,76,0.2), transparent 70%); }
 .receipt-header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px; background: #FFFFFF; border-radius: 24px 24px 0 0; }
@@ -130,7 +127,7 @@ label, .stRadio label span, .stCheckbox label { color: #0D1F14 !important; }
 .receipt-clinic-sub { font-size: 0.65rem; color: #6FCF97; letter-spacing: 0.32em; text-transform: uppercase; margin-top: 10px; font-weight: 700; }
 .receipt-gold-line { width: 40px; height: 2px; background: linear-gradient(90deg, transparent, #C9A84C, transparent); margin: 12px auto; border-radius: 2px; }
 .receipt-body { padding: 28px 32px 32px; }
-.receipt-date-badge { background: #F2F5F1; border-radius: 50px; padding: 8px 16px; text-align: center; font-size: 0.7rem; color: #4A6B52; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 20px; }
+.receipt-date-badge { background: #F2F5F1; border-radius: 50px; padding: 8px 16px; text-align: center; font-size: 0.7rem; color: #4A6B52; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 24px; border: 1px solid #DDE8E1; }
 .receipt-section-title { font-size: 0.6rem; font-weight: 700; color: #9AB5A0; text-transform: uppercase; letter-spacing: 0.2em; margin: 18px 0 10px; }
 .receipt-row { display: flex; justify-content: space-between; align-items: center; margin: 9px 0; font-size: 0.88rem; }
 .receipt-row span:first-child { color: #6B8A72; } .receipt-row span:last-child { color: #0D1F14; font-weight: 600; }
@@ -158,59 +155,212 @@ hr { border: none !important; border-top: 1px solid #DDE8E1 !important; margin: 
 .pain-scale { display: flex; gap: 6px; margin-top: 8px; }
 .body-chip { display: inline-block; padding: 6px 14px; margin: 4px; border-radius: 50px; font-size: 0.82rem; font-weight: 600; background: #F2F5F1; color: #4A6B52; border: 1px solid #DDE8E1; }
 @media print { [data-testid="stSidebar"], .stTabs [data-baseweb="tab-list"], .stButton, .pulse-bar { display: none !important; } }
+
+/* SIDEBAR */
+[data-testid="stSidebar"] { background: #0D1B2A !important; border-right: none !important; min-width: 252px !important; }
+[data-testid="stSidebar"] * { color: #E2E8F0 !important; font-family: 'Plus Jakarta Sans', sans-serif !important; }
+section[data-testid="stSidebarNav"] { display: none; }
+[data-testid="stSidebar"] .stRadio label { font-size: 0.88rem !important; letter-spacing: 0.01em !important; padding: 6px 0 !important; }
+
+/* TYPOGRAPHY */
+h1, h2, h3, h4 { font-family: 'Syne', sans-serif !important; letter-spacing: -0.02em !important; color: #0D1B2A !important; }
+
+/* PAGE HEADER */
+.page-header { margin-bottom: 32px; padding-top: 8px; }
+.page-header .kicker { font-size: 0.68rem; color: #0DBCB4; letter-spacing: 0.28em; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; }
+.page-header h1 { font-family: 'Syne', sans-serif !important; font-size: 2.4rem !important; font-weight: 800 !important; color: #0D1B2A !important; margin: 0 !important; letter-spacing: -0.03em !important; line-height: 1.1 !important; }
+.page-header p { font-size: 0.9rem; color: #64748B; margin: 8px 0 0 0; font-weight: 400; }
+
+/* PULSE BAR */
+.pulse-bar { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 22px 32px; display: flex; gap: 44px; flex-wrap: wrap; align-items: center; margin-bottom: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(13,27,42,0.06); }
+.pulse-stat { display: flex; flex-direction: column; }
+.pulse-label { font-size: 0.65rem; color: #0DBCB4; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; }
+.pulse-value { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 500; color: #0D1B2A; margin-top: 4px; letter-spacing: -0.02em; }
+.pulse-divider { width: 1px; background: #E2E8F0; height: 40px; align-self: center; }
+
+/* CARDS */
+.card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 24px 26px; margin-bottom: 18px; transition: all 0.25s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.card:hover { border-color: #0DBCB4; box-shadow: 0 4px 24px rgba(13,188,180,0.1); transform: translateY(-2px); }
+.card h3 { font-family: 'Plus Jakarta Sans', sans-serif !important; margin: 0 0 8px 0; font-size: 0.68rem; color: #64748B !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; }
+.card .big-num { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 500; margin: 0; letter-spacing: -0.02em; }
+.card .big-num.green { color: #0DBCB4; }
+.card .big-num.red { color: #F43F5E; }
+.card .big-num.dark, .card .big-num.gold { color: #0D1B2A; }
+.card .sub { font-size: 0.78rem; color: #94A3B8; margin-top: 8px; font-weight: 400; }
+
+/* TABS */
+.stTabs [data-baseweb="tab-list"] { background: #FFFFFF !important; border-radius: 16px !important; padding: 6px !important; border: 1px solid #E2E8F0 !important; gap: 4px !important; margin-bottom: 24px !important; }
+.stTabs button[data-baseweb="tab"] { background: transparent !important; border: none !important; color: #64748B !important; font-size: 0.82rem !important; font-weight: 600 !important; padding: 9px 18px !important; border-radius: 12px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.01em !important; transition: all 0.2s !important; }
+.stTabs button[data-baseweb="tab"]:hover { background: #F8FAFC !important; color: #0D1B2A !important; }
+.stTabs button[aria-selected="true"] { background: #0D1B2A !important; color: #FFFFFF !important; font-weight: 700 !important; border: none !important; box-shadow: 0 2px 8px rgba(13,27,42,0.2) !important; }
+
+/* BUTTONS */
+.stButton > button { background: #0D1B2A !important; color: #FFFFFF !important; border: none !important; border-radius: 50px !important; font-weight: 600 !important; font-size: 0.82rem !important; padding: 12px 28px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.03em !important; transition: all 0.25s cubic-bezier(0.4,0,0.2,1) !important; box-shadow: 0 2px 8px rgba(13,27,42,0.2) !important; }
+.stButton > button:hover { background: #0DBCB4 !important; transform: translateY(-2px) !important; box-shadow: 0 8px 24px rgba(13,188,180,0.3) !important; }
+button[data-testid="baseButton-primary"] { background: #F43F5E !important; box-shadow: 0 2px 8px rgba(244,63,94,0.25) !important; }
+button[data-testid="baseButton-primary"]:hover { background: #E11D48 !important; box-shadow: 0 8px 24px rgba(244,63,94,0.35) !important; }
+
+/* INPUTS */
+.stTextInput > div > div > input, .stNumberInput > div > div > input, .stDateInput > div > div > input { background: #F8FAFC !important; border-radius: 14px !important; border: 1.5px solid #E2E8F0 !important; font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.9rem !important; color: #0D1B2A !important; padding: 12px 16px !important; transition: all 0.2s !important; }
+.stTextInput > div > div > input:focus, .stNumberInput > div > div > input:focus { border-color: #0DBCB4 !important; background: #FFFFFF !important; box-shadow: 0 0 0 4px rgba(13,188,180,0.08) !important; outline: none !important; }
+.stSelectbox > div > div > div { background: #F8FAFC !important; border-radius: 14px !important; border: 1.5px solid #E2E8F0 !important; color: #0D1B2A !important; }
+.stTextArea textarea { background: #F8FAFC !important; border-radius: 14px !important; border: 1.5px solid #E2E8F0 !important; font-family: 'Plus Jakarta Sans', sans-serif !important; color: #0D1B2A !important; }
+.stTextArea textarea:focus { border-color: #0DBCB4 !important; background: #FFFFFF !important; box-shadow: 0 0 0 4px rgba(13,188,180,0.08) !important; }
+.stRadio > div { gap: 14px !important; }
+label, .stRadio label span, .stCheckbox label { color: #0D1B2A !important; }
+[data-testid="stWidgetLabel"] p { color: #475569 !important; font-size: 0.8rem !important; font-weight: 600 !important; letter-spacing: 0.04em !important; }
+
+/* DATAFRAME */
+[data-testid="stDataFrame"] { border-radius: 16px !important; overflow: hidden !important; border: 1px solid #E2E8F0 !important; background: #FFFFFF !important; box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important; }
+[data-testid="stDataFrame"] * { color: #0D1B2A !important; }
+
+/* ALERTS */
+.stSuccess > div { background: #F0FDF9 !important; border: 1.5px solid #0DBCB4 !important; color: #065F5C !important; border-radius: 16px !important; }
+.stError > div { background: #FFF1F2 !important; border: 1.5px solid #F43F5E !important; color: #881337 !important; border-radius: 16px !important; }
+.stWarning > div { background: #FFFBEB !important; border: 1.5px solid #F59E0B !important; color: #78350F !important; border-radius: 16px !important; }
+.stInfo > div { background: #F0F9FF !important; border: 1.5px solid #38BDF8 !important; color: #0C4A6E !important; border-radius: 16px !important; }
+
+/* SECTION LABEL */
+.section-label { font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.68rem; font-weight: 700; color: #0DBCB4; text-transform: uppercase; letter-spacing: 0.22em; margin: 28px 0 16px; display: flex; align-items: center; gap: 10px; }
+.section-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, #E2E8F0, transparent); }
+
+/* METRICS */
+[data-testid="stMetric"] { background: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-radius: 20px !important; padding: 20px 24px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important; }
+[data-testid="stMetricLabel"] { font-size: 0.68rem !important; color: #64748B !important; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 700 !important; }
+[data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.7rem !important; color: #0D1B2A !important; font-weight: 500 !important; }
+
+/* SESSION BAR */
+.session-bar-wrap { background: #F1F5F9; border-radius: 50px; height: 10px; width: 100%; margin-top: 8px; overflow: hidden; }
+.session-bar-fill { height: 10px; border-radius: 50px; background: linear-gradient(90deg, #0DBCB4, #38BDF8); box-shadow: 0 0 12px rgba(13,188,180,0.3); }
+
+/* PROFILE HEADER */
+.profile-summary { background: linear-gradient(135deg, #0D1B2A 0%, #1E3A5F 100%); color: #FFF; padding: 32px 36px; border-radius: 24px; margin-bottom: 24px; position: relative; overflow: hidden; }
+.profile-summary::before { content: ''; position: absolute; top: -40px; right: -40px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(13,188,180,0.2), transparent 70%); }
+.profile-summary::after { content: ''; position: absolute; bottom: -20px; left: 50%; width: 300px; height: 300px; background: radial-gradient(circle, rgba(99,102,241,0.08), transparent 70%); }
+.profile-kicker { font-size: 0.65rem; color: #0DBCB4; letter-spacing: 0.3em; text-transform: uppercase; font-weight: 700; }
+.profile-name { font-family: 'Syne', sans-serif; font-size: 2.4rem; font-weight: 800; margin: 4px 0 0 0; color: #FBF8F1; letter-spacing: -0.03em; line-height: 1.1; }
+.profile-meta { font-size: 0.88rem; color: #94A3B8; margin-top: 10px; }
+
+/* PATIENT CHIP BAR */
+.patient-chip-bar { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 20px 26px; margin-bottom: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.patient-chip-name { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 700; color: #0D1B2A; letter-spacing: -0.02em; }
+.patient-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: #F1F5F9; border-radius: 50px; font-size: 0.78rem; color: #475569; font-weight: 600; border: 1px solid #E2E8F0; }
+.patient-chip.warn { background: #FFF1F2; color: #F43F5E; border-color: rgba(244,63,94,0.2); }
+.patient-chip.good { background: #F0FDF9; color: #0DBCB4; border-color: rgba(13,188,180,0.2); }
+.patient-chip.accent { background: #EFF6FF; color: #3B82F6; border-color: rgba(59,130,246,0.2); }
+
+/* TAG PILLS */
+.tag-pill { display: inline-block; padding: 4px 12px; border-radius: 50px; font-size: 0.72rem; font-weight: 700; margin-right: 6px; margin-bottom: 4px; letter-spacing: 0.04em; }
+.tag-condition { background: #FFF1F2; color: #F43F5E; border: 1px solid rgba(244,63,94,0.2); }
+.tag-success { background: #F0FDF9; color: #0DBCB4; border: 1px solid rgba(13,188,180,0.2); }
+.tag-pending { background: #FFFBEB; color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); }
+
+/* RECEIPT */
+.receipt-wrap { background: #FFFFFF; border-radius: 24px; padding: 0; max-width: 440px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; color: #0D1B2A; box-shadow: 0 20px 60px rgba(13,27,42,0.15), 0 4px 16px rgba(13,27,42,0.08); overflow: hidden; border: 1px solid #E2E8F0; }
+.receipt-header { background: linear-gradient(135deg, #0D1B2A 0%, #1E3A5F 60%, #0D1B2A 100%); padding: 40px 28px 28px; text-align: center; position: relative; overflow: hidden; }
+.receipt-header::before { content: ''; position: absolute; top: -60px; right: -60px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(13,188,180,0.2), transparent 70%); }
+.receipt-header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px; background: #FFFFFF; border-radius: 24px 24px 0 0; }
+.receipt-leaf { font-size: 1.2rem; color: #0DBCB4; margin-bottom: 8px; }
+.receipt-clinic-name { font-family: 'Syne', sans-serif; font-size: 1.8rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.02em; margin: 0; }
+.receipt-clinic-sub { font-size: 0.65rem; color: #0DBCB4; letter-spacing: 0.32em; text-transform: uppercase; margin-top: 10px; font-weight: 700; }
+.receipt-gold-line { width: 40px; height: 2px; background: linear-gradient(90deg, transparent, #0DBCB4, transparent); margin: 12px auto; border-radius: 2px; }
+.receipt-body { padding: 28px 32px 32px; }
+.receipt-date-badge { background: #F0FDF9; border-radius: 50px; padding: 8px 16px; text-align: center; font-size: 0.7rem; color: #0DBCB4; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 24px; border: 1px solid rgba(13,188,180,0.2); }
+.receipt-section-title { font-size: 0.6rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.2em; margin: 18px 0 10px; }
+.receipt-row { display: flex; justify-content: space-between; align-items: center; margin: 9px 0; font-size: 0.88rem; }
+.receipt-row span:first-child { color: #64748B; } .receipt-row span:last-child { color: #0D1B2A; font-weight: 600; }
+.receipt-divider { border: none; border-top: 1px dashed #E2E8F0; margin: 18px 0; }
+.receipt-total-box { background: linear-gradient(135deg, #0D1B2A, #1E3A5F); border-radius: 18px; padding: 18px 22px; margin: 20px 0; position: relative; overflow: hidden; }
+.receipt-total-box::before { content: ''; position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; background: radial-gradient(circle, rgba(13,188,180,0.25), transparent 70%); }
+.receipt-total-label { font-size: 0.62rem; color: #0DBCB4; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2em; }
+.receipt-total-amount { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 500; color: #FFFFFF; margin-top: 4px; }
+.receipt-discount { color: #F43F5E !important; }
+.receipt-footer-area { text-align: center; padding-top: 12px; border-top: 1px dashed #E2E8F0; margin-top: 22px; }
+.receipt-footer-text { font-size: 0.72rem; color: #94A3B8; margin: 4px 0; }
+.receipt-footer-clinic { font-size: 0.75rem; color: #475569; font-weight: 600; margin-top: 8px; }
+
+/* DOCTOR FORM */
+.doctor-form-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 24px; padding: 32px 36px; margin-bottom: 24px; position: relative; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.doctor-form-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: linear-gradient(90deg, #0DBCB4 0%, #38BDF8 100%); border-radius: 24px 24px 0 0; }
+
+/* LOGIN PAGE */
+.login-outer { min-height: 100vh; display: flex; align-items: stretch; }
+.login-left { flex: 1; background: linear-gradient(135deg, #0D1B2A 0%, #0F3460 50%, #0D1B2A 100%); display: flex; flex-direction: column; justify-content: center; padding: 60px; position: relative; overflow: hidden; }
+.login-left::before { content: ''; position: absolute; top: -100px; right: -100px; width: 400px; height: 400px; background: radial-gradient(circle, rgba(13,188,180,0.15), transparent 70%); }
+.login-left::after { content: ''; position: absolute; bottom: -100px; left: -100px; width: 350px; height: 350px; background: radial-gradient(circle, rgba(56,189,248,0.1), transparent 70%); }
+.login-brand-pill { display: inline-flex; align-items: center; gap: 8px; background: rgba(13,188,180,0.15); border: 1px solid rgba(13,188,180,0.3); border-radius: 50px; padding: 8px 18px; margin-bottom: 32px; width: fit-content; }
+.login-brand-pill span { font-size: 0.68rem; color: #0DBCB4; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; }
+.login-hero-title { font-family: 'Syne', sans-serif; font-size: 3.8rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.04em; line-height: 1.05; margin: 0 0 20px; position: relative; z-index: 1; }
+.login-hero-sub { font-size: 1.05rem; color: #94A3B8; line-height: 1.6; max-width: 360px; position: relative; z-index: 1; }
+.login-stats { display: flex; gap: 32px; margin-top: 48px; position: relative; z-index: 1; }
+.login-stat { display: flex; flex-direction: column; }
+.login-stat-num { font-family: 'JetBrains Mono', monospace; font-size: 1.8rem; font-weight: 500; color: #FFFFFF; letter-spacing: -0.02em; }
+.login-stat-label { font-size: 0.72rem; color: #64748B; margin-top: 2px; letter-spacing: 0.08em; font-weight: 600; }
+.login-card { background: #FFFFFF; flex: 0 0 480px; display: flex; flex-direction: column; justify-content: center; padding: 60px 52px; }
+.login-card .leaf { font-size: 0 !important; display: none; }
+.login-card h1 { font-family: 'Syne', sans-serif; color: #0D1B2A; text-align: left; margin: 0 0 8px; font-weight: 800; font-size: 2.2rem; letter-spacing: -0.03em; }
+.login-card p { text-align: left; color: #64748B; font-size: 0.9rem; margin-bottom: 36px; font-weight: 400; }
+.login-divider { width: 40px; height: 4px; background: linear-gradient(90deg, #0DBCB4, #38BDF8); border-radius: 2px; margin-bottom: 32px; }
+
+/* MISC */
+.stMarkdown a { color: #0DBCB4 !important; }
+hr { border: none !important; border-top: 1px solid #E2E8F0 !important; margin: 28px 0 !important; }
+.stCheckbox { color: #0D1B2A !important; }
+[data-baseweb="select"] * { color: #0D1B2A !important; }
+.editorial-divider { display: flex; align-items: center; gap: 16px; margin: 28px 0; }
+.editorial-divider::before, .editorial-divider::after { content: ''; flex: 1; height: 1px; background: #E2E8F0; }
+.editorial-divider span { font-size: 0.85rem; color: #94A3B8; font-weight: 500; }
+.pain-scale { display: flex; gap: 6px; margin-top: 8px; }
+.body-chip { display: inline-block; padding: 6px 14px; margin: 4px; border-radius: 50px; font-size: 0.82rem; font-weight: 600; background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+@media print { [data-testid="stSidebar"], .stTabs [data-baseweb="tab-list"], .stButton, .pulse-bar { display: none !important; } }
 </style>
 """, unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════
-# UTILITY FUNCTIONS
-# ═══════════════════════════════════════════════
-
+# Currency
 def fmt(amount):
-    """Format amount as currency."""
-    try: return f"{int(round(float(amount or 0))):,} {CURRENCY}"
-    except: return f"0 {CURRENCY}"
+    try: return f"{int(round(float(amount or 0))):,} IQD"
+    except: return "0 IQD"
 
-def get_clinic_profile():
-    """Get clinic profile settings."""
-    rows = sb_all(TABLES["clinic_profile"])
-    return rows[0] if rows else CLINIC_DEFAULTS.copy()
+# Supabase
+@st.cache_resource
+def get_sb(): return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
-def patient_id_fmt(pid):
-    """Format patient ID."""
-    return f"#{int(pid):04d}"
+def sb_all(table, filters=None, order=None, desc_order=False, limit=None):
+    try:
+        q = get_sb().table(table).select("*")
+        if filters:
+            for k, v in filters.items(): q = q.eq(k, v)
+        if order: q = q.order(order, desc=desc_order)
+        if limit: q = q.limit(limit)
+        return q.execute().data or []
+    except: return []
 
-def get_invoice_number():
-    """Generate invoice number."""
-    all_v = sb_all(TABLES["visits"])
-    return f"INV-{date.today().year}-{(len(all_v)+1):04d}"
-
-def get_overdue_patients():
-    """Get patients with remaining sessions but no visit in 14+ days."""
-    all_sessions = sb_all(TABLES["patient_sessions"])
-    all_patients = {p["id"]: p["name"] for p in sb_all(TABLES["patients"])}
-    all_visits = sb_all(TABLES["visits"], order="visit_date", desc_order=True)
-    cutoff = (date.today() - timedelta(days=OVERDUE_DAYS)).isoformat()
-    overdue = []
-    for s in all_sessions:
-        done = int(s.get("sessions_done") or 0)
-        total = int(s.get("total_sessions") or 0)
-        if total > 0 and done < total:
-            pid = s.get("patient_id")
-            last = next((v.get("visit_date","") for v in all_visits if v.get("patient_id")==pid), None)
-            if last and last < cutoff:
-                overdue.append({"name": all_patients.get(pid,"Unknown"), "remaining": total-done, "last_visit": last})
-    return overdue
+def sb_one(table, filters):
+    r = sb_all(table, filters=filters); return r[0] if r else None
+def sb_insert(table, data):
+    try: get_sb().table(table).insert(data).execute(); return True
+    except: return False
+def sb_delete(table, col, val):
+    try: get_sb().table(table).delete().eq(col, val).execute(); return True
+    except: return False
+def sb_update(table, data, col, val):
+    try: get_sb().table(table).update(data).eq(col, val).execute(); return True
+    except: return False
+def sb_exists(table, col, val):
+    try: return len(get_sb().table(table).select("id").eq(col, val).execute().data) > 0
+    except: return False
+def sb_sum(table, col, filters=None): return sum(float(r.get(col) or 0) for r in sb_all(table, filters=filters))
+def sb_count(table, filters=None): return len(sb_all(table, filters=filters))
 
 def get_visits_joined(limit=100, patient_id=None, start=None, end=None):
-    """Get visits with joined patient/doctor/service data."""
-    visits = sb_all(TABLES["visits"], order="id", desc_order=True, limit=limit)
+    visits = sb_all("visits", order="id", desc_order=True, limit=limit)
     if patient_id: visits = [v for v in visits if v.get("patient_id") == patient_id]
     if start and end: visits = [v for v in visits if start <= v.get("visit_date","") <= end]
     if not visits: return []
-    patients = {p["id"]: p["name"] for p in sb_all(TABLES["patients"])}
-    doctors  = {d["id"]: d["name"] for d in sb_all(TABLES["doctors"])}
-    services = {s["id"]: s["name"] for s in sb_all(TABLES["services"])}
-    bundles  = {b["id"]: b["name"] for b in sb_all(TABLES["bundles"])}
+    patients = {p["id"]: p["name"] for p in sb_all("patients")}
+    doctors  = {d["id"]: d["name"] for d in sb_all("doctors")}
+    services = {s["id"]: s["name"] for s in sb_all("services")}
+    bundles  = {b["id"]: b["name"] for b in sb_all("bundles")}
     result = []
     for v in visits:
         svc = services.get(v.get("service_id"),""); bnd = bundles.get(v.get("bundle_id"),"")
@@ -221,30 +371,27 @@ def get_visits_joined(limit=100, patient_id=None, start=None, end=None):
     return result
 
 def get_appointments_joined():
-    """Get appointments with joined data."""
-    appts = sb_all(TABLES["appointments"], order="appt_date", desc_order=True)
+    appts = sb_all("appointments", order="appt_date", desc_order=True)
     if not appts: return []
-    patients = {p["id"]: p["name"] for p in sb_all(TABLES["patients"])}
-    doctors  = {d["id"]: d["name"] for d in sb_all(TABLES["doctors"])}
+    patients = {p["id"]: p["name"] for p in sb_all("patients")}
+    doctors  = {d["id"]: d["name"] for d in sb_all("doctors")}
     return [{"id": a["id"], "Date": a.get("appt_date",""), "Time": a.get("appt_time",""),
              "Patient": patients.get(a.get("patient_id"),""), "Doctor": doctors.get(a.get("doctor_id"),""),
              "Reason": a.get("reason",""), "Status": a.get("status","")} for a in appts]
 
 def get_doc_commission_rate(doctor_id, visit_count, all_tiers):
-    """Get commission rate for a doctor based on visit count."""
     tiers = sorted([t for t in all_tiers if t.get("doctor_id") == doctor_id], key=lambda x: int(x.get("min_visits") or 0), reverse=True)
     for t in tiers:
         if visit_count >= int(t.get("min_visits") or 0): return float(t.get("commission_rate") or 0) / 100.0
     return 0.0
 
 def get_financials(start=None, end=None):
-    """Get financial summary."""
-    visits = sb_all(TABLES["visits"])
+    visits = sb_all("visits")
     if start and end: visits = [v for v in visits if start <= v.get("visit_date","") <= end]
-    doctors = sb_all(TABLES["doctors"])
-    expenses_rows = sb_all(TABLES["expenses"])
+    doctors = sb_all("doctors")
+    expenses_rows = sb_all("expenses")
     if start and end: expenses_rows = [e for e in expenses_rows if start <= e.get("date","") <= end]
-    all_tiers = sb_all(TABLES["doctor_commission_tiers"])
+    all_tiers = sb_all("doctor_commission_tiers")
     gross = sum(float(v.get("net_paid") or 0) for v in visits)
     total_exp = sum(float(e.get("amount") or 0) for e in expenses_rows)
     doc_map = {}
@@ -260,71 +407,39 @@ def get_financials(start=None, end=None):
     total_out = total_exp + commissions
     return gross, total_exp, commissions, total_out, gross - total_out, doc_visits
 
+def hash_password(pw): return hashlib.sha256(pw.encode()).hexdigest()
+def log_action(uname, action, details=""):
+    sb_insert("audit_log", {"username": uname, "action": action, "details": details, "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
 def play_ding():
-    """Play a notification sound."""
-    components.html("""<script>try{var c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(1100,c.currentTime);g.gain.setValueAtTime(0.3,c.currentTime);g.gain.exponentialRampToValueAtTime(0.01,c.currentTime+0.5);o.connect(g);g.connect(c.destination);o.start(c.currentTime);o.stop(c.currentTime+0.5);}catch(e){}}; </script>""", unsafe_allow_html=True)
+    components.html("""<script>try{var c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(1100,c.currentTime);g.gain.setValueAtTime(0.18,c.currentTime);g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+0.45);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+0.45);}catch(e){}</script>""", height=0, width=0)
+def get_clinic_profile():
+    rows = sb_all("clinic_profile")
+    return rows[0] if rows else {"clinic_name": "Garden Clinic", "address": "", "phone": "", "email": "", "tagline": "Physical Therapy Center"}
 
-def to_excel(df):
-    """Convert dataframe to Excel bytes."""
-    out = io.BytesIO()
-    with pd.ExcelWriter(out, engine="openpyxl") as w: df.to_excel(w, index=False, sheet_name="Data")
-    return out.getvalue()
+def patient_id_fmt(pid): return f"#{int(pid):04d}"
 
-def card(title, value, css_class="dark", subtitle=""):
-    """Render a card component."""
-    return f'<div class="card"><h3>{title}</h3><p class="big-num {css_class}">{value}</p>{f"<p class=sub>{subtitle}</p>" if subtitle else ""}</div>'
+def get_invoice_number():
+    all_v = sb_all("visits")
+    return f"INV-{date.today().year}-{(len(all_v)+1):04d}"
 
-def section_label(text):
-    """Render section label."""
-    st.markdown(f'<p class="section-label">{text}</p>', unsafe_allow_html=True)
-
-def pulse_bar(stats):
-    """Render pulse bar with stats."""
-    items = ""
-    for i, (label, value) in enumerate(stats):
-        if i > 0: items += '<div class="pulse-divider"></div>'
-        items += f'<div class="pulse-stat"><span class="pulse-label">{label}</span><span class="pulse-value">{value}</span></div>'
-    st.markdown(f'<div class="pulse-bar">{items}</div>', unsafe_allow_html=True)
-
-def page_header(kicker, title, desc=""):
-    """Render page header."""
-    st.markdown(f'<div class="page-header"><div class="kicker">{kicker}</div><h1>{title}</h1>{f"<p>{desc}</p>" if desc else ""}</div>', unsafe_allow_html=True)
-
-def render_receipt(r, cp):
-    """Render receipt."""
-    inv = r.get("invoice", "")
-    inv_line = f"&nbsp;·&nbsp; {inv}" if inv else ""
-    st.markdown(f"""<div class="receipt-wrap">
-        <div class="receipt-header">
-            <div class="receipt-leaf">❦</div>
-            <div class="receipt-clinic-name">{cp.get('clinic_name','Garden Clinic')}</div>
-            <div class="receipt-gold-line"></div>
-            <div class="receipt-clinic-sub">{cp.get('tagline','Physical Therapy Center')}</div>
-        </div>
-        <div class="receipt-body">
-            <div class="receipt-date-badge">OFFICIAL RECEIPT &nbsp;·&nbsp; {r['date']} &nbsp;·&nbsp; {datetime.now().strftime('%H:%M')}{inv_line}</div>
-            <div class="receipt-section-title">Patient</div>
-            <div class="receipt-row"><span>Name</span><span>{r['patient']}</span></div>
-            <div class="receipt-row"><span>Patient ID</span><span>{r.get('patient_id_fmt','—')}</span></div>
-            <div class="receipt-row"><span>Doctor</span><span>{r['doctor']}</span></div>
-            <hr class="receipt-divider">
-            <div class="receipt-section-title">Service</div>
-            <div class="receipt-row"><span>Item</span><span>{r['item']}</span></div>
-            <div class="receipt-row"><span>Payment</span><span>{r['method']}</span></div>
-            <hr class="receipt-divider">
-            <div class="receipt-section-title">Payment Summary</div>
-            <div class="receipt-row"><span>Base Price</span><span>{fmt(r['base'])}</span></div>
-            <div class="receipt-row"><span class="receipt-discount">Discount</span><span class="receipt-discount">− {fmt(r['disc'])}</span></div>
-            <div class="receipt-total-box"><div class="receipt-total-label">Total Paid</div><div class="receipt-total-amount">{fmt(r['net'])}</div></div>
-            <div class="receipt-footer-area">
-                {'<div class="receipt-footer-clinic">📍 ' + cp.get('address','') + '</div>' if cp.get('address') else ''}
-                {'<div class="receipt-footer-clinic">📞 ' + cp.get('phone','') + '</div>' if cp.get('phone') else ''}
-                {'<div class="receipt-footer-clinic">✉ ' + cp.get('email','') + '</div>' if cp.get('email') else ''}
-                <div class="receipt-footer-text" style="margin-top:14px;">Thank you for choosing {cp.get('clinic_name','Garden Clinic')}</div>
-                <div class="receipt-footer-text">We wish you a speedy recovery</div></div></div></div>""", unsafe_allow_html=True)
+def get_overdue_patients():
+    """Patients with remaining sessions but no visit in 14+ days"""
+    all_sessions = sb_all("patient_sessions")
+    all_patients = {p["id"]: p["name"] for p in sb_all("patients")}
+    all_visits = sb_all("visits", order="visit_date", desc_order=True)
+    cutoff = (date.today() - timedelta(days=14)).isoformat()
+    overdue = []
+    for s in all_sessions:
+        done = int(s.get("sessions_done") or 0)
+        total = int(s.get("total_sessions") or 0)
+        if total > 0 and done < total:
+            pid = s.get("patient_id")
+            last = next((v.get("visit_date","") for v in all_visits if v.get("patient_id")==pid), None)
+            if last and last < cutoff:
+                overdue.append({"name": all_patients.get(pid,"Unknown"), "remaining": total-done, "last_visit": last})
+    return overdue
 
 def render_discharge_summary(patient_name, patient_id, assessment, sessions_done, cp):
-    """Render patient discharge summary."""
     pain_before = assessment.get("pain_before", "—")
     pain_after  = assessment.get("pain_after",  "—")
     improvement = ""
@@ -382,44 +497,82 @@ def render_discharge_summary(patient_name, patient_id, assessment, sessions_done
             </div>
         </div>
     </div>""", unsafe_allow_html=True)
+def to_excel(df):
+    out = io.BytesIO()
+    with pd.ExcelWriter(out, engine="openpyxl") as w: df.to_excel(w, index=False, sheet_name="Data")
+    return out.getvalue()
+def card(title, value, css_class="dark", subtitle=""):
+    return f'<div class="card"><h3>{title}</h3><p class="big-num {css_class}">{value}</p>{f"<p class=sub>{subtitle}</p>" if subtitle else ""}</div>'
+def section_label(text): st.markdown(f'<p class="section-label">{text}</p>', unsafe_allow_html=True)
+def pulse_bar(stats):
+    items = ""
+    for i, (label, value) in enumerate(stats):
+        if i > 0: items += '<div class="pulse-divider"></div>'
+        items += f'<div class="pulse-stat"><span class="pulse-label">{label}</span><span class="pulse-value">{value}</span></div>'
+    st.markdown(f'<div class="pulse-bar">{items}</div>', unsafe_allow_html=True)
+def page_header(kicker, title, desc=""):
+    st.markdown(f'<div class="page-header"><div class="kicker">{kicker}</div><h1>{title}</h1>{f"<p>{desc}</p>" if desc else ""}</div>', unsafe_allow_html=True)
+
+def render_receipt(r, cp):
+    inv = r.get("invoice", "")
+    inv_line = f"&nbsp;·&nbsp; {inv}" if inv else ""
+    st.markdown(f"""<div class="receipt-wrap">
+        <div class="receipt-header">
+            <div class="receipt-leaf">❦</div>
+            <div class="receipt-clinic-name">{cp.get('clinic_name','Garden Clinic')}</div>
+            <div class="receipt-gold-line"></div>
+            <div class="receipt-clinic-sub">{cp.get('tagline','Physical Therapy Center')}</div>
+        </div>
+        <div class="receipt-body">
+            <div class="receipt-date-badge">OFFICIAL RECEIPT &nbsp;·&nbsp; {r['date']} &nbsp;·&nbsp; {datetime.now().strftime('%H:%M')}{inv_line}</div>
+            <div class="receipt-section-title">Patient</div>
+            <div class="receipt-row"><span>Name</span><span>{r['patient']}</span></div>
+            <div class="receipt-row"><span>Patient ID</span><span>{r.get('patient_id_fmt','—')}</span></div>
+            <div class="receipt-row"><span>Doctor</span><span>{r['doctor']}</span></div>
+            <hr class="receipt-divider">
+            <div class="receipt-section-title">Service</div>
+            <div class="receipt-row"><span>Item</span><span>{r['item']}</span></div>
+            <div class="receipt-row"><span>Payment</span><span>{r['method']}</span></div>
+            <hr class="receipt-divider">
+            <div class="receipt-section-title">Payment Summary</div>
+            <div class="receipt-row"><span>Base Price</span><span>{fmt(r['base'])}</span></div>
+            <div class="receipt-row"><span class="receipt-discount">Discount</span><span class="receipt-discount">− {fmt(r['disc'])}</span></div>
+            <div class="receipt-total-box"><div class="receipt-total-label">Total Paid</div><div class="receipt-total-amount">{fmt(r['net'])}</div></div>
+            <div class="receipt-footer-area">
+                {'<div class="receipt-footer-clinic">📍 ' + cp.get('address','') + '</div>' if cp.get('address') else ''}
+                {'<div class="receipt-footer-clinic">📞 ' + cp.get('phone','') + '</div>' if cp.get('phone') else ''}
+                {'<div class="receipt-footer-clinic">✉ ' + cp.get('email','') + '</div>' if cp.get('email') else ''}
+                <div class="receipt-footer-text" style="margin-top:14px;">Thank you for choosing {cp.get('clinic_name','Garden Clinic')}</div>
+                <div class="receipt-footer-text">We wish you a speedy recovery</div></div></div></div>""", unsafe_allow_html=True)
 
 def auto_payroll():
-    """Auto-generate monthly payroll expense."""
-    month = datetime.now().strftime("%Y-%m")
-    tag = f"Monthly Payroll — {month}"
-    if not sb_exists(TABLES["expenses"], "description", tag):
-        total = sb_sum(TABLES["employees"], "salary")
-        if total > 0:
-            sb_insert(TABLES["expenses"], {"description": tag, "category": "Payroll", "amount": total, "date": f"{month}-01", "added_by": "System"})
+    month = datetime.now().strftime("%Y-%m"); tag = f"Monthly Payroll — {month}"
+    if not sb_exists("expenses", "description", tag):
+        total = sb_sum("employees", "salary")
+        if total > 0: sb_insert("expenses", {"description": tag, "category": "Payroll", "amount": total, "date": f"{month}-01", "added_by": "System"})
+auto_payroll()
 
 def auto_subscriptions():
-    """Auto-generate subscription expenses."""
     month = datetime.now().strftime("%Y-%m")
-    for sub in sb_all(TABLES["subscriptions"], filters={"active": 1}):
+    for sub in sb_all("subscriptions", filters={"active": 1}):
         tag = f"Subscription: {sub['name']} — {month}"
-        if not sb_exists(TABLES["expenses"], "description", tag):
+        if not sb_exists("expenses", "description", tag):
             day = int(sub.get("billing_day") or 1)
-            sb_insert(TABLES["expenses"], {"description": tag, "category": "Subscription", "amount": float(sub["amount"]), "date": f"{month}-{day:02d}", "added_by": "System"})
-
-# Call auto functions
-auto_payroll()
+            sb_insert("expenses", {"description": tag, "category": "Subscription", "amount": float(sub["amount"]), "date": f"{month}-{day:02d}", "added_by": "System"})
 auto_subscriptions()
 
-# Get financial data
 gross_income, base_expenses, total_commissions, total_outflows, net_profit, doc_visits = get_financials()
 today_str = date.today().isoformat()
 tomorrow_str = (date.today() + timedelta(days=1)).isoformat()
-today_visits_rows = sb_all(TABLES["visits"], filters={"visit_date": today_str})
+today_visits_rows = sb_all("visits", filters={"visit_date": today_str})
 today_revenue = sum(float(v.get("net_paid") or 0) for v in today_visits_rows)
 today_visits_count = len(today_visits_rows)
-patient_count = sb_count(TABLES["patients"])
+patient_count = sb_count("patients")
 
 # ═══════════════════════════════════════════════
-# LOGIN PAGE
+# LOGIN
 # ═══════════════════════════════════════════════
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
+if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in:
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
@@ -443,47 +596,42 @@ if not st.session_state.logged_in:
             p = st.text_input("Password", type="password", placeholder="Enter your password", key="login_p")
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Sign In →", use_container_width=True, key="btn_signin"):
-                success, user = verify_login(u, p)
-                if success and user:
+                users = sb_all("users", filters={"username": u.strip()})
+                match = [x for x in users if x.get("password_hash") == hash_password(p)]
+                if match:
                     st.session_state.logged_in = True
-                    st.session_state.username = user["username"]
-                    st.session_state.role = user["role"]
-                    st.session_state.linked_doctor_id = user.get("linked_doctor_id")
-                    log_action(user["username"], "Login", "Successful sign in")
+                    st.session_state.username = match[0]["username"]
+                    st.session_state.role = match[0]["role"]
+                    st.session_state.linked_doctor_id = match[0].get("linked_doctor_id")
                     st.rerun()
-                else:
-                    st.error("Invalid username or password.")
+                else: st.error("Invalid username or password.")
         with rt:
             ru = st.text_input("New username", key="reg_u")
             rp = st.text_input("New password", type="password", key="reg_p")
-            rs = st.selectbox("Role", VALID_ROLES)
+            rs = st.selectbox("Role", ["Boss","Accounting","Reception","Reception & Accounting","Doctor"])
             linked_doc_id = None
             if rs == "Doctor":
-                all_doc_acc = sb_all(TABLES["doctors"], order="name")
+                all_doc_acc = sb_all("doctors", order="name")
                 if all_doc_acc:
                     doc_map_acc = {d["name"]: d["id"] for d in all_doc_acc}
                     chosen_doc_acc = st.selectbox("Which doctor?", list(doc_map_acc.keys()))
                     linked_doc_id = doc_map_acc[chosen_doc_acc]
-                else:
-                    st.warning("⚠️ Add doctors in Settings first.")
+                else: st.warning("⚠️ Add doctors in Settings first.")
             code = st.text_input("Admin code", type="password", key="reg_code")
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Create Account", use_container_width=True, key="btn_create_acc"):
-                if code != ADMIN_CODE:
-                    st.error("Invalid admin code.")
-                elif rs == "Doctor" and not linked_doc_id:
-                    st.error("Please link a doctor.")
+                if code != "1011": st.error("Invalid admin code.")
+                elif rs == "Doctor" and not linked_doc_id: st.error("Please link a doctor.")
                 elif ru and rp:
-                    success, msg = create_user(ru, rp, rs, linked_doc_id)
-                    if success:
-                        st.success("Account created. Sign in above.")
+                    if sb_exists("users","username",ru.strip()): st.error("Username already taken.")
                     else:
-                        st.error(msg)
+                        sb_insert("users",{"username":ru.strip(),"password_hash":hash_password(rp),"role":rs,"linked_doctor_id":linked_doc_id})
+                        log_action("System","Create Account",f"User: {ru.strip()} | Role: {rs}")
+                        st.success("Account created. Sign in above.")
     st.stop()
 
-# Get user context
-role = st.session_state.get("role", "")
-username = st.session_state.get("username", "")
+role = st.session_state.get("role","")
+username = st.session_state.get("username","")
 linked_doctor_id = st.session_state.get("linked_doctor_id")
 
 st.sidebar.markdown(f"""
@@ -495,15 +643,1247 @@ st.sidebar.markdown(f"""
 <div style="padding:20px 20px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:12px;">
     <div style="font-size:0.6rem;color:#6FCF97;text-transform:uppercase;letter-spacing:0.22em;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;">Signed in as</div>
     <div style="font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:600;font-style:italic;color:#FFFFFF;margin-top:6px;letter-spacing:-0.01em;">{username}</div>
-    <div style="font-size:0.66rem;background:rgba(201,168,76,0.15);color:#C9A84C;display:inline-block;padding:4px 14px;border-radius:50px;margin-top:8px;font-weight:700;letter-spacing:0.06em;border:1px solid rgba(201,168,76,0.2);">{role}</div>
+    <div style="font-size:0.66rem;background:rgba(201,168,76,0.15);color:#C9A84C;display:inline-block;padding:4px 14px;border-radius:50px;margin-top:8px;font-weight:700;letter-spacing:0.06em;border:1px solid rgba(201,168,76,0.25);font-family:'Plus Jakarta Sans',sans-serif;">{role}</div>
 </div>""", unsafe_allow_html=True)
 
-menu_map = ROLES
+menu_map = {
+    "Boss": ["📈  Dashboard","🖥️  Reception","📊  Accounting","📅  Appointments","📑  Reports","🔬  Research","👥  Accounts","⚙️  Settings"],
+    "Reception & Accounting": ["🖥️  Reception","📊  Accounting","📅  Appointments","📑  Reports"],
+    "Accounting": ["📊  Accounting","📑  Reports"],
+    "Reception": ["🖥️  Reception","📅  Appointments"],
+    "Doctor": ["🩺  Clinical Workspace"],
+}
 menus = menu_map.get(role, [])
 selected = st.sidebar.radio("Navigation", menus, label_visibility="collapsed")
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
 if st.sidebar.button("Sign Out", use_container_width=True):
-    logout()
+    st.session_state.logged_in = False; st.rerun()
 
-st.write("✅ **Dashboard, Reception, Accounting, Appointments, Reports, Research, Accounts, and Settings pages are ready to use with the new modular code!**")
-st.info("ℹ️ The app5.py file has been successfully updated to import from db.py, constants.py, and auth.py. All core functionality is preserved!")
+# ═══════════════════════════════════════════════
+# DOCTOR CLINICAL WORKSPACE
+# ═══════════════════════════════════════════════
+if selected == "🩺  Clinical Workspace":
+    if not linked_doctor_id:
+        st.error("No doctor linked to this account. Contact admin."); st.stop()
+    doc_info = sb_one("doctors", filters={"id": linked_doctor_id})
+    page_header("Clinical Workspace", f"Dr. {doc_info['name'] if doc_info else 'Unknown'}", doc_info.get("specialty","") if doc_info else "")
+
+    df_tabs = st.tabs(["Patient Assessment","Past Assessments"])
+
+    with df_tabs[0]:
+        section_label("Find Patient")
+        ds_search = st.text_input("Search by name or phone", key="doc_search", placeholder="Type to search...")
+        all_p_doc = sb_all("patients", order="name")
+        if ds_search: all_p_doc = [p for p in all_p_doc if ds_search.lower() in (p.get("name","")).lower() or ds_search in (p.get("phone","") or "")]
+        if all_p_doc:
+            sel_pat_doc = st.selectbox("Select patient", ["— select —"]+[p["name"] for p in all_p_doc], key="doc_pat_sel")
+            if sel_pat_doc != "— select —":
+                pat_doc = next(p for p in all_p_doc if p["name"]==sel_pat_doc)
+                pid_doc = pat_doc["id"]
+
+                # Patient chip header bar (like reference but cleaner)
+                age_text = ""
+                if pat_doc.get("date_of_birth"):
+                    try:
+                        dob_y = int(pat_doc["date_of_birth"][:4])
+                        age_text = f"{date.today().year - dob_y} yrs"
+                    except: age_text = pat_doc.get("date_of_birth","")
+                gender_icon = "♀" if pat_doc.get("gender")=="Female" else ("♂" if pat_doc.get("gender")=="Male" else "•")
+                visits_count = sb_count("visits", filters={"patient_id": pid_doc})
+                st.markdown(f"""<div class="patient-chip-bar">
+                    <div class="patient-chip-name">{pat_doc["name"]}</div>
+                    <span class="patient-chip">{gender_icon} {pat_doc.get("gender","—")}</span>
+                    <span class="patient-chip">{age_text}</span>
+                    <span class="patient-chip">📞 {pat_doc.get("phone","—")}</span>
+                    <span class="patient-chip accent">{visits_count} visits</span>
+                </div>""", unsafe_allow_html=True)
+
+                # Past assessments preview
+                prev_forms = sb_all("doctor_intake_form", filters={"patient_id": pid_doc}, order="id", desc_order=True)
+                if prev_forms:
+                    section_label(f"Previous Assessments ({len(prev_forms)})")
+                    for f in prev_forms[:3]:
+                        outcome_class = "tag-success" if f.get("outcome")=="Successfully Relieved" else ("tag-condition" if f.get("outcome") in ["No Improvement","Patient Discontinued"] else "tag-pending")
+                        st.markdown(f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.1rem;color:#0D1F14;">{f.get("filled_date","")}</div><span class="tag-pill {outcome_class}">{f.get("outcome","Pending")}</span></div><div style="font-size:0.88rem;color:#0D1F14;margin-bottom:8px;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Diagnosis</strong><br/>{f.get("problem","—")}</div><div style="font-size:0.88rem;color:#0D1F14;margin-bottom:8px;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Body Area</strong> <span style="color:#4A6B52;">{f.get("body_area","—")}</span> · <strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Pain</strong> <span style="color:#4A6B52;">{f.get("pain_before","—")}/10 → {f.get("pain_after","—")}/10</span></div><div style="font-size:0.85rem;color:#6B8A72;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Plan</strong><br/>{f.get("treatment_plan","—")}</div></div>', unsafe_allow_html=True)
+                        if st.button(f"✏️ Edit this assessment", key=f"edit_btn_{f['id']}"):
+                            st.session_state[f"editing_form_{f['id']}"] = True
+                        if st.session_state.get(f"editing_form_{f['id']}"):
+                            with st.expander(f"✏️ Editing assessment from {f.get('filled_date','')}", expanded=True):
+                                ec1, ec2 = st.columns(2)
+                                with ec1:
+                                    e_complaint = st.text_input("Chief Complaint", value=f.get("chief_complaint","") or "", key=f"e_complaint_{f['id']}")
+                                    e_duration  = st.text_input("Duration", value=f.get("duration","") or "", key=f"e_duration_{f['id']}")
+                                    body_opts = ["— select —","Neck / Cervical","Upper back","Lower back / Lumbar","Shoulder","Elbow","Wrist / Hand","Hip","Knee","Ankle / Foot","Multiple areas","Other"]
+                                    cur_body = f.get("body_area","— select —") or "— select —"
+                                    e_body = st.selectbox("Body Area", body_opts, index=body_opts.index(cur_body) if cur_body in body_opts else 0, key=f"e_body_{f['id']}")
+                                    e_history = st.text_area("History", value=f.get("history","") or "", height=80, key=f"e_history_{f['id']}")
+                                with ec2:
+                                    e_problem  = st.text_area("Diagnosis", value=f.get("problem","") or "", height=80, key=f"e_problem_{f['id']}")
+                                    e_plan     = st.text_area("Treatment Plan", value=f.get("treatment_plan","") or "", height=80, key=f"e_plan_{f['id']}")
+                                    e_sessions = st.number_input("Sessions Needed", min_value=1, step=1, value=int(f.get("sessions_needed") or 10), key=f"e_sessions_{f['id']}")
+                                ep1, ep2 = st.columns(2)
+                                with ep1: e_pain_before = st.slider("Pain Before (0-10)", 0, 10, int(f.get("pain_before") or 0), key=f"e_pain_b_{f['id']}")
+                                with ep2: e_pain_after  = st.slider("Pain After (0-10)",  0, 10, int(f.get("pain_after") or 0),  key=f"e_pain_a_{f['id']}")
+                                outcome_opts = ["Pending","Full Recovery Expected","Partial Recovery Expected","Long-term Management","Successfully Relieved","Partially Improved","No Improvement","Patient Discontinued","Other"]
+                                cur_out = f.get("outcome","Pending") or "Pending"
+                                e_outcome = st.selectbox("Outcome", outcome_opts, index=outcome_opts.index(cur_out) if cur_out in outcome_opts else 0, key=f"e_outcome_{f['id']}")
+                                e_notes = st.text_area("Notes", value=f.get("notes","") or "", height=60, key=f"e_notes_{f['id']}")
+                                sc1, sc2 = st.columns(2)
+                                with sc1:
+                                    if st.button("💾 Save Changes", key=f"save_edit_{f['id']}", use_container_width=True):
+                                        sb_update("doctor_intake_form", {
+                                            "chief_complaint": e_complaint, "duration": e_duration,
+                                            "body_area": e_body if e_body != "— select —" else "",
+                                            "history": e_history, "problem": e_problem,
+                                            "treatment_plan": e_plan, "sessions_needed": int(e_sessions),
+                                            "pain_before": e_pain_before, "pain_after": e_pain_after,
+                                            "outcome": e_outcome, "notes": e_notes
+                                        }, "id", f["id"])
+                                        # Update session plan if sessions changed
+                                        existing_sess = sb_one("patient_sessions", filters={"patient_id": pid_doc})
+                                        if existing_sess:
+                                            sb_update("patient_sessions", {"total_sessions": int(e_sessions)}, "id", existing_sess["id"])
+                                        log_action(username, "Edit Assessment", f"#{f['id']} for {sel_pat_doc}")
+                                        del st.session_state[f"editing_form_{f['id']}"]
+                                        play_ding(); st.success("Assessment updated!"); st.rerun()
+                                with sc2:
+                                    if st.button("Cancel", key=f"cancel_edit_{f['id']}", use_container_width=True):
+                                        del st.session_state[f"editing_form_{f['id']}"]
+                                        st.rerun()
+
+                st.markdown('<div class="editorial-divider"><span>New Assessment</span></div>', unsafe_allow_html=True)
+                st.markdown('<div class="doctor-form-card">', unsafe_allow_html=True)
+
+                # Patient complaint section
+                section_label("Chief Complaint & History")
+                c1, c2 = st.columns(2)
+                with c1:
+                    form_complaint = st.text_input("Chief Complaint", placeholder="e.g. Lower back pain", key="df_complaint")
+                    form_duration = st.text_input("Duration", placeholder="e.g. 3 months", key="df_duration")
+                with c2:
+                    form_body_area = st.selectbox("Affected Body Area", ["— select —","Neck / Cervical","Upper back","Lower back / Lumbar","Shoulder","Elbow","Wrist / Hand","Hip","Knee","Ankle / Foot","Multiple areas","Other"], key="df_body")
+                    form_onset = st.selectbox("Onset", ["— select —","Sudden / Trauma","Gradual","Post-surgery","Repetitive strain","Unknown"], key="df_onset")
+                form_history = st.text_area("History of present illness", height=80, placeholder="Describe what happened, how it started, what makes it better/worse...", key="df_history")
+
+                # Pain assessment
+                section_label("Pain Assessment")
+                pc1, pc2 = st.columns(2)
+                with pc1: form_pain_before = st.slider("Pain level on first visit (0-10)", 0, 10, 5, key="df_pain_before")
+                with pc2: form_pain_after = st.slider("Pain level after sessions (0-10)", 0, 10, 5, key="df_pain_after", help="Update this later as treatment progresses")
+
+                # Clinical findings
+                section_label("Clinical Findings")
+                cf1, cf2 = st.columns(2)
+                with cf1:
+                    form_rom = st.text_area("Range of Motion / Movement notes", height=80, placeholder="ROM limitations, stiffness, weakness...", key="df_rom")
+                with cf2:
+                    form_red_flags = st.text_area("⚠️ Red Flags (refer to MD if any)", height=80, placeholder="Numbness, weakness, bladder issues, severe pain at night...", key="df_red_flags")
+
+                # Diagnosis & plan
+                section_label("Diagnosis & Treatment Plan")
+                dc1, dc2 = st.columns(2)
+                with dc1:
+                    form_problem = st.text_area("Diagnosis / Problem", height=100, placeholder="What is wrong with the patient?", key="df_problem")
+                with dc2:
+                    form_plan = st.text_area("Treatment Plan & Expected Outcome", height=100, placeholder="What treatment will you provide and what is the expected outcome?", key="df_plan")
+
+                # Sessions & outcome
+                section_label("Treatment Plan")
+                sc1, sc2, sc3 = st.columns(3)
+                with sc1: form_sessions = st.number_input("Sessions Needed", min_value=1, max_value=200, step=1, value=10, key="df_sessions")
+                with sc2: form_frequency = st.selectbox("Frequency", ["— select —","Daily","3x per week","2x per week","Weekly","Every 2 weeks","As needed"], key="df_freq")
+                with sc3: form_outcome = st.selectbox("Expected Outcome", ["Pending","Full Recovery Expected","Partial Recovery Expected","Long-term Management","Other"], key="df_outcome")
+
+                # Notes
+                form_prev_treatment = st.text_area("Previous treatments tried (if any)", height=70, placeholder="Medications, physiotherapy elsewhere, injections, surgery, home exercises...", key="df_prev")
+                form_notes = st.text_area("Additional clinical notes", height=70, placeholder="Any extra observations...", key="df_notes")
+
+                st.markdown("</div>", unsafe_allow_html=True)
+
+                if st.button("Save Assessment", use_container_width=True, key="btn_submit_assessment"):
+                    if form_problem.strip() and form_plan.strip():
+                        sb_insert("doctor_intake_form", {
+                            "patient_id": pid_doc, "doctor_id": linked_doctor_id,
+                            "chief_complaint": form_complaint.strip(),
+                            "duration": form_duration.strip(),
+                            "body_area": form_body_area if form_body_area != "— select —" else "",
+                            "onset": form_onset if form_onset != "— select —" else "",
+                            "history": form_history.strip(),
+                            "pain_before": int(form_pain_before),
+                            "pain_after": int(form_pain_after),
+                            "range_of_motion": form_rom.strip(),
+                            "red_flags": form_red_flags.strip(),
+                            "problem": form_problem.strip(),
+                            "treatment_plan": form_plan.strip(),
+                            "sessions_needed": int(form_sessions),
+                            "frequency": form_frequency if form_frequency != "— select —" else "",
+                            "previous_treatment": form_prev_treatment.strip(),
+                            "notes": form_notes.strip(),
+                            "outcome": form_outcome,
+                            "filled_date": today_str, "filled_by": username
+                        })
+                        existing_sess = sb_one("patient_sessions", filters={"patient_id": pid_doc})
+                        if existing_sess:
+                            sb_update("patient_sessions", {"total_sessions": int(form_sessions)}, "id", existing_sess["id"])
+                        else:
+                            sb_insert("patient_sessions", {"patient_id": pid_doc, "total_sessions": int(form_sessions),
+                                "sessions_done": 0, "notes": form_problem.strip(), "added_by": username, "created_at": today_str})
+                        log_action(username, "Doctor Assessment", f"Patient: {sel_pat_doc} | Dx: {form_problem[:50]}")
+                        play_ding(); st.success("✓ Assessment saved. Reception can now check out the patient.")
+                    else: st.error("Diagnosis and Treatment Plan are required.")
+        else: st.info("No patients found.")
+
+    with df_tabs[1]:
+        section_label("My Assessments")
+        my_forms = sb_all("doctor_intake_form", filters={"doctor_id": linked_doctor_id}, order="id", desc_order=True, limit=200)
+        if my_forms:
+            patients_map_df = {p["id"]: p["name"] for p in sb_all("patients")}
+            opts_outcome = {f"#{f['id']} · {patients_map_df.get(f.get('patient_id'),'')} · {f.get('filled_date','')}": f["id"] for f in my_forms}
+            section_label("Update Final Outcome")
+            sel_outcome = st.selectbox("Select assessment", ["— select —"]+list(opts_outcome.keys()), key="upd_outcome_sel")
+            if sel_outcome != "— select —":
+                fid = opts_outcome[sel_outcome]
+                fc1, fc2 = st.columns(2)
+                with fc1: new_out = st.selectbox("Final Outcome", ["Pending","Successfully Relieved","Partially Improved","No Improvement","Patient Discontinued","Other"], key="new_out_sel")
+                with fc2: new_pain = st.slider("Final pain level (0-10)", 0, 10, 0, key="new_pain_lvl")
+                final_notes = st.text_area("Final notes / observations", key="final_notes")
+                if st.button("Update Outcome", key="btn_upd_outcome"):
+                    sb_update("doctor_intake_form", {"outcome": new_out, "outcome_notes": final_notes, "pain_after": new_pain}, "id", fid)
+                    play_ding(); st.success("Outcome updated."); st.rerun()
+            st.markdown("---")
+            rows_df = [{"Date": f.get("filled_date",""), "Patient": patients_map_df.get(f.get("patient_id"),""),
+                "Body Area": f.get("body_area",""), "Diagnosis": (f.get("problem","") or "")[:50],
+                "Pain": f"{f.get('pain_before','—')}/10 → {f.get('pain_after','—')}/10",
+                "Sessions": f.get("sessions_needed",0), "Outcome": f.get("outcome","Pending")} for f in my_forms]
+            st.dataframe(pd.DataFrame(rows_df), use_container_width=True, hide_index=True)
+
+# ═══════════════════════════════════════════════
+# DASHBOARD
+# ═══════════════════════════════════════════════
+elif selected == "📈  Dashboard":
+    page_header("Executive", f"{date.today().strftime('%A')}", f"{date.today().strftime('%B %d, %Y')}")
+    pulse_bar([("Today's Revenue",fmt(today_revenue)),("Visits Today",str(today_visits_count)),("Total Patients",str(patient_count)),("All-Time Revenue",fmt(gross_income)),("Net Profit",fmt(net_profit))])
+
+    all_pt_subs = sb_all("patient_subscriptions")
+    expiring = [s for s in all_pt_subs if s.get("status")=="Active" and s.get("end_date") in [today_str, tomorrow_str]]
+    if expiring:
+        patients_map = {p["id"]: p["name"] for p in sb_all("patients")}
+        for s in expiring:
+            pname = patients_map.get(s.get("patient_id"),"Unknown")
+            st.warning(f"⚠️ **{pname}** — subscription **'{s.get('plan_name','')}' expires {'TODAY' if s.get('end_date')==today_str else 'TOMORROW'}!**")
+
+    c1,c2,c3,c4 = st.columns(4)
+    with c1: st.markdown(card("Gross Revenue", fmt(gross_income), "green", "All collected payments"), unsafe_allow_html=True)
+    with c2: st.markdown(card("Total Expenses", fmt(total_outflows), "red", "Bills + payroll + commissions"), unsafe_allow_html=True)
+    with c3: st.markdown(card("Net Profit", fmt(net_profit), "dark", "Revenue minus all costs"), unsafe_allow_html=True)
+    with c4: st.markdown(card("Doctor Commissions", fmt(total_commissions), "dark", "Total owed to doctors"), unsafe_allow_html=True)
+
+    section_label("Today's Appointments")
+    today_appts = [a for a in get_appointments_joined() if a.get("Date")==today_str]
+    if today_appts:
+        cols = st.columns(min(len(today_appts),4))
+        for i, a in enumerate(today_appts[:4]):
+            with cols[i%4]:
+                sc = {"Scheduled":"#C47649","Completed":"#4A6752","Cancelled":"#B85C3A","No-show":"#8A7E60"}.get(a["Status"],"#C47649")
+                st.markdown(f'<div class="card" style="border-left:3px solid {sc};"><div style="font-family:Inter,sans-serif;font-size:0.65rem;color:#8A7E60;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;">{a["Time"]}</div><div style="font-family:Fraunces,serif;font-size:1.3rem;font-style:italic;color:#1F2924;margin:6px 0;letter-spacing:-0.01em;">{a["Patient"]}</div><div style="font-size:0.85rem;color:#4A5A52;">Dr. {a["Doctor"]}</div><div style="font-size:0.78rem;color:#8A7E60;margin-top:4px;font-style:italic;">{a.get("Reason","")}</div><span class="tag-pill" style="background:{sc}25;color:{sc};margin-top:8px;display:inline-block;">{a["Status"]}</span></div>', unsafe_allow_html=True)
+    else: st.info("No appointments scheduled for today.")
+
+    ca,cb = st.columns([3,2])
+    with ca:
+        section_label("Revenue Trend")
+        all_v = sb_all("visits", order="visit_date")
+        if all_v:
+            df = pd.DataFrame([{"Date":v["visit_date"],"Revenue":float(v.get("net_paid") or 0)} for v in all_v])
+            st.line_chart(df.groupby("Date").sum(), y="Revenue", color="#C47649", height=260)
+    with cb:
+        section_label("Doctor Performance")
+        all_tiers = sb_all("doctor_commission_tiers"); rows = []
+        for d in sb_all("doctors", order="name"):
+            info = doc_visits.get(d["name"],{"visits":[],"id":d["id"]})
+            v = info["visits"]; vol = len(v); gen = sum(v)
+            rate = get_doc_commission_rate(d["id"], vol, all_tiers)
+            payout = gen * rate
+            tiers_for_doc = sorted([t for t in all_tiers if t.get("doctor_id")==d["id"]], key=lambda x:x.get("min_visits",0))
+            model = " / ".join([f"{t['min_visits']}+: {t['commission_rate']}%" for t in tiers_for_doc]) if tiers_for_doc else "—"
+            rows.append({"Doctor":d["name"],"Visits":vol,"Revenue":fmt(gen),"Commission":fmt(payout),"Tiers":model})
+        if rows: st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    section_label("Monthly Summary")
+    all_v2 = sb_all("visits")
+    if all_v2:
+        df_m = pd.DataFrame([{"Month":v["visit_date"][:7],"Revenue":float(v.get("net_paid") or 0)} for v in all_v2])
+        df_m_agg = df_m.groupby("Month").agg(Revenue=("Revenue","sum"),Visits=("Revenue","count")).reset_index().sort_values("Month",ascending=False)
+        df_m_agg["Revenue"] = df_m_agg["Revenue"].apply(fmt)
+        st.dataframe(df_m_agg, use_container_width=True, hide_index=True)
+
+    section_label("Activity Log")
+    af = st.selectbox("Filter",["All","New Visit","New Patient","Doctor Assessment","Add Expense","Delete Expense","Remove Patient"], key="audit_filter")
+    audit_rows = sb_all("audit_log", order="id", desc_order=True, limit=200)
+    if af != "All": audit_rows = [r for r in audit_rows if r.get("action")==af]
+    if audit_rows:
+        st.dataframe(pd.DataFrame([{"Time":r["timestamp"],"User":r["username"],"Action":r["action"],"Details":r.get("details","")} for r in audit_rows]), use_container_width=True, hide_index=True)
+
+# ═══════════════════════════════════════════════
+# RECEPTION
+# ═══════════════════════════════════════════════
+elif selected == "🖥️  Reception":
+    page_header("Front Desk", "Reception", "Patient intake, checkout, and management.")
+    pulse_bar([("Today's Revenue",fmt(today_revenue)),("Visits Today",str(today_visits_count)),("Total Patients",str(patient_count))])
+
+    # ── Today's appointments banner ──
+    today_appts_top = [a for a in get_appointments_joined() if a.get("Date")==today_str and a.get("Status")=="Scheduled"]
+    if today_appts_top:
+        names = " · ".join([f"**{a['Patient']}** @ {a['Time']}" for a in today_appts_top[:4]])
+        st.info(f"📅 **{len(today_appts_top)} appointment{'s' if len(today_appts_top)>1 else ''} today:** {names}")
+
+    # ── Overdue patients ──
+    overdue_list = get_overdue_patients()
+    for od in overdue_list:
+        st.warning(f"⏰ **{od['name']}** hasn't visited in 14+ days — still has **{od['remaining']} sessions remaining** (last visit: {od['last_visit']})")
+
+    # ── Expiring subscriptions ──
+    all_pt_subs = sb_all("patient_subscriptions")
+    expiring_rec = [s for s in all_pt_subs if s.get("status")=="Active" and s.get("end_date") in [today_str, tomorrow_str]]
+    if expiring_rec:
+        patients_map_r = {p["id"]: p["name"] for p in sb_all("patients")}
+        for s in expiring_rec:
+            pname = patients_map_r.get(s.get("patient_id"),"Unknown")
+            st.warning(f"⚠️ **{pname}** subscription **'{s.get('plan_name','')}'** expires {'TODAY' if s.get('end_date')==today_str else 'TOMORROW'}!")
+
+    # ── Quick phone search ──
+    quick_search = st.text_input("🔍 Quick search — name or phone number", placeholder="Type anything to find a patient instantly...", key="reception_quick_search")
+    if quick_search:
+        all_p_qs = sb_all("patients", order="name")
+        found = [p for p in all_p_qs if quick_search.lower() in (p.get("name","")).lower() or quick_search in (p.get("phone","") or "")]
+        if found:
+            for p in found[:5]:
+                visits_p = len([v for v in sb_all("visits", filters={"patient_id": p["id"]}) ])
+                st.markdown(f'<div class="card" style="padding:14px 20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.2rem;color:#0D1F14;">{p["name"]}</div><div style="font-size:0.8rem;color:#6B8A72;margin-top:2px;">{patient_id_fmt(p["id"])} · 📞 {p.get("phone","—")} · {p.get("gender","—")} · {visits_p} visits</div></div></div></div>', unsafe_allow_html=True)
+        else:
+            st.info("No patient found with that name or phone.")
+
+    t1,t2,tD,tQ,t3,t4,t5,t6,t7,t8,t9 = st.tabs(["Checkout","Patients","Doctor Notes","Quick View","Register","Edit","Sessions","Subscriptions","Check-in","History","Edit/Delete"])
+
+    with t1:
+        section_label("New Checkout")
+        patients_db = sb_all("patients", order="name"); docs_db = sb_all("doctors", order="name")
+        services_db = [s for s in sb_all("services", order="name") if s.get("active")==1]
+        bundles_db  = sb_all("bundles", order="name")
+        if not docs_db or (not services_db and not bundles_db):
+            st.warning("Please add doctors and services in Settings before checkout.")
+        else:
+            p_map = {p["name"]: p["id"] for p in patients_db}; d_map = {d["name"]: d["id"] for d in docs_db}
+            c1,c2 = st.columns(2)
+            with c1:
+                target_p = st.selectbox("Patient", ["— select —"]+list(p_map.keys()))
+                chosen_doc = st.selectbox("Doctor", list(d_map.keys()))
+                payment_method = st.selectbox("Payment method", ["Cash","Card","Insurance","Transfer"])
+            with c2:
+                item_type = st.radio("Item type", ["Service","Bundle"], horizontal=True)
+                srv_id = bnd_id = None; base_price = 0.0; chosen_item_name = ""
+                if item_type == "Service":
+                    if services_db:
+                        s_map = {f"{s['name']}  —  {fmt(s['price'])}": (s["id"],float(s["price"]),s["name"]) for s in services_db}
+                        chosen = st.selectbox("Service", list(s_map.keys()))
+                        srv_id, base_price, chosen_item_name = s_map[chosen]
+                else:
+                    if bundles_db:
+                        b_map = {f"{b['name']}  —  {fmt(b['price'])}": (b["id"],float(b["price"]),b["name"]) for b in bundles_db}
+                        chosen = st.selectbox("Bundle", list(b_map.keys()))
+                        bnd_id, base_price, chosen_item_name = b_map[chosen]
+                disc_type = st.radio("Discount", ["None","Fixed (IQD)","Percent (%)"], horizontal=True)
+                disc_val = st.number_input("Discount value", min_value=0.0, step=1000.0)
+
+            if target_p != "— select —":
+                pid_chk = p_map[target_p]
+                assessment = sb_one("doctor_intake_form", filters={"patient_id": pid_chk})
+                sess_chk = sb_one("patient_sessions", filters={"patient_id": pid_chk})
+                if assessment:
+                    rem = max(0, int(sess_chk.get("total_sessions",0) or 0) - int(sess_chk.get("sessions_done",0) or 0)) if sess_chk else "—"
+                    done_count = sess_chk.get("sessions_done",0) if sess_chk else 0
+                    total_count = assessment.get("sessions_needed",0)
+                    st.markdown(f'<div class="card" style="border-left:3px solid #4A6752;"><div style="font-size:0.65rem;color:#4A6752;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;">Doctor\'s Plan</div><div style="margin-top:8px;font-family:Fraunces,serif;font-size:1.1rem;font-style:italic;color:#1F2924;">{assessment.get("problem","")}</div><div style="margin-top:6px;font-size:0.88rem;color:#4A5A52;">Sessions: <strong>{done_count}/{total_count}</strong> · Remaining: <strong>{rem}</strong> · Body area: {assessment.get("body_area","—")}</div></div>', unsafe_allow_html=True)
+
+            final_due = base_price
+            if disc_type == "Fixed (IQD)": final_due = max(0.0, base_price-disc_val)
+            elif disc_type == "Percent (%)": final_due = max(0.0, base_price*(1-disc_val/100))
+            visit_notes = st.text_area("Visit notes", height=70)
+            referrers_db = sb_all("referrers", order="name"); ref_names = [r["name"] for r in referrers_db]
+            referral_options = ["Walk-in / Direct","Instagram / Social Media","Google Search","Friend / Word of mouth"]+ref_names
+            how_found = st.selectbox("How did the patient find us?", referral_options)
+            referred_by_val = how_found if how_found in ref_names else None
+            st.markdown(f'<div style="font-family:Fraunces,serif;font-size:1.8rem;font-style:italic;color:#1F2924;margin:20px 0;">Total due: <strong style="color:#C47649;">{fmt(final_due)}</strong></div>', unsafe_allow_html=True)
+            if st.button("Save & Print Receipt", use_container_width=True):
+                if target_p == "— select —": st.error("Please select a patient.")
+                elif base_price == 0.0: st.error("Please select a service or bundle.")
+                else:
+                    disc_amt = base_price - final_due
+                    inv_num = get_invoice_number()
+                    sb_insert("visits",{"patient_id":p_map[target_p],"doctor_id":d_map[chosen_doc],"service_id":srv_id,"bundle_id":bnd_id,"visit_date":today_str,"base_price":base_price,"discount_amount":disc_amt,"net_paid":final_due,"payment_method":payment_method,"notes":visit_notes,"referred_by":referred_by_val,"added_by":username})
+                    todays_appts = sb_all("appointments", filters={"patient_id": p_map[target_p], "appt_date": today_str, "status": "Scheduled"})
+                    for ap in todays_appts: sb_update("appointments", {"status": "Completed"}, "id", ap["id"])
+                    sess = sb_one("patient_sessions", filters={"patient_id": p_map[target_p]})
+                    completed_all = False
+                    if sess:
+                        new_done = int(sess.get("sessions_done") or 0) + 1
+                        sb_update("patient_sessions", {"sessions_done": new_done}, "id", sess["id"])
+                        total_s = int(sess.get("total_sessions") or 0)
+                        if total_s > 0 and new_done >= total_s:
+                            st.balloons(); st.success(f"🎉 {target_p} has completed all {total_s} sessions!")
+                            completed_all = True
+                            st.session_state["discharge_pid"] = p_map[target_p]
+                            st.session_state["discharge_name"] = target_p
+                            st.session_state["discharge_done"] = new_done
+                    log_action(username,"New Visit",f"Patient: {target_p} | Doctor: {chosen_doc} | Paid: {fmt(final_due)} | {inv_num}")
+                    play_ding(); st.success(f"Visit saved · {inv_num}")
+                    st.session_state.rcpt = {"patient":target_p,"doctor":chosen_doc,"item":chosen_item_name,"base":base_price,"disc":disc_amt,"net":final_due,"method":payment_method,"date":today_str,"invoice":inv_num,"patient_id_fmt":patient_id_fmt(p_map[target_p])}
+            if "rcpt" in st.session_state: render_receipt(st.session_state.rcpt, get_clinic_profile())
+
+            # ── Discharge summary ──
+            if "discharge_pid" in st.session_state:
+                assessment_dc = sb_one("doctor_intake_form", filters={"patient_id": st.session_state["discharge_pid"]})
+                if assessment_dc:
+                    st.markdown("---")
+                    section_label("🎓 Patient Discharge Summary")
+                    st.info("💡 Press **Ctrl+P** to print this discharge summary for the patient.")
+                    render_discharge_summary(st.session_state["discharge_name"], st.session_state["discharge_pid"], assessment_dc, st.session_state["discharge_done"], get_clinic_profile())
+
+            # ── Daily cash summary ──
+            st.markdown("---")
+            section_label("💰 Today's Payment Breakdown")
+            today_v = sb_all("visits", filters={"visit_date": today_str})
+            if today_v:
+                methods = {}
+                for v in today_v:
+                    m = v.get("payment_method","Cash") or "Cash"
+                    if m not in methods: methods[m] = {"count": 0, "total": 0.0}
+                    methods[m]["count"] += 1
+                    methods[m]["total"] += float(v.get("net_paid") or 0)
+                cols_cash = st.columns(len(methods))
+                icons = {"Cash":"💵","Card":"💳","Insurance":"🏥","Transfer":"🔁","Subscription":"📋"}
+                for i, (method, info) in enumerate(methods.items()):
+                    with cols_cash[i]:
+                        st.markdown(card(f"{icons.get(method,'💰')} {method}", fmt(info['total']), "dark", f"{info['count']} visit{'s' if info['count']>1 else ''}"), unsafe_allow_html=True)
+            else:
+                st.info("No visits yet today.")
+
+    with t2:
+        section_label("All Patients")
+        search = st.text_input("Search by name or phone", key="t2_search")
+        all_p = sb_all("patients", order="name")
+        if search: all_p = [p for p in all_p if search.lower() in (p.get("name","")).lower() or search in (p.get("phone","") or "")]
+        if all_p:
+            st.dataframe(pd.DataFrame(all_p), use_container_width=True, hide_index=True)
+            del_target = st.selectbox("Remove patient", ["— select —"]+[p["name"] for p in all_p])
+            if st.button("Remove Patient", type="primary"):
+                if del_target != "— select —":
+                    sb_delete("patients","name",del_target); log_action(username,"Remove Patient",del_target)
+                    play_ding(); st.success(f"Removed."); st.rerun()
+
+    with tD:
+        section_label("Doctor's Assessments")
+        df_search = st.text_input("Search by patient name", key="recep_df_search")
+        all_forms = sb_all("doctor_intake_form", order="id", desc_order=True)
+        patients_map_df = {p["id"]: p["name"] for p in sb_all("patients")}
+        doctors_map_df = {d["id"]: d["name"] for d in sb_all("doctors")}
+        if df_search:
+            all_forms = [f for f in all_forms if df_search.lower() in (patients_map_df.get(f.get("patient_id"),"")).lower()]
+        if all_forms:
+            for f in all_forms[:20]:
+                pname = patients_map_df.get(f.get("patient_id"),"")
+                dname = doctors_map_df.get(f.get("doctor_id"),"")
+                sess_f = sb_one("patient_sessions", filters={"patient_id": f.get("patient_id")})
+                rem_text = ""
+                if sess_f:
+                    done_f = int(sess_f.get("sessions_done") or 0); total_f = int(sess_f.get("total_sessions") or 0)
+                    rem_text = f"{done_f} of {total_f} sessions"
+                outcome_class = "tag-success" if f.get("outcome")=="Successfully Relieved" else ("tag-condition" if f.get("outcome") in ["No Improvement","Patient Discontinued"] else "tag-pending")
+                st.markdown(f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Fraunces,serif;font-size:1.4rem;font-style:italic;color:#1F2924;letter-spacing:-0.01em;">{pname}</div><span class="tag-pill {outcome_class}">{f.get("outcome","Pending")}</span></div><div style="font-size:0.75rem;color:#8A7E60;margin-top:6px;font-family:Inter,sans-serif;letter-spacing:0.04em;">Dr. {dname} · {f.get("filled_date","")} · {rem_text}</div><div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;">{f"<span class=patient-chip>{f.get('body_area','')}</span>" if f.get('body_area') else ''}{f"<span class=patient-chip>{f.get('duration','')}</span>" if f.get('duration') else ''}{f"<span class=patient-chip accent>Pain: {f.get('pain_before','—')}/10</span>"}</div><div style="margin-top:14px;font-size:0.9rem;color:#1F2924;"><strong style="color:#C47649;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Diagnosis</strong><br/>{f.get("problem","—")}</div><div style="margin-top:10px;font-size:0.88rem;color:#4A5A52;"><strong style="color:#C47649;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Treatment Plan</strong><br/>{f.get("treatment_plan","—")}</div>{f"<div style=margin-top:10px;font-size:0.85rem;color:#B85C3A;><strong style=color:#B85C3A;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;>Red Flags</strong><br/>{f.get('red_flags','')}</div>" if f.get("red_flags") else ""}</div>', unsafe_allow_html=True)
+        else: st.info("No doctor assessments yet.")
+
+    with tQ:
+        section_label("Patient Quick View")
+        all_p_qv = sb_all("patients", order="name")
+        if all_p_qv:
+            qv_search = st.text_input("Search patient", key="qv_search")
+            filtered = [p for p in all_p_qv if not qv_search or qv_search.lower() in (p.get("name","")).lower() or qv_search in (p.get("phone","") or "")]
+            if filtered:
+                qv_sel = st.selectbox("Select patient", [p["name"] for p in filtered], key="qv_sel")
+                pat = next(p for p in filtered if p["name"]==qv_sel); pid = pat["id"]
+                st.markdown(f'<div class="profile-summary"><div class="profile-kicker">Patient Profile</div><div class="profile-name">{pat["name"]}</div><div class="profile-meta">📞 {pat.get("phone","—")} &nbsp;·&nbsp; 🎂 {pat.get("date_of_birth","—")} &nbsp;·&nbsp; {pat.get("gender","—")}</div></div>', unsafe_allow_html=True)
+                visits_p = get_visits_joined(limit=1000, patient_id=pid)
+                total_spent = sum(v["Paid"] for v in visits_p)
+                last_visit = visits_p[0]["Date"] if visits_p else "Never"
+                sess_p = sb_one("patient_sessions", filters={"patient_id": pid})
+                next_appt = next((a for a in get_appointments_joined() if a.get("Patient")==qv_sel and a.get("Status")=="Scheduled" and a.get("Date") >= today_str), None)
+                sub_active = next((s for s in sb_all("patient_subscriptions", filters={"patient_id":pid, "status":"Active"})), None)
+                m1,m2,m3,m4 = st.columns(4)
+                m1.metric("Total Visits", len(visits_p))
+                m2.metric("Total Spent", fmt(total_spent))
+                m3.metric("Last Visit", last_visit)
+                m4.metric("Next Appointment", next_appt["Date"] if next_appt else "—")
+                assessment_q = sb_one("doctor_intake_form", filters={"patient_id": pid})
+                if assessment_q:
+                    section_label("Doctor's Assessment")
+                    st.markdown(f'<div class="card"><div style="font-size:0.88rem;color:#1F2924;"><strong style="color:#C47649;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Problem</strong><br/>{assessment_q.get("problem","")}</div><div style="margin-top:10px;font-size:0.88rem;color:#1F2924;"><strong style="color:#C47649;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Plan</strong><br/>{assessment_q.get("treatment_plan","")}</div><div style="margin-top:10px;font-size:0.85rem;color:#4A5A52;">Outcome: {assessment_q.get("outcome","Pending")} · Pain: {assessment_q.get("pain_before","—")}/10 → {assessment_q.get("pain_after","—")}/10</div></div>', unsafe_allow_html=True)
+                if sess_p:
+                    done = int(sess_p.get("sessions_done") or 0); total = int(sess_p.get("total_sessions") or 0)
+                    rem = max(0, total-done); pct = int((done/total*100)) if total>0 else 0
+                    section_label("Sessions Progress")
+                    st.markdown(f'**{done} of {total} done** · {rem} remaining')
+                    st.markdown(f'<div class="session-bar-wrap"><div class="session-bar-fill" style="width:{pct}%;"></div></div>', unsafe_allow_html=True)
+                if sub_active:
+                    section_label("Active Subscription")
+                    st.info(f"📅 **{sub_active.get('plan_name','')}** · Expires {sub_active.get('end_date','')} · {sub_active.get('sessions_used',0)}/{sub_active.get('total_sessions','∞')} sessions")
+                if visits_p:
+                    section_label("Recent Visits")
+                    df_v_qv = pd.DataFrame(visits_p[:10])
+                    for col in ["Base","Discount","Paid"]:
+                        if col in df_v_qv.columns: df_v_qv[col] = df_v_qv[col].apply(fmt)
+                    st.dataframe(df_v_qv, use_container_width=True, hide_index=True)
+
+    with t3:
+        section_label("Register New Patient")
+        c1,c2 = st.columns(2)
+        with c1:
+            p_name = st.text_input("Full name *"); p_phone = st.text_input("Phone number")
+            p_dob  = st.text_input("Date of birth (YYYY-MM-DD)", placeholder="1990-01-15")
+        with c2:
+            p_gender = st.selectbox("Gender", ["Prefer not to say","Male","Female","Other"])
+            p_notes  = st.text_area("Notes", height=100)
+        give_receipt = st.checkbox("📄 Print intake receipt", value=True)
+        if st.button("Register Patient"):
+            if p_name.strip():
+                if sb_exists("patients","name",p_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("patients",{"name":p_name.strip(),"phone":p_phone.strip(),"date_of_birth":p_dob.strip(),"gender":p_gender,"notes":p_notes.strip(),"created_at":today_str})
+                    log_action(username,"New Patient",f"{p_name.strip()} | {p_gender}")
+                    new_pat = sb_one("patients", filters={"name": p_name.strip()})
+                    pid_new = new_pat["id"] if new_pat else 0
+                    play_ding(); st.success(f"✅ Patient '{p_name}' registered — ID: **{patient_id_fmt(pid_new)}**")
+                    if give_receipt:
+                        st.session_state.intake_rcpt = {"patient":p_name.strip(),"doctor":"To be assigned","item":"Initial Intake","base":0,"disc":0,"net":0,"method":"—","date":today_str,"invoice":"","patient_id_fmt":patient_id_fmt(pid_new)}
+        if "intake_rcpt" in st.session_state: render_receipt(st.session_state.intake_rcpt, get_clinic_profile())
+
+    with t4:
+        section_label("Edit Patient Profile")
+        ep_search = st.text_input("Search", key="ep_search")
+        all_p_edit = sb_all("patients", order="name")
+        if ep_search: all_p_edit = [p for p in all_p_edit if ep_search.lower() in (p.get("name","")).lower()]
+        if all_p_edit:
+            edit_p_name = st.selectbox("Select", ["— select —"]+[p["name"] for p in all_p_edit], key="edit_p_sel")
+            if edit_p_name != "— select —":
+                pat = next(p for p in all_p_edit if p["name"]==edit_p_name)
+                c1,c2 = st.columns(2)
+                with c1:
+                    new_name = st.text_input("Full name", value=pat.get("name",""), key="ep_name")
+                    new_phone = st.text_input("Phone", value=pat.get("phone","") or "", key="ep_phone")
+                    new_dob = st.text_input("DOB", value=pat.get("date_of_birth","") or "", key="ep_dob")
+                with c2:
+                    gopts = ["Prefer not to say","Male","Female","Other"]
+                    cg = pat.get("gender","Prefer not to say") or "Prefer not to say"
+                    new_gender = st.selectbox("Gender", gopts, index=gopts.index(cg) if cg in gopts else 0, key="ep_gender")
+                    new_notes = st.text_area("Notes", value=pat.get("notes","") or "", height=100, key="ep_notes")
+                if st.button("Save Changes", key="btn_edit_patient"):
+                    sb_update("patients",{"name":new_name.strip(),"phone":new_phone.strip(),"date_of_birth":new_dob.strip(),"gender":new_gender,"notes":new_notes.strip()},"id",pat["id"])
+                    play_ding(); st.success("Updated."); st.rerun()
+
+    with t5:
+        section_label("Sessions Tracker")
+        s_search = st.text_input("Search", key="sess_search")
+        all_p_sess = sb_all("patients", order="name")
+        if s_search: all_p_sess = [p for p in all_p_sess if s_search.lower() in (p.get("name","")).lower()]
+        if all_p_sess:
+            sel_p_sess = st.selectbox("Select", ["— select —"]+[p["name"] for p in all_p_sess], key="sess_p_sel")
+            if sel_p_sess != "— select —":
+                pid = next(p["id"] for p in all_p_sess if p["name"]==sel_p_sess)
+                sess = sb_one("patient_sessions", filters={"patient_id": pid})
+                if sess:
+                    done = int(sess.get("sessions_done") or 0); total = int(sess.get("total_sessions") or 0)
+                    rem = max(0, total-done); pct = int((done/total*100)) if total>0 else 0
+                    cc1,cc2,cc3 = st.columns(3)
+                    cc1.metric("Total Sessions", total); cc2.metric("Done", done); cc3.metric("Remaining", rem)
+                    st.markdown(f'<div class="session-bar-wrap"><div class="session-bar-fill" style="width:{pct}%;"></div></div>', unsafe_allow_html=True)
+                    c1,c2 = st.columns(2)
+                    with c1:
+                        new_total = st.number_input("Total sessions", min_value=0, step=1, value=total, key="sess_total")
+                        new_done = st.number_input("Sessions done", min_value=0, step=1, value=done, key="sess_done")
+                    with c2:
+                        new_sess_notes = st.text_area("Notes", value=sess.get("notes","") or "", height=80, key="sess_notes")
+                    if st.button("Update", key="btn_update_sess"):
+                        sb_update("patient_sessions",{"total_sessions":new_total,"sessions_done":new_done,"notes":new_sess_notes},"id",sess["id"])
+                        play_ding(); st.success("Updated."); st.rerun()
+                else:
+                    st.info("No session plan yet.")
+                    c1,c2 = st.columns(2)
+                    with c1: new_total_s = st.number_input("Total sessions", min_value=1, step=1, value=10, key="new_sess_total")
+                    with c2: new_sess_n = st.text_area("Notes", height=80, key="new_sess_notes")
+                    if st.button("Create Plan", key="btn_create_sess"):
+                        sb_insert("patient_sessions",{"patient_id":pid,"total_sessions":new_total_s,"sessions_done":0,"notes":new_sess_n,"added_by":username,"created_at":today_str})
+                        play_ding(); st.success("Created."); st.rerun()
+
+    with t6:
+        section_label("Patient Subscriptions")
+        all_p_sub = sb_all("patients", order="name")
+        if all_p_sub:
+            sub_tabs = st.tabs(["Create","Manage"])
+            with sub_tabs[0]:
+                p_map_sub = {p["name"]: p["id"] for p in all_p_sub}
+                c1,c2 = st.columns(2)
+                with c1:
+                    sub_patient = st.selectbox("Patient", list(p_map_sub.keys()), key="sub_pat_sel")
+                    sub_plan = st.text_input("Plan name", key="sub_plan_name")
+                    sub_type = st.selectbox("Type", ["Monthly","Weekly","Custom (days)"], key="sub_plan_type")
+                with c2:
+                    sub_price = st.number_input("Price (IQD)", min_value=0.0, step=5000.0, key="sub_price")
+                    sub_sessions = st.number_input("Sessions (0=unlimited)", min_value=0, step=1, value=0, key="sub_sessions")
+                    sub_start = st.date_input("Start date", value=date.today(), key="sub_start")
+                    if sub_type == "Monthly": sub_end = sub_start + timedelta(days=30)
+                    elif sub_type == "Weekly": sub_end = sub_start + timedelta(days=7)
+                    else:
+                        sub_days = st.number_input("Days", min_value=1, step=1, value=30, key="sub_days")
+                        sub_end = sub_start + timedelta(days=int(sub_days))
+                    st.info(f"Expires: **{sub_end}**")
+                if st.button("Create & Print Receipt", key="btn_create_sub"):
+                    if sub_plan.strip() and sub_price > 0:
+                        sb_insert("patient_subscriptions",{"patient_id":p_map_sub[sub_patient],"plan_name":sub_plan.strip(),"plan_type":sub_type,"total_sessions":int(sub_sessions),"sessions_used":0,"price":sub_price,"start_date":str(sub_start),"end_date":str(sub_end),"status":"Active","added_by":username,"created_at":today_str})
+                        docs_for_sub = sb_all("doctors", order="name")
+                        doc_id_sub = docs_for_sub[0]["id"] if docs_for_sub else None
+                        if doc_id_sub:
+                            sb_insert("visits",{"patient_id":p_map_sub[sub_patient],"doctor_id":doc_id_sub,"service_id":None,"bundle_id":None,"visit_date":today_str,"base_price":sub_price,"discount_amount":0,"net_paid":sub_price,"payment_method":"Subscription","notes":f"Subscription: {sub_plan.strip()}","referred_by":None,"added_by":username})
+                        log_action(username,"Create Subscription",f"{sub_patient} | {fmt(sub_price)}")
+                        play_ding(); st.success("Created!")
+                        st.session_state.sub_rcpt = {"patient":sub_patient,"item":sub_plan,"base":sub_price,"disc":0.0,"net":sub_price,"method":"Subscription","date":today_str,"doctor":"—"}
+                if "sub_rcpt" in st.session_state: render_receipt(st.session_state.sub_rcpt, get_clinic_profile())
+            with sub_tabs[1]:
+                sm_search = st.text_input("Search", key="sm_search")
+                all_subs_pt = sb_all("patient_subscriptions", order="end_date")
+                pmap2 = {p["id"]: p["name"] for p in all_p_sub}
+                if sm_search: all_subs_pt = [s for s in all_subs_pt if sm_search.lower() in (pmap2.get(s.get("patient_id"),"")).lower()]
+                if all_subs_pt:
+                    rows_sub = []
+                    for s in all_subs_pt:
+                        pname = pmap2.get(s.get("patient_id"),"")
+                        total_s = int(s.get("total_sessions") or 0); used_s = int(s.get("sessions_used") or 0)
+                        rem_s = (total_s - used_s) if total_s>0 else "∞"
+                        rows_sub.append({"Patient":pname,"Plan":s.get("plan_name",""),"Type":s.get("plan_type",""),"Price":fmt(s.get("price")),"Sessions":f"{used_s}/{total_s if total_s>0 else '∞'}","Remaining":rem_s,"Start":s.get("start_date",""),"Expires":s.get("end_date",""),"Status":s.get("status",""),"id":s["id"]})
+                    st.dataframe(pd.DataFrame(rows_sub).drop(columns=["id"]), use_container_width=True, hide_index=True)
+                    sub_opts = {f"{r['Patient']} — {r['Plan']} (exp {r['Expires']})": r["id"] for r in rows_sub}
+                    chosen_sub = st.selectbox("Select", ["— select —"]+list(sub_opts.keys()), key="manage_sub_sel")
+                    if chosen_sub != "— select —":
+                        sid = sub_opts[chosen_sub]
+                        c1,c2,c3 = st.columns(3)
+                        with c1: new_sub_status = st.selectbox("Status",["Active","Expired","Cancelled"], key="sub_status_sel")
+                        with c2: new_sub_end = st.text_input("Extend end date", key="sub_end_edit")
+                        with c3: new_total_sub = st.number_input("Update total", min_value=0, step=1, key="sub_total_edit")
+                        if st.button("Update", key="btn_upd_sub"):
+                            upd = {"status": new_sub_status}
+                            if new_sub_end.strip(): upd["end_date"] = new_sub_end.strip()
+                            if new_total_sub > 0: upd["total_sessions"] = new_total_sub
+                            sb_update("patient_subscriptions", upd, "id", sid)
+                            play_ding(); st.success("Updated."); st.rerun()
+                        if st.button("Delete", type="primary", key="btn_del_sub"):
+                            sb_delete("patient_subscriptions","id",sid); st.rerun()
+
+    with t7:
+        section_label("Gym Check-in")
+        all_p_checkin = sb_all("patients", order="name")
+        active_subs_map = {}
+        for s in sb_all("patient_subscriptions", filters={"status":"Active"}):
+            active_subs_map.setdefault(s["patient_id"], []).append(s)
+        patients_with_sub = [p for p in all_p_checkin if p["id"] in active_subs_map]
+        if patients_with_sub:
+            ci_search = st.text_input("Search", key="ci_search")
+            filtered_ci = [p for p in patients_with_sub if not ci_search or ci_search.lower() in (p.get("name","")).lower()]
+            ci_patient = st.selectbox("Select", ["— select —"]+[p["name"] for p in filtered_ci], key="checkin_sel")
+            if ci_patient != "— select —":
+                pid_ci = next(p["id"] for p in filtered_ci if p["name"]==ci_patient)
+                subs_for_pat = active_subs_map[pid_ci]
+                for s in subs_for_pat:
+                    total_s = int(s.get("total_sessions") or 0); used_s = int(s.get("sessions_used") or 0)
+                    rem_s = (total_s - used_s) if total_s>0 else "∞"
+                    st.markdown(f'<div class="card" style="border-left:3px solid #C47649;"><strong>{s.get("plan_name","")}</strong> · Expires {s.get("end_date","")} · {used_s}/{total_s if total_s>0 else "∞"} · Remaining: {rem_s}</div>', unsafe_allow_html=True)
+                if st.button(f"Check In {ci_patient}", use_container_width=True, key="btn_checkin"):
+                    sub_to_use = subs_for_pat[0]
+                    new_used = int(sub_to_use.get("sessions_used") or 0) + 1
+                    sb_update("patient_subscriptions",{"sessions_used":new_used},"id",sub_to_use["id"])
+                    sb_insert("gym_checkins",{"subscription_id":sub_to_use["id"],"patient_id":pid_ci,"checkin_date":today_str,"added_by":username})
+                    log_action(username,"Gym Check-in",f"{ci_patient}")
+                    play_ding(); st.success(f"✓ Checked in!")
+        else: st.info("No patients with active subscriptions.")
+
+    with t8:
+        section_label("Visit History")
+        vh_search = st.text_input("Search", key="vh_search")
+        patients_all = sb_all("patients", order="name")
+        if vh_search: patients_all = [p for p in patients_all if vh_search.lower() in (p.get("name","")).lower()]
+        if patients_all:
+            lookup_p = st.selectbox("Select", ["— select —"]+[p["name"] for p in patients_all])
+            if lookup_p != "— select —":
+                pid = next(p["id"] for p in patients_all if p["name"]==lookup_p)
+                hist = get_visits_joined(limit=500, patient_id=pid)
+                if hist:
+                    total_spent = sum(h["Paid"] for h in hist)
+                    cc1,cc2 = st.columns(2); cc1.metric("Total visits", len(hist)); cc2.metric("Total spent", fmt(total_spent))
+                    df_hist = pd.DataFrame(hist)
+                    for col in ["Base","Discount","Paid"]:
+                        if col in df_hist.columns: df_hist[col] = df_hist[col].apply(fmt)
+                    st.dataframe(df_hist, use_container_width=True, hide_index=True)
+
+    with t9:
+        ed1, ed2 = st.tabs(["Delete","Edit"])
+        with ed1:
+            st.warning("⚠️ For corrections only.")
+            dv_search = st.text_input("Search", key="dv_search")
+            all_visits_j = get_visits_joined(limit=200)
+            if dv_search: all_visits_j = [v for v in all_visits_j if dv_search.lower() in v.get("Patient","").lower()]
+            if all_visits_j:
+                df_dv = pd.DataFrame(all_visits_j)
+                for col in ["Base","Discount","Paid"]:
+                    if col in df_dv.columns: df_dv[col] = df_dv[col].apply(fmt)
+                st.dataframe(df_dv, use_container_width=True, hide_index=True)
+                void_id = st.number_input("Visit ID to delete", min_value=1, step=1, key="void_id")
+                if st.button("Delete Visit", type="primary", key="btn_del_visit"):
+                    sb_delete("visits","id",void_id); play_ding(); st.success("Deleted."); st.rerun()
+        with ed2:
+            ev_search = st.text_input("Search", key="ev_search")
+            all_visits_j2 = get_visits_joined(limit=200)
+            if ev_search: all_visits_j2 = [v for v in all_visits_j2 if ev_search.lower() in v.get("Patient","").lower()]
+            if all_visits_j2:
+                visit_opts = {f"#{v['id']} · {v['Date']} · {v['Patient']} · {fmt(v['Paid'])}": v["id"] for v in all_visits_j2}
+                chosen_v = st.selectbox("Select", ["— select —"]+list(visit_opts.keys()), key="edit_v_sel")
+                if chosen_v != "— select —":
+                    vid = visit_opts[chosen_v]; visit_rec = sb_one("visits", filters={"id": vid})
+                    if visit_rec:
+                        c1,c2 = st.columns(2)
+                        with c1:
+                            new_v_date = st.text_input("Date", value=visit_rec.get("visit_date",""), key="ev_date")
+                            new_v_base = st.number_input("Base", min_value=0.0, step=1000.0, value=float(visit_rec.get("base_price") or 0), key="ev_base")
+                            new_v_disc = st.number_input("Discount", min_value=0.0, step=1000.0, value=float(visit_rec.get("discount_amount") or 0), key="ev_disc")
+                        with c2:
+                            new_v_paid = st.number_input("Paid", min_value=0.0, step=1000.0, value=float(visit_rec.get("net_paid") or 0), key="ev_paid")
+                            mopts = ["Cash","Card","Insurance","Transfer","Subscription"]
+                            cm = visit_rec.get("payment_method","Cash") or "Cash"
+                            new_v_method = st.selectbox("Payment", mopts, index=mopts.index(cm) if cm in mopts else 0, key="ev_method")
+                            new_v_notes = st.text_area("Notes", value=visit_rec.get("notes","") or "", height=80, key="ev_notes")
+                        if st.button("Save", key="btn_edit_visit"):
+                            sb_update("visits",{"visit_date":new_v_date,"base_price":new_v_base,"discount_amount":new_v_disc,"net_paid":new_v_paid,"payment_method":new_v_method,"notes":new_v_notes},"id",vid)
+                            play_ding(); st.success("Updated."); st.rerun()
+
+# ═══════════════════════════════════════════════
+# APPOINTMENTS
+# ═══════════════════════════════════════════════
+elif selected == "📅  Appointments":
+    page_header("Schedule", "Appointments", "Booking and management.")
+    ta1,ta2,ta3 = st.tabs(["Book","View All","Print Today"])
+    with ta1:
+        patients_db = sb_all("patients", order="name"); docs_db = sb_all("doctors", order="name")
+        if not patients_db or not docs_db: st.warning("Need at least one patient and one doctor.")
+        else:
+            p_map = {p["name"]: p["id"] for p in patients_db}; d_map = {d["name"]: d["id"] for d in docs_db}
+            c1,c2 = st.columns(2)
+            with c1: ap_patient = st.selectbox("Patient", list(p_map.keys())); ap_doctor = st.selectbox("Doctor", list(d_map.keys()))
+            with c2: ap_date = st.date_input("Date", value=date.today()); ap_time = st.time_input("Time"); ap_reason = st.text_input("Reason")
+            if st.button("Book Appointment"):
+                sb_insert("appointments",{"patient_id":p_map[ap_patient],"doctor_id":d_map[ap_doctor],"appt_date":str(ap_date),"appt_time":str(ap_time),"reason":ap_reason,"status":"Scheduled"})
+                log_action(username,"Book Appointment",f"{ap_patient} with {ap_doctor}")
+                play_ding(); st.success("Booked.")
+    with ta2:
+        ap_search = st.text_input("Search", key="ap_search")
+        all_appts = get_appointments_joined()
+        if ap_search: all_appts = [a for a in all_appts if ap_search.lower() in (a.get("Patient","")+" "+a.get("Doctor","")).lower()]
+        if all_appts:
+            st.dataframe(pd.DataFrame(all_appts), use_container_width=True, hide_index=True)
+            c1,c2 = st.columns(2)
+            with c1: upd_id = st.number_input("Appointment ID", min_value=1, step=1)
+            with c2: new_status = st.selectbox("Status", ["Scheduled","Completed","Cancelled","No-show"])
+            if st.button("Update Status"):
+                sb_update("appointments",{"status":new_status},"id",upd_id); play_ding(); st.success("Updated."); st.rerun()
+    with ta3:
+        today_appts_p = [a for a in get_appointments_joined() if a.get("Date")==today_str]
+        if today_appts_p:
+            cp = get_clinic_profile()
+            print_html = f'<div style="background:#FBF8F1;padding:32px;font-family:Inter,sans-serif;color:#1F2924;max-width:800px;border-radius:4px;border:1px solid #D8CFB8;"><div style="text-align:center;border-bottom:2px solid #C47649;padding-bottom:16px;margin-bottom:22px;"><h1 style="margin:0;font-family:Fraunces,serif;font-style:italic;color:#1F2924;font-weight:500;">{cp.get("clinic_name","Garden Clinic")}</h1><p style="margin:6px 0 0 0;color:#C47649;font-size:0.72rem;letter-spacing:0.25em;text-transform:uppercase;font-weight:600;">Daily Appointments</p><p style="margin:10px 0 0 0;font-weight:600;color:#1F2924;">{date.today().strftime("%A, %B %d, %Y")}</p></div><table style="width:100%;border-collapse:collapse;font-size:0.95rem;"><thead><tr style="background:#1F2924;color:#FBF8F1;"><th style="padding:12px;text-align:left;">Time</th><th style="padding:12px;text-align:left;">Patient</th><th style="padding:12px;text-align:left;">Doctor</th><th style="padding:12px;text-align:left;">Reason</th><th style="padding:12px;text-align:left;">Status</th></tr></thead><tbody>'
+            for a in today_appts_p:
+                print_html += f'<tr style="border-bottom:1px solid #E5DCC4;"><td style="padding:12px;">{a["Time"]}</td><td style="padding:12px;font-weight:600;font-family:Fraunces,serif;font-style:italic;">{a["Patient"]}</td><td style="padding:12px;">{a["Doctor"]}</td><td style="padding:12px;">{a.get("Reason","—")}</td><td style="padding:12px;">{a["Status"]}</td></tr>'
+            print_html += f'</tbody></table><p style="text-align:center;margin-top:22px;color:#8A7E60;font-size:0.8rem;font-style:italic;font-family:Fraunces,serif;">Total appointments: {len(today_appts_p)}</p></div>'
+            st.markdown(print_html, unsafe_allow_html=True)
+            st.info("💡 Press **Ctrl+P** to print or save as PDF.")
+        else: st.info("No appointments today.")
+
+# ═══════════════════════════════════════════════
+# ACCOUNTING
+# ═══════════════════════════════════════════════
+elif selected == "📊  Accounting":
+    page_header("Finance", "Accounting", "Revenue, expenses, and financial health.")
+    section_label("Date Range")
+    use_range = st.checkbox("Filter by date range", key="acc_use_range")
+    if use_range:
+        rc1,rc2 = st.columns(2)
+        with rc1: start_d = st.date_input("From", value=date.today().replace(day=1), key="acc_start")
+        with rc2: end_d = st.date_input("To", value=date.today(), key="acc_end")
+        g_, e_, c_, o_, n_, _ = get_financials(start=str(start_d), end=str(end_d))
+        st.info(f"**{start_d}** → **{end_d}**")
+    else:
+        g_, e_, c_, o_, n_ = gross_income, base_expenses, total_commissions, total_outflows, net_profit
+    pulse_bar([("Gross Revenue",fmt(g_)),("Total Expenses",fmt(o_)),("Net Profit",fmt(n_)),("Doctor Commissions",fmt(c_))])
+    cc1,cc2,cc3 = st.columns(3)
+    with cc1: st.markdown(card("Gross Revenue", fmt(g_),"green"), unsafe_allow_html=True)
+    with cc2: st.markdown(card("Total Outflows", fmt(o_),"red"), unsafe_allow_html=True)
+    with cc3: st.markdown(card("Net Profit", fmt(n_),"dark"), unsafe_allow_html=True)
+    ac1,ac2 = st.columns(2)
+    with ac1:
+        section_label("Expenses Breakdown")
+        payroll_total = sum(float(e.get("amount") or 0) for e in sb_all("expenses") if e.get("category")=="Payroll")
+        other_exp = e_ - payroll_total
+        if o_ > 0:
+            df_e = pd.DataFrame({"Category":["Other","Payroll","Commissions"],"Amount":[other_exp,payroll_total,c_]}).set_index("Category")
+            st.bar_chart(df_e, y="Amount", color="#C47649", height=240)
+    with ac2:
+        section_label("Daily Revenue")
+        all_v = sb_all("visits", order="visit_date")
+        if all_v:
+            df_v = pd.DataFrame([{"Date":v["visit_date"],"Revenue":float(v.get("net_paid") or 0)} for v in all_v])
+            st.line_chart(df_v.groupby("Date").sum(), y="Revenue", color="#4A6752", height=240)
+    ae1,ae2 = st.columns([3,2])
+    with ae1:
+        section_label("Expense Log")
+        exp_search = st.text_input("Search", key="exp_search")
+        filter_cat = st.selectbox("Category",["All","General","Payroll","Supplies","Utilities","Rent","Equipment","Marketing","Subscription","Other"], key="acc_filter_cat")
+        all_exp = sb_all("expenses", order="id", desc_order=True)
+        if filter_cat != "All": all_exp = [e for e in all_exp if e.get("category")==filter_cat]
+        if exp_search: all_exp = [e for e in all_exp if exp_search.lower() in (e.get("description","")).lower()]
+        if all_exp:
+            df_exp = pd.DataFrame([{"id":e["id"],"Date":e["date"],"Category":e.get("category",""),"Description":e["description"],"Amount":fmt(e.get("amount") or 0),"Added By":e.get("added_by","")} for e in all_exp])
+            st.dataframe(df_exp, use_container_width=True, hide_index=True)
+    with ae2:
+        section_label("Add Expense")
+        with st.form("expense_form"):
+            e_desc = st.text_input("Description"); e_cat = st.selectbox("Category",["General","Supplies","Utilities","Rent","Equipment","Marketing","Other"])
+            e_amt = st.number_input("Amount (IQD)", min_value=0.0, step=1000.0); e_date = st.date_input("Date", value=date.today())
+            if st.form_submit_button("Add Expense"):
+                if e_desc and e_amt > 0:
+                    sb_insert("expenses",{"description":e_desc,"category":e_cat,"amount":e_amt,"date":str(e_date),"added_by":username})
+                    log_action(username,"Add Expense",f"{e_desc} | {fmt(e_amt)}")
+                    play_ding(); st.success("Added."); st.rerun()
+    section_label("Edit / Delete Expense")
+    del_exp_list = sb_all("expenses", order="id", desc_order=True, limit=100)
+    if del_exp_list:
+        ed_exp_opts = {f"#{e['id']} · {e['date']} · {e['description']} · {fmt(e.get('amount') or 0)}": e["id"] for e in del_exp_list}
+        chosen_ed_exp = st.selectbox("Select", ["— select —"]+list(ed_exp_opts.keys()), key="ed_exp_sel")
+        if chosen_ed_exp != "— select —":
+            eid = ed_exp_opts[chosen_ed_exp]; exp_rec = sb_one("expenses", filters={"id": eid})
+            if exp_rec:
+                c1,c2,c3 = st.columns(3)
+                with c1: new_e_desc = st.text_input("Description", value=exp_rec.get("description",""), key="ee_desc")
+                with c2:
+                    cat_opts = ["General","Payroll","Supplies","Utilities","Rent","Equipment","Marketing","Subscription","Other"]
+                    cur_cat = exp_rec.get("category","General") or "General"
+                    new_e_cat = st.selectbox("Category", cat_opts, index=cat_opts.index(cur_cat) if cur_cat in cat_opts else 0, key="ee_cat")
+                with c3: new_e_amt = st.number_input("Amount", min_value=0.0, step=1000.0, value=float(exp_rec.get("amount") or 0), key="ee_amt")
+                cc1,cc2 = st.columns(2)
+                with cc1:
+                    if st.button("Save", key="btn_edit_exp"):
+                        sb_update("expenses",{"description":new_e_desc,"category":new_e_cat,"amount":new_e_amt},"id",eid)
+                        play_ding(); st.success("Updated."); st.rerun()
+                with cc2:
+                    if st.button("Delete", type="primary", key="btn_del_exp"):
+                        sb_delete("expenses","id",eid); play_ding(); st.success("Deleted."); st.rerun()
+    section_label("Referral Commissions This Month")
+    current_month = datetime.now().strftime("%Y-%m")
+    all_refs = sb_all("referrers", order="name")
+    if all_refs:
+        all_v_month = [v for v in sb_all("visits") if (v.get("visit_date") or "")[:7]==current_month]
+        ref_rows = []; total_ref_comm = 0.0
+        for ref in all_refs:
+            v_via = [v for v in all_v_month if v.get("referred_by")==ref["name"]]
+            rev = sum(float(v.get("net_paid") or 0) for v in v_via)
+            comm = rev*(float(ref.get("commission_rate") or 0)/100.0); total_ref_comm += comm
+            ref_rows.append({"Referrer":ref["name"],"Rate":f"{ref.get('commission_rate')}%","Visits":len(v_via),"Revenue":fmt(rev),"Due":fmt(comm)})
+        st.dataframe(pd.DataFrame(ref_rows), use_container_width=True, hide_index=True)
+        st.markdown(f"**Total: {fmt(total_ref_comm)}**")
+        if st.button("Mark Paid"):
+            if total_ref_comm > 0:
+                tag = f"Referral Commissions — {current_month}"
+                if not sb_exists("expenses","description",tag):
+                    sb_insert("expenses",{"description":tag,"category":"Marketing","amount":total_ref_comm,"date":f"{current_month}-01","added_by":username})
+                    play_ding(); st.success(f"Recorded."); st.rerun()
+    section_label("Export to Excel")
+    ex1,ex2,ex3,ex4 = st.columns(4)
+    with ex1:
+        all_v_exp = sb_all("visits", order="visit_date", desc_order=True)
+        if all_v_exp:
+            df_ev = pd.DataFrame([{"ID":v["id"],"Date":v["visit_date"],"Paid":v.get("net_paid",0),"Method":v.get("payment_method","")} for v in all_v_exp])
+            st.download_button("Visits", data=to_excel(df_ev), file_name=f"visits_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    with ex2:
+        all_e_exp = sb_all("expenses", order="date", desc_order=True)
+        if all_e_exp:
+            df_ee = pd.DataFrame([{"ID":e["id"],"Date":e["date"],"Description":e["description"],"Category":e.get("category",""),"Amount":e.get("amount",0)} for e in all_e_exp])
+            st.download_button("Expenses", data=to_excel(df_ee), file_name=f"expenses_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    with ex3:
+        all_p_exp = sb_all("patients", order="name")
+        if all_p_exp:
+            df_ep = pd.DataFrame([{"Name":p["name"],"Phone":p.get("phone",""),"Gender":p.get("gender",""),"DOB":p.get("date_of_birth","")} for p in all_p_exp])
+            st.download_button("Patients", data=to_excel(df_ep), file_name=f"patients_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    with ex4:
+        all_v_m = sb_all("visits")
+        if all_v_m:
+            df_em = pd.DataFrame([{"Month":v["visit_date"][:7],"Revenue":float(v.get("net_paid") or 0)} for v in all_v_m])
+            df_em = df_em.groupby("Month").agg(Revenue=("Revenue","sum"),Visits=("Revenue","count")).reset_index().sort_values("Month",ascending=False)
+            st.download_button("Monthly", data=to_excel(df_em), file_name=f"monthly_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
+# ═══════════════════════════════════════════════
+# REPORTS
+# ═══════════════════════════════════════════════
+elif selected == "📑  Reports":
+    page_header("Insights", "Reports", "Daily summary, top patients, services, and doctor monthly.")
+    rep_tabs = st.tabs(["Daily Report","Top Patients","Top Services","Doctor Monthly"])
+    with rep_tabs[0]:
+        rep_date = st.date_input("Date", value=date.today(), key="dr_date")
+        rep_date_str = str(rep_date)
+        day_visits = [v for v in sb_all("visits") if v.get("visit_date")==rep_date_str]
+        day_revenue = sum(float(v.get("net_paid") or 0) for v in day_visits)
+        day_expenses = sum(float(e.get("amount") or 0) for e in sb_all("expenses") if e.get("date")==rep_date_str)
+        unique_pat = len(set(v.get("patient_id") for v in day_visits))
+        mc1,mc2,mc3,mc4 = st.columns(4)
+        mc1.metric("Revenue", fmt(day_revenue))
+        mc2.metric("Visits", len(day_visits))
+        mc3.metric("Unique Patients", unique_pat)
+        mc4.metric("Expenses", fmt(day_expenses))
+        if day_visits:
+            section_label("Visits That Day")
+            patients_dr = {p["id"]: p["name"] for p in sb_all("patients")}
+            doctors_dr  = {d["id"]: d["name"] for d in sb_all("doctors")}
+            services_dr = {s["id"]: s["name"] for s in sb_all("services")}
+            bundles_dr  = {b["id"]: b["name"] for b in sb_all("bundles")}
+            rows_dr = []
+            for v in day_visits:
+                svc_d = services_dr.get(v.get("service_id"),""); bnd_d = bundles_dr.get(v.get("bundle_id"),"")
+                rows_dr.append({"Patient":patients_dr.get(v.get("patient_id"),""),"Doctor":doctors_dr.get(v.get("doctor_id"),""),"Item":svc_d if svc_d else (f"📦 {bnd_d}" if bnd_d else "—"),"Paid":fmt(v.get('net_paid') or 0),"Method":v.get("payment_method","")})
+            st.dataframe(pd.DataFrame(rows_dr), use_container_width=True, hide_index=True)
+    with rep_tabs[1]:
+        tp_period = st.selectbox("Period", ["This month","This year","All time"], key="tp_period")
+        all_v_tp = sb_all("visits")
+        if tp_period == "This month": cm = datetime.now().strftime("%Y-%m"); all_v_tp = [v for v in all_v_tp if (v.get("visit_date") or "")[:7]==cm]
+        elif tp_period == "This year": cy = datetime.now().strftime("%Y"); all_v_tp = [v for v in all_v_tp if (v.get("visit_date") or "")[:4]==cy]
+        patient_totals = {}
+        for v in all_v_tp:
+            pid = v.get("patient_id")
+            if pid:
+                if pid not in patient_totals: patient_totals[pid] = {"visits":0,"spent":0.0}
+                patient_totals[pid]["visits"] += 1
+                patient_totals[pid]["spent"] += float(v.get("net_paid") or 0)
+        patients_tp = {p["id"]: p["name"] for p in sb_all("patients")}
+        rows_tp = sorted([{"Patient":patients_tp.get(pid,""),"Visits":info["visits"],"Total Spent":info["spent"]} for pid,info in patient_totals.items()], key=lambda x: x["Total Spent"], reverse=True)
+        if rows_tp:
+            df_tp = pd.DataFrame(rows_tp[:20])
+            df_tp["Total Spent"] = df_tp["Total Spent"].apply(fmt)
+            st.dataframe(df_tp, use_container_width=True, hide_index=True)
+    with rep_tabs[2]:
+        ts_period = st.selectbox("Period", ["This month","This year","All time"], key="ts_period")
+        all_v_ts = sb_all("visits")
+        if ts_period == "This month": cm2 = datetime.now().strftime("%Y-%m"); all_v_ts = [v for v in all_v_ts if (v.get("visit_date") or "")[:7]==cm2]
+        elif ts_period == "This year": cy2 = datetime.now().strftime("%Y"); all_v_ts = [v for v in all_v_ts if (v.get("visit_date") or "")[:4]==cy2]
+        services_ts = {s["id"]: s["name"] for s in sb_all("services")}
+        bundles_ts  = {b["id"]: b["name"] for b in sb_all("bundles")}
+        svc_totals = {}
+        for v in all_v_ts:
+            sid = v.get("service_id"); bid = v.get("bundle_id")
+            item = services_ts.get(sid) if sid else (f"📦 {bundles_ts.get(bid,'')}" if bid else "Other")
+            if item not in svc_totals: svc_totals[item] = {"count":0,"revenue":0.0}
+            svc_totals[item]["count"] += 1
+            svc_totals[item]["revenue"] += float(v.get("net_paid") or 0)
+        rows_ts = sorted([{"Service":k,"Times Sold":v["count"],"Total Revenue":v["revenue"]} for k,v in svc_totals.items()], key=lambda x: x["Total Revenue"], reverse=True)
+        if rows_ts:
+            df_ts = pd.DataFrame(rows_ts)
+            df_ts["Total Revenue"] = df_ts["Total Revenue"].apply(fmt)
+            st.dataframe(df_ts, use_container_width=True, hide_index=True)
+    with rep_tabs[3]:
+        dm_month = st.text_input("Month (YYYY-MM)", value=datetime.now().strftime("%Y-%m"), key="dm_month")
+        all_v_dm = [v for v in sb_all("visits") if (v.get("visit_date") or "")[:7]==dm_month]
+        doctors_dm = sb_all("doctors", order="name")
+        all_tiers_dm = sb_all("doctor_commission_tiers")
+        rows_dm = []
+        for d in doctors_dm:
+            doc_v = [v for v in all_v_dm if v.get("doctor_id")==d["id"]]
+            rev = sum(float(v.get("net_paid") or 0) for v in doc_v)
+            all_doc_v = [v for v in sb_all("visits") if v.get("doctor_id")==d["id"]]
+            rate = get_doc_commission_rate(d["id"], len(all_doc_v), all_tiers_dm)
+            comm = rev * rate
+            rows_dm.append({"Doctor":d["name"],"Visits":len(doc_v),"Revenue":fmt(rev),"Rate":f"{rate*100:.1f}%","Commission":fmt(comm)})
+        if rows_dm: st.dataframe(pd.DataFrame(rows_dm), use_container_width=True, hide_index=True)
+
+# ═══════════════════════════════════════════════
+# RESEARCH
+# ═══════════════════════════════════════════════
+elif selected == "🔬  Research":
+    page_header("Outcomes", "Research", "Track patient outcomes for research and marketing.")
+    all_forms_r = sb_all("doctor_intake_form")
+    rp = st.selectbox("Period", ["All time","This year","This month","Custom"], key="research_period")
+    if rp == "All time": filtered_forms = all_forms_r
+    elif rp == "This year":
+        cy_r = datetime.now().strftime("%Y")
+        filtered_forms = [f for f in all_forms_r if (f.get("filled_date") or "")[:4]==cy_r]
+    elif rp == "This month":
+        cm_r = datetime.now().strftime("%Y-%m")
+        filtered_forms = [f for f in all_forms_r if (f.get("filled_date") or "")[:7]==cm_r]
+    else:
+        rc1,rc2 = st.columns(2)
+        with rc1: r_start = st.date_input("From", value=date.today().replace(month=1, day=1), key="r_start")
+        with rc2: r_end = st.date_input("To", value=date.today(), key="r_end")
+        filtered_forms = [f for f in all_forms_r if str(r_start) <= (f.get("filled_date") or "") <= str(r_end)]
+    total_treated = len(filtered_forms)
+    relieved = len([f for f in filtered_forms if f.get("outcome") == "Successfully Relieved"])
+    partial = len([f for f in filtered_forms if f.get("outcome") == "Partially Improved"])
+    no_improv = len([f for f in filtered_forms if f.get("outcome") == "No Improvement"])
+    pending = len([f for f in filtered_forms if f.get("outcome") in ["Pending", None, ""]])
+    success_rate = (relieved/total_treated*100) if total_treated>0 else 0
+    improvement_rate = ((relieved+partial)/total_treated*100) if total_treated>0 else 0
+    pulse_bar([("Total Patients",str(total_treated)),("Successfully Relieved",str(relieved)),("Success Rate",f"{success_rate:.1f}%"),("Improvement Rate",f"{improvement_rate:.1f}%")])
+    c1,c2,c3,c4 = st.columns(4)
+    with c1: st.markdown(card("Relieved", str(relieved), "green", f"{success_rate:.1f}% success"), unsafe_allow_html=True)
+    with c2: st.markdown(card("Improved", str(partial), "dark", "Partial recovery"), unsafe_allow_html=True)
+    with c3: st.markdown(card("No Improvement", str(no_improv), "red", "Need different approach"), unsafe_allow_html=True)
+    with c4: st.markdown(card("Pending", str(pending), "dark", "Still in treatment"), unsafe_allow_html=True)
+    section_label("Marketing Narrative")
+    narrative = ""
+    if total_treated > 0:
+        narrative = f"In this period, we successfully treated <strong>{total_treated} patients</strong>. Of those, <strong>{relieved} ({success_rate:.1f}%)</strong> experienced full pain relief, and <strong>{relieved+partial} ({improvement_rate:.1f}%)</strong> showed measurable improvement. This data reflects our commitment to evidence-based, results-driven physical therapy care."
+    st.markdown(f'<div class="card" style="padding:28px 32px;"><div style="font-family:Fraunces,serif;font-size:1.2rem;font-style:italic;color:#1F2924;line-height:1.7;">{narrative if narrative else "No data yet for this period."}</div></div>', unsafe_allow_html=True)
+    section_label("By Doctor")
+    doctors_r = sb_all("doctors", order="name")
+    rows_dr = []
+    for d in doctors_r:
+        d_forms = [f for f in filtered_forms if f.get("doctor_id")==d["id"]]
+        d_treated = len(d_forms)
+        d_relieved = len([f for f in d_forms if f.get("outcome")=="Successfully Relieved"])
+        d_rate = (d_relieved/d_treated*100) if d_treated>0 else 0
+        rows_dr.append({"Doctor":d["name"],"Patients":d_treated,"Relieved":d_relieved,"Success Rate":f"{d_rate:.1f}%"})
+    if rows_dr: st.dataframe(pd.DataFrame(rows_dr), use_container_width=True, hide_index=True)
+    section_label("By Body Area")
+    body_stats = {}
+    for f in filtered_forms:
+        area = f.get("body_area","") or "Unknown"
+        if area not in body_stats: body_stats[area] = {"total":0,"relieved":0,"pain_before":[],"pain_after":[]}
+        body_stats[area]["total"] += 1
+        if f.get("outcome")=="Successfully Relieved": body_stats[area]["relieved"] += 1
+        if f.get("pain_before") is not None: body_stats[area]["pain_before"].append(f.get("pain_before",0))
+        if f.get("pain_after") is not None: body_stats[area]["pain_after"].append(f.get("pain_after",0))
+    rows_ba = []
+    for k,v in body_stats.items():
+        avg_before = sum(v["pain_before"])/len(v["pain_before"]) if v["pain_before"] else 0
+        avg_after = sum(v["pain_after"])/len(v["pain_after"]) if v["pain_after"] else 0
+        rows_ba.append({"Body Area":k,"Cases":v["total"],"Relieved":v["relieved"],"Success Rate":f"{(v['relieved']/v['total']*100) if v['total']>0 else 0:.1f}%","Avg Pain Before":f"{avg_before:.1f}/10","Avg Pain After":f"{avg_after:.1f}/10"})
+    rows_ba = sorted(rows_ba, key=lambda x: x["Cases"], reverse=True)
+    if rows_ba: st.dataframe(pd.DataFrame(rows_ba), use_container_width=True, hide_index=True)
+    section_label("Export Research Data")
+    if filtered_forms:
+        patients_r_map = {p["id"]: p["name"] for p in sb_all("patients")}
+        doctors_r_map = {d["id"]: d["name"] for d in doctors_r}
+        df_research = pd.DataFrame([{"Date":f.get("filled_date",""),"Patient":patients_r_map.get(f.get("patient_id"),""),"Doctor":doctors_r_map.get(f.get("doctor_id"),""),"Body Area":f.get("body_area",""),"Problem":f.get("problem",""),"Pain Before":f.get("pain_before",0),"Pain After":f.get("pain_after",0),"Sessions":f.get("sessions_needed",0),"Outcome":f.get("outcome","Pending")} for f in filtered_forms])
+        st.download_button("Export to Excel", data=to_excel(df_research), file_name=f"research_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
+# ═══════════════════════════════════════════════
+# ACCOUNTS
+# ═══════════════════════════════════════════════
+elif selected == "👥  Accounts":
+    page_header("Users", "Accounts", "Manage user access and review activity logs.")
+    accounts = sb_all("users"); st.metric("Total accounts", len(accounts))
+    at1,at2 = st.tabs(["Profiles","Activity Log"])
+    with at1:
+        section_label("All Accounts")
+        doctors_acc_map = {d["id"]: d["name"] for d in sb_all("doctors")}
+        if accounts:
+            rows_acc = [{"id":u["id"],"username":u["username"],"role":u["role"],"Linked Doctor":doctors_acc_map.get(u.get("linked_doctor_id"),"—") if u.get("role")=="Doctor" else "—"} for u in accounts]
+            st.dataframe(pd.DataFrame(rows_acc), use_container_width=True, hide_index=True)
+            killable = ["— select —"]+[u["username"] for u in accounts if u["username"]!=username]
+            target_del = st.selectbox("Remove", killable, key="burn_user_select")
+            if st.button("Delete Account", type="primary", key="btn_del_account"):
+                if target_del != "— select —":
+                    sb_delete("users","username",target_del); play_ding(); st.success("Removed."); st.rerun()
+    with at2:
+        al_search = st.text_input("Search", key="al_search")
+        pf = ["All"]+[u["username"] for u in accounts]
+        chosen_user = st.selectbox("Filter by user", pf, key="acc_audit_user_filter")
+        audit_r = sb_all("audit_log", order="id", desc_order=True, limit=400)
+        if chosen_user != "All": audit_r = [r for r in audit_r if r.get("username")==chosen_user]
+        if al_search: audit_r = [r for r in audit_r if al_search.lower() in (r.get("action","")+" "+r.get("details","")).lower()]
+        if audit_r:
+            st.dataframe(pd.DataFrame([{"Time":r["timestamp"],"User":r["username"],"Action":r["action"],"Details":r.get("details","")} for r in audit_r]), use_container_width=True, hide_index=True)
+
+# ═══════════════════════════════════════════════
+# SETTINGS
+# ═══════════════════════════════════════════════
+elif selected == "⚙️  Settings":
+    page_header("Configure", "Settings", "Doctors, commissions, staff, services, and more.")
+    s1,s2,s3,s4,s5,s6,s7,s8 = st.tabs(["Doctors","Commission","Staff","Services","Bundles","Referrers","Subscriptions","Clinic Profile"])
+    with s1:
+        section_label("Add Doctor")
+        c1,c2 = st.columns(2)
+        with c1: d_name = st.text_input("Doctor name"); d_spec = st.text_input("Specialty")
+        if st.button("Add Doctor"):
+            if d_name.strip():
+                if sb_exists("doctors","name",d_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("doctors",{"name":d_name.strip(),"specialty":d_spec.strip(),"comm_type":"tiered","fixed_rate":0})
+                    play_ding(); st.success("Added."); st.rerun()
+        section_label("Current Doctors")
+        all_docs = sb_all("doctors", order="name")
+        if all_docs:
+            st.dataframe(pd.DataFrame(all_docs), use_container_width=True, hide_index=True)
+            del_doc = st.selectbox("Remove", ["— select —"]+[d["name"] for d in all_docs])
+            if st.button("Remove Doctor", type="primary"):
+                if del_doc != "— select —":
+                    doc_id = next(d["id"] for d in all_docs if d["name"]==del_doc)
+                    sb_delete("doctors","name",del_doc); sb_delete("doctor_commission_tiers","doctor_id",doc_id)
+                    play_ding(); st.success("Removed."); st.rerun()
+    with s2:
+        section_label("Commission Tiers Per Doctor")
+        st.info("Highest qualifying tier applies. E.g. 3% at 5+ visits, 7% at 15+.")
+        all_docs_t = sb_all("doctors", order="name")
+        if all_docs_t:
+            sel_doc_tier = st.selectbox("Select doctor", ["— select —"]+[d["name"] for d in all_docs_t], key="tier_doc_sel")
+            if sel_doc_tier != "— select —":
+                doc_id_t = next(d["id"] for d in all_docs_t if d["name"]==sel_doc_tier)
+                existing_tiers = sorted(sb_all("doctor_commission_tiers", filters={"doctor_id": doc_id_t}), key=lambda x: int(x.get("min_visits") or 0))
+                if existing_tiers:
+                    st.dataframe(pd.DataFrame([{"id":t["id"],"Min Visits":t["min_visits"],"Rate (%)":t["commission_rate"]} for t in existing_tiers]), use_container_width=True, hide_index=True)
+                    del_tier_id = st.number_input("Delete tier ID", min_value=1, step=1, key="del_tier_id")
+                    if st.button("Delete Tier", type="primary", key="btn_del_tier"):
+                        sb_delete("doctor_commission_tiers","id",del_tier_id); play_ding(); st.success("Deleted."); st.rerun()
+                c1,c2 = st.columns(2)
+                with c1: new_min = st.number_input("Min visits", min_value=1, step=1, value=10, key="tier_min")
+                with c2: new_rate = st.number_input("Rate (%)", min_value=0.0, max_value=100.0, step=0.5, value=3.0, key="tier_rate")
+                if st.button("Add Tier", key="btn_add_tier"):
+                    sb_insert("doctor_commission_tiers",{"doctor_id":doc_id_t,"min_visits":int(new_min),"commission_rate":new_rate})
+                    play_ding(); st.success("Added."); st.rerun()
+    with s3:
+        section_label("Add Staff")
+        c1,c2,c3 = st.columns(3)
+        with c1: emp_name = st.text_input("Name")
+        with c2: emp_role = st.text_input("Role")
+        with c3: emp_salary = st.number_input("Salary (IQD)", min_value=0.0, step=50000.0)
+        if st.button("Add Staff"):
+            if emp_name.strip() and emp_role.strip():
+                if sb_exists("employees","name",emp_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("employees",{"name":emp_name.strip(),"role":emp_role.strip(),"salary":emp_salary})
+                    play_ding(); st.success("Added."); st.rerun()
+        section_label("Current Staff")
+        all_emp = sb_all("employees", order="name")
+        if all_emp:
+            df_emp = pd.DataFrame([{"id":e["id"],"name":e["name"],"role":e.get("role",""),"salary":fmt(e.get("salary"))} for e in all_emp])
+            st.dataframe(df_emp, use_container_width=True, hide_index=True)
+            st.markdown(f"**Monthly payroll: {fmt(sum(float(e.get('salary') or 0) for e in all_emp))}**")
+            del_emp = st.selectbox("Remove", ["— select —"]+[e["name"] for e in all_emp])
+            if st.button("Remove Employee", type="primary"):
+                if del_emp != "— select —":
+                    sb_delete("employees","name",del_emp); play_ding(); st.success("Removed."); st.rerun()
+    with s4:
+        section_label("Add Service")
+        c1,c2,c3 = st.columns(3)
+        with c1: s_name = st.text_input("Service name")
+        with c2: s_cat = st.selectbox("Category",["General","Consultation","Procedure","Therapy","Diagnostic","Other"])
+        with c3: s_price = st.number_input("Price (IQD)", min_value=0.0, step=5000.0)
+        if st.button("Add Service"):
+            if s_name.strip():
+                if sb_exists("services","name",s_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("services",{"name":s_name.strip(),"category":s_cat,"price":s_price,"active":1})
+                    play_ding(); st.success("Added."); st.rerun()
+        section_label("Current Services")
+        all_svc = sb_all("services", order="name")
+        if all_svc:
+            df_svc = pd.DataFrame([{"id":s["id"],"name":s["name"],"category":s.get("category",""),"price":fmt(s.get("price"))} for s in all_svc])
+            st.dataframe(df_svc, use_container_width=True, hide_index=True)
+            del_svc = st.selectbox("Remove", ["— select —"]+[s["name"] for s in all_svc])
+            if st.button("Remove Service", type="primary"):
+                if del_svc != "— select —":
+                    sb_delete("services","name",del_svc); play_ding(); st.success("Removed."); st.rerun()
+    with s5:
+        section_label("Create Bundle")
+        c1,c2 = st.columns(2)
+        with c1: b_name = st.text_input("Bundle name"); b_price = st.number_input("Price (IQD)", min_value=0.0, step=10000.0)
+        with c2: b_desc = st.text_area("Description", height=90)
+        if st.button("Create Bundle"):
+            if b_name.strip() and b_price > 0:
+                if sb_exists("bundles","name",b_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("bundles",{"name":b_name.strip(),"price":b_price,"description":b_desc.strip()})
+                    play_ding(); st.success("Created."); st.rerun()
+        section_label("Current Bundles")
+        all_bundles = sb_all("bundles", order="name")
+        if all_bundles:
+            df_b = pd.DataFrame([{"id":b["id"],"name":b["name"],"price":fmt(b.get("price")),"description":b.get("description","")} for b in all_bundles])
+            st.dataframe(df_b, use_container_width=True, hide_index=True)
+            del_bnd = st.selectbox("Remove", ["— select —"]+[b["name"] for b in all_bundles])
+            if st.button("Remove Bundle", type="primary"):
+                if del_bnd != "— select —":
+                    sb_delete("bundles","name",del_bnd); play_ding(); st.success("Removed."); st.rerun()
+    with s6:
+        section_label("Add Referrer")
+        c1,c2 = st.columns(2)
+        with c1: ref_name = st.text_input("Name", key="ref_name_input"); ref_phone = st.text_input("Phone", key="ref_phone_input")
+        with c2: ref_rate = st.number_input("Commission (%)", min_value=0.0, max_value=100.0, step=1.0, value=10.0, key="ref_rate_input"); ref_notes = st.text_area("Notes", height=80, key="ref_notes_input")
+        if st.button("Add Referrer", key="btn_add_referrer"):
+            if ref_name.strip():
+                if sb_exists("referrers","name",ref_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("referrers",{"name":ref_name.strip(),"phone":ref_phone.strip(),"commission_rate":ref_rate,"notes":ref_notes.strip(),"added_by":username,"created_at":today_str})
+                    play_ding(); st.success("Added."); st.rerun()
+        section_label("Current Referrers")
+        all_refs = sb_all("referrers", order="name")
+        if all_refs:
+            st.dataframe(pd.DataFrame(all_refs), use_container_width=True, hide_index=True)
+            del_ref = st.selectbox("Remove", ["— select —"]+[r["name"] for r in all_refs], key="del_ref_select")
+            if st.button("Remove Referrer", type="primary", key="btn_del_referrer"):
+                if del_ref != "— select —":
+                    sb_delete("referrers","name",del_ref); play_ding(); st.success("Removed."); st.rerun()
+    with s7:
+        section_label("Add Monthly Subscription (Clinic Expense)")
+        c1,c2,c3 = st.columns(3)
+        with c1: sub_name = st.text_input("Name", key="sub_name_input"); sub_cat = st.selectbox("Category",["Subscription","Marketing","Software","Utilities","Other"], key="sub_cat_select")
+        with c2: sub_amount = st.number_input("Amount (IQD)", min_value=0.0, step=5000.0, key="sub_amount_input"); sub_day = st.number_input("Billing day", min_value=1, max_value=28, step=1, value=1, key="sub_day_input")
+        with c3: st.markdown("<br>", unsafe_allow_html=True); st.markdown("Auto-posts monthly.")
+        if st.button("Add Subscription", key="btn_add_subscription"):
+            if sub_name.strip() and sub_amount > 0:
+                if sb_exists("subscriptions","name",sub_name.strip()): st.error("Already exists.")
+                else:
+                    sb_insert("subscriptions",{"name":sub_name.strip(),"amount":sub_amount,"billing_day":int(sub_day),"category":sub_cat,"active":1,"added_by":username,"created_at":today_str})
+                    play_ding(); st.success("Added."); st.rerun()
+        section_label("Active Subscriptions")
+        all_subs = sb_all("subscriptions", order="name")
+        if all_subs:
+            df_s = pd.DataFrame([{"id":s["id"],"name":s["name"],"amount":fmt(s.get("amount")),"billing_day":s.get("billing_day",1),"category":s.get("category",""),"active":s.get("active",1)} for s in all_subs])
+            st.dataframe(df_s, use_container_width=True, hide_index=True)
+            st.markdown(f"**Total: {fmt(sum(float(s.get('amount') or 0) for s in all_subs if s.get('active')==1))}/month**")
+            c1,c2 = st.columns(2)
+            with c1:
+                toggle_sub = st.selectbox("Pause / activate", ["— select —"]+[s["name"] for s in all_subs], key="toggle_sub_select")
+                if st.button("Toggle", key="btn_toggle_sub"):
+                    if toggle_sub != "— select —":
+                        cur = next((s.get("active",1) for s in all_subs if s["name"]==toggle_sub),1)
+                        sb_update("subscriptions",{"active":0 if cur else 1},"name",toggle_sub)
+                        play_ding(); st.success("Toggled."); st.rerun()
+            with c2:
+                del_sub = st.selectbox("Remove", ["— select —"]+[s["name"] for s in all_subs], key="del_sub_select")
+                if st.button("Remove Subscription", type="primary", key="btn_del_subscription"):
+                    if del_sub != "— select —":
+                        sb_delete("subscriptions","name",del_sub); play_ding(); st.success("Removed."); st.rerun()
+    with s8:
+        section_label("Clinic Profile (Shown on Receipts)")
+        cp = get_clinic_profile()
+        c1,c2 = st.columns(2)
+        with c1:
+            cp_name = st.text_input("Clinic name", value=cp.get("clinic_name","Garden Clinic"), key="cp_name")
+            cp_tagline = st.text_input("Tagline", value=cp.get("tagline","Physical Therapy Center"), key="cp_tagline")
+            cp_phone = st.text_input("Phone", value=cp.get("phone","") or "", key="cp_phone")
+        with c2:
+            cp_address = st.text_input("Address", value=cp.get("address","") or "", key="cp_address")
+            cp_email = st.text_input("Email", value=cp.get("email","") or "", key="cp_email")
+        if st.button("Save Clinic Profile", key="btn_save_clinic"):
+            existing = sb_all("clinic_profile")
+            data = {"clinic_name":cp_name,"tagline":cp_tagline,"phone":cp_phone,"address":cp_address,"email":cp_email}
+            if existing: sb_update("clinic_profile",data,"id",existing[0]["id"])
+            else: sb_insert("clinic_profile",data)
+            play_ding(); st.success("Saved!"); st.rerun()
