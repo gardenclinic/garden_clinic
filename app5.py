@@ -415,6 +415,88 @@ def play_ding():
 def get_clinic_profile():
     rows = sb_all("clinic_profile")
     return rows[0] if rows else {"clinic_name": "Garden Clinic", "address": "", "phone": "", "email": "", "tagline": "Physical Therapy Center"}
+
+def patient_id_fmt(pid): return f"#{int(pid):04d}"
+
+def get_invoice_number():
+    all_v = sb_all("visits")
+    return f"INV-{date.today().year}-{(len(all_v)+1):04d}"
+
+def get_overdue_patients():
+    """Patients with remaining sessions but no visit in 14+ days"""
+    all_sessions = sb_all("patient_sessions")
+    all_patients = {p["id"]: p["name"] for p in sb_all("patients")}
+    all_visits = sb_all("visits", order="visit_date", desc_order=True)
+    cutoff = (date.today() - timedelta(days=14)).isoformat()
+    overdue = []
+    for s in all_sessions:
+        done = int(s.get("sessions_done") or 0)
+        total = int(s.get("total_sessions") or 0)
+        if total > 0 and done < total:
+            pid = s.get("patient_id")
+            last = next((v.get("visit_date","") for v in all_visits if v.get("patient_id")==pid), None)
+            if last and last < cutoff:
+                overdue.append({"name": all_patients.get(pid,"Unknown"), "remaining": total-done, "last_visit": last})
+    return overdue
+
+def render_discharge_summary(patient_name, patient_id, assessment, sessions_done, cp):
+    pain_before = assessment.get("pain_before", "—")
+    pain_after  = assessment.get("pain_after",  "—")
+    improvement = ""
+    try:
+        improvement = f"{int(pain_before) - int(pain_after)} point improvement"
+    except: pass
+    st.markdown(f"""<div style="background:#FFFFFF;border:1px solid #DDE8E1;border-radius:24px;padding:0;max-width:640px;overflow:hidden;box-shadow:0 20px 60px rgba(13,31,20,0.12);">
+        <div style="background:linear-gradient(135deg,#0D3D2B,#1A5C3E);padding:36px 40px;position:relative;overflow:hidden;">
+            <div style="position:absolute;top:-30px;right:-30px;width:150px;height:150px;background:radial-gradient(circle,rgba(201,168,76,0.2),transparent 70%);"></div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:600;font-style:italic;color:#FFFFFF;">{cp.get('clinic_name','Garden Clinic')}</div>
+            <div style="font-size:0.65rem;color:#C9A84C;letter-spacing:0.3em;text-transform:uppercase;font-weight:700;margin-top:6px;">Patient Discharge Summary</div>
+            <div style="width:40px;height:1px;background:rgba(201,168,76,0.5);margin:14px 0;"></div>
+            <div style="font-size:0.82rem;color:#9AB5A0;">Completed: {today_str}</div>
+        </div>
+        <div style="padding:32px 40px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+                <div><div style="font-size:0.65rem;color:#9AB5A0;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;">Patient</div>
+                    <div style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:600;font-style:italic;color:#0D1F14;margin-top:4px;">{patient_name}</div>
+                    <div style="font-size:0.8rem;color:#9AB5A0;">{patient_id_fmt(patient_id)}</div></div>
+                <div style="text-align:right;"><div style="font-size:0.65rem;color:#9AB5A0;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;">Outcome</div>
+                    <div style="font-size:1rem;font-weight:700;color:#1A7A4E;margin-top:4px;">{assessment.get("outcome","Completed")}</div></div>
+            </div>
+            <div style="background:#F2F5F1;border-radius:16px;padding:20px 24px;margin-bottom:18px;">
+                <div style="font-size:0.65rem;color:#6B8A72;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:10px;">Diagnosis</div>
+                <div style="font-size:0.95rem;color:#0D1F14;">{assessment.get("problem","—")}</div>
+                <div style="font-size:0.85rem;color:#6B8A72;margin-top:6px;">Body area: {assessment.get("body_area","—")} · Onset: {assessment.get("onset","—")}</div>
+            </div>
+            <div style="background:#F2F5F1;border-radius:16px;padding:20px 24px;margin-bottom:18px;">
+                <div style="font-size:0.65rem;color:#6B8A72;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:10px;">Treatment</div>
+                <div style="font-size:0.95rem;color:#0D1F14;">{assessment.get("treatment_plan","—")}</div>
+            </div>
+            <div style="display:flex;gap:16px;margin-bottom:18px;">
+                <div style="flex:1;background:#FDF8EC;border:1px solid rgba(201,168,76,0.2);border-radius:16px;padding:18px 20px;text-align:center;">
+                    <div style="font-size:0.65rem;color:#7B6020;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;">Pain Before</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:500;color:#7B6020;margin-top:6px;">{pain_before}/10</div>
+                </div>
+                <div style="flex:1;background:#EAF5EC;border:1px solid rgba(26,122,78,0.2);border-radius:16px;padding:18px 20px;text-align:center;">
+                    <div style="font-size:0.65rem;color:#1A7A4E;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;">Pain After</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:500;color:#1A7A4E;margin-top:6px;">{pain_after}/10</div>
+                </div>
+                <div style="flex:1;background:#0D3D2B;border-radius:16px;padding:18px 20px;text-align:center;">
+                    <div style="font-size:0.65rem;color:#6FCF97;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;">Improvement</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:500;color:#FFFFFF;margin-top:6px;">{improvement}</div>
+                </div>
+            </div>
+            <div style="background:#F2F5F1;border-radius:16px;padding:18px 24px;margin-bottom:24px;">
+                <div style="font-size:0.65rem;color:#6B8A72;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:6px;">Sessions Completed</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1.4rem;color:#0D1F14;">{sessions_done} sessions</div>
+                {f'<div style="font-size:0.85rem;color:#6B8A72;margin-top:4px;">Frequency: {assessment.get("frequency","—")}</div>' if assessment.get("frequency") else ''}
+            </div>
+            <div style="text-align:center;padding-top:20px;border-top:1px dashed #DDE8E1;">
+                {'<div style="font-size:0.78rem;color:#4A6B52;margin-bottom:4px;">📍 ' + cp.get('address','') + '</div>' if cp.get('address') else ''}
+                {'<div style="font-size:0.78rem;color:#4A6B52;">📞 ' + cp.get('phone','') + '</div>' if cp.get('phone') else ''}
+                <div style="font-size:0.75rem;color:#9AB5A0;margin-top:10px;font-style:italic;">We wish you continued health and wellness.</div>
+            </div>
+        </div>
+    </div>""", unsafe_allow_html=True)
 def to_excel(df):
     out = io.BytesIO()
     with pd.ExcelWriter(out, engine="openpyxl") as w: df.to_excel(w, index=False, sheet_name="Data")
@@ -432,6 +514,8 @@ def page_header(kicker, title, desc=""):
     st.markdown(f'<div class="page-header"><div class="kicker">{kicker}</div><h1>{title}</h1>{f"<p>{desc}</p>" if desc else ""}</div>', unsafe_allow_html=True)
 
 def render_receipt(r, cp):
+    inv = r.get("invoice", "")
+    inv_line = f"&nbsp;·&nbsp; {inv}" if inv else ""
     st.markdown(f"""<div class="receipt-wrap">
         <div class="receipt-header">
             <div class="receipt-leaf">❦</div>
@@ -440,9 +524,10 @@ def render_receipt(r, cp):
             <div class="receipt-clinic-sub">{cp.get('tagline','Physical Therapy Center')}</div>
         </div>
         <div class="receipt-body">
-            <div class="receipt-date-badge">OFFICIAL RECEIPT &nbsp;·&nbsp; {r['date']} &nbsp;·&nbsp; {datetime.now().strftime('%H:%M')}</div>
+            <div class="receipt-date-badge">OFFICIAL RECEIPT &nbsp;·&nbsp; {r['date']} &nbsp;·&nbsp; {datetime.now().strftime('%H:%M')}{inv_line}</div>
             <div class="receipt-section-title">Patient</div>
             <div class="receipt-row"><span>Name</span><span>{r['patient']}</span></div>
+            <div class="receipt-row"><span>Patient ID</span><span>{r.get('patient_id_fmt','—')}</span></div>
             <div class="receipt-row"><span>Doctor</span><span>{r['doctor']}</span></div>
             <hr class="receipt-divider">
             <div class="receipt-section-title">Service</div>
@@ -845,6 +930,18 @@ elif selected == "🖥️  Reception":
     page_header("Front Desk", "Reception", "Patient intake, checkout, and management.")
     pulse_bar([("Today's Revenue",fmt(today_revenue)),("Visits Today",str(today_visits_count)),("Total Patients",str(patient_count))])
 
+    # ── Today's appointments banner ──
+    today_appts_top = [a for a in get_appointments_joined() if a.get("Date")==today_str and a.get("Status")=="Scheduled"]
+    if today_appts_top:
+        names = " · ".join([f"**{a['Patient']}** @ {a['Time']}" for a in today_appts_top[:4]])
+        st.info(f"📅 **{len(today_appts_top)} appointment{'s' if len(today_appts_top)>1 else ''} today:** {names}")
+
+    # ── Overdue patients ──
+    overdue_list = get_overdue_patients()
+    for od in overdue_list:
+        st.warning(f"⏰ **{od['name']}** hasn't visited in 14+ days — still has **{od['remaining']} sessions remaining** (last visit: {od['last_visit']})")
+
+    # ── Expiring subscriptions ──
     all_pt_subs = sb_all("patient_subscriptions")
     expiring_rec = [s for s in all_pt_subs if s.get("status")=="Active" and s.get("end_date") in [today_str, tomorrow_str]]
     if expiring_rec:
@@ -852,6 +949,18 @@ elif selected == "🖥️  Reception":
         for s in expiring_rec:
             pname = patients_map_r.get(s.get("patient_id"),"Unknown")
             st.warning(f"⚠️ **{pname}** subscription **'{s.get('plan_name','')}'** expires {'TODAY' if s.get('end_date')==today_str else 'TOMORROW'}!")
+
+    # ── Quick phone search ──
+    quick_search = st.text_input("🔍 Quick search — name or phone number", placeholder="Type anything to find a patient instantly...", key="reception_quick_search")
+    if quick_search:
+        all_p_qs = sb_all("patients", order="name")
+        found = [p for p in all_p_qs if quick_search.lower() in (p.get("name","")).lower() or quick_search in (p.get("phone","") or "")]
+        if found:
+            for p in found[:5]:
+                visits_p = len([v for v in sb_all("visits", filters={"patient_id": p["id"]}) ])
+                st.markdown(f'<div class="card" style="padding:14px 20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.2rem;color:#0D1F14;">{p["name"]}</div><div style="font-size:0.8rem;color:#6B8A72;margin-top:2px;">{patient_id_fmt(p["id"])} · 📞 {p.get("phone","—")} · {p.get("gender","—")} · {visits_p} visits</div></div></div></div>', unsafe_allow_html=True)
+        else:
+            st.info("No patient found with that name or phone.")
 
     t1,t2,tD,tQ,t3,t4,t5,t6,t7,t8,t9 = st.tabs(["Checkout","Patients","Doctor Notes","Quick View","Register","Edit","Sessions","Subscriptions","Check-in","History","Edit/Delete"])
 
@@ -909,20 +1018,54 @@ elif selected == "🖥️  Reception":
                 elif base_price == 0.0: st.error("Please select a service or bundle.")
                 else:
                     disc_amt = base_price - final_due
+                    inv_num = get_invoice_number()
                     sb_insert("visits",{"patient_id":p_map[target_p],"doctor_id":d_map[chosen_doc],"service_id":srv_id,"bundle_id":bnd_id,"visit_date":today_str,"base_price":base_price,"discount_amount":disc_amt,"net_paid":final_due,"payment_method":payment_method,"notes":visit_notes,"referred_by":referred_by_val,"added_by":username})
                     todays_appts = sb_all("appointments", filters={"patient_id": p_map[target_p], "appt_date": today_str, "status": "Scheduled"})
                     for ap in todays_appts: sb_update("appointments", {"status": "Completed"}, "id", ap["id"])
                     sess = sb_one("patient_sessions", filters={"patient_id": p_map[target_p]})
+                    completed_all = False
                     if sess:
                         new_done = int(sess.get("sessions_done") or 0) + 1
                         sb_update("patient_sessions", {"sessions_done": new_done}, "id", sess["id"])
                         total_s = int(sess.get("total_sessions") or 0)
                         if total_s > 0 and new_done >= total_s:
                             st.balloons(); st.success(f"🎉 {target_p} has completed all {total_s} sessions!")
-                    log_action(username,"New Visit",f"Patient: {target_p} | Doctor: {chosen_doc} | Paid: {fmt(final_due)}")
-                    play_ding(); st.success("Visit saved.")
-                    st.session_state.rcpt = {"patient":target_p,"doctor":chosen_doc,"item":chosen_item_name,"base":base_price,"disc":disc_amt,"net":final_due,"method":payment_method,"date":today_str}
+                            completed_all = True
+                            st.session_state["discharge_pid"] = p_map[target_p]
+                            st.session_state["discharge_name"] = target_p
+                            st.session_state["discharge_done"] = new_done
+                    log_action(username,"New Visit",f"Patient: {target_p} | Doctor: {chosen_doc} | Paid: {fmt(final_due)} | {inv_num}")
+                    play_ding(); st.success(f"Visit saved · {inv_num}")
+                    st.session_state.rcpt = {"patient":target_p,"doctor":chosen_doc,"item":chosen_item_name,"base":base_price,"disc":disc_amt,"net":final_due,"method":payment_method,"date":today_str,"invoice":inv_num,"patient_id_fmt":patient_id_fmt(p_map[target_p])}
             if "rcpt" in st.session_state: render_receipt(st.session_state.rcpt, get_clinic_profile())
+
+            # ── Discharge summary ──
+            if "discharge_pid" in st.session_state:
+                assessment_dc = sb_one("doctor_intake_form", filters={"patient_id": st.session_state["discharge_pid"]})
+                if assessment_dc:
+                    st.markdown("---")
+                    section_label("🎓 Patient Discharge Summary")
+                    st.info("💡 Press **Ctrl+P** to print this discharge summary for the patient.")
+                    render_discharge_summary(st.session_state["discharge_name"], st.session_state["discharge_pid"], assessment_dc, st.session_state["discharge_done"], get_clinic_profile())
+
+            # ── Daily cash summary ──
+            st.markdown("---")
+            section_label("💰 Today's Payment Breakdown")
+            today_v = sb_all("visits", filters={"visit_date": today_str})
+            if today_v:
+                methods = {}
+                for v in today_v:
+                    m = v.get("payment_method","Cash") or "Cash"
+                    if m not in methods: methods[m] = {"count": 0, "total": 0.0}
+                    methods[m]["count"] += 1
+                    methods[m]["total"] += float(v.get("net_paid") or 0)
+                cols_cash = st.columns(len(methods))
+                icons = {"Cash":"💵","Card":"💳","Insurance":"🏥","Transfer":"🔁","Subscription":"📋"}
+                for i, (method, info) in enumerate(methods.items()):
+                    with cols_cash[i]:
+                        st.markdown(card(f"{icons.get(method,'💰')} {method}", fmt(info['total']), "dark", f"{info['count']} visit{'s' if info['count']>1 else ''}"), unsafe_allow_html=True)
+            else:
+                st.info("No visits yet today.")
 
     with t2:
         section_label("All Patients")
@@ -1015,9 +1158,11 @@ elif selected == "🖥️  Reception":
                 else:
                     sb_insert("patients",{"name":p_name.strip(),"phone":p_phone.strip(),"date_of_birth":p_dob.strip(),"gender":p_gender,"notes":p_notes.strip(),"created_at":today_str})
                     log_action(username,"New Patient",f"{p_name.strip()} | {p_gender}")
-                    play_ding(); st.success(f"Patient '{p_name}' registered.")
+                    new_pat = sb_one("patients", filters={"name": p_name.strip()})
+                    pid_new = new_pat["id"] if new_pat else 0
+                    play_ding(); st.success(f"✅ Patient '{p_name}' registered — ID: **{patient_id_fmt(pid_new)}**")
                     if give_receipt:
-                        st.session_state.intake_rcpt = {"patient":p_name.strip(),"doctor":"To be assigned","item":"Initial Intake","base":0,"disc":0,"net":0,"method":"—","date":today_str}
+                        st.session_state.intake_rcpt = {"patient":p_name.strip(),"doctor":"To be assigned","item":"Initial Intake","base":0,"disc":0,"net":0,"method":"—","date":today_str,"invoice":"","patient_id_fmt":patient_id_fmt(pid_new)}
         if "intake_rcpt" in st.session_state: render_receipt(st.session_state.intake_rcpt, get_clinic_profile())
 
     with t4:
