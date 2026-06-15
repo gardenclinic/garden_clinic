@@ -619,7 +619,52 @@ if selected == "🩺  Clinical Workspace":
                     section_label(f"Previous Assessments ({len(prev_forms)})")
                     for f in prev_forms[:3]:
                         outcome_class = "tag-success" if f.get("outcome")=="Successfully Relieved" else ("tag-condition" if f.get("outcome") in ["No Improvement","Patient Discontinued"] else "tag-pending")
-                        st.markdown(f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-family:Fraunces,serif;font-style:italic;font-size:1.1rem;color:#1F2924;">{f.get("filled_date","")}</div><span class="tag-pill {outcome_class}">{f.get("outcome","Pending")}</span></div><div style="font-size:0.88rem;color:#1F2924;margin-bottom:8px;"><strong style="color:#C47649;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Diagnosis</strong><br/>{f.get("problem","—")}</div><div style="font-size:0.88rem;color:#1F2924;margin-bottom:8px;"><strong style="color:#C47649;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Body Area</strong> <span style="color:#4A5A52;">{f.get("body_area","—")}</span> · <strong style="color:#C47649;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Pain</strong> <span style="color:#4A5A52;">{f.get("pain_before","—")}/10 → {f.get("pain_after","—")}/10</span></div><div style="font-size:0.85rem;color:#6B7A6F;"><strong style="color:#C47649;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Plan</strong><br/>{f.get("treatment_plan","—")}</div></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.1rem;color:#0D1F14;">{f.get("filled_date","")}</div><span class="tag-pill {outcome_class}">{f.get("outcome","Pending")}</span></div><div style="font-size:0.88rem;color:#0D1F14;margin-bottom:8px;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Diagnosis</strong><br/>{f.get("problem","—")}</div><div style="font-size:0.88rem;color:#0D1F14;margin-bottom:8px;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Body Area</strong> <span style="color:#4A6B52;">{f.get("body_area","—")}</span> · <strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Pain</strong> <span style="color:#4A6B52;">{f.get("pain_before","—")}/10 → {f.get("pain_after","—")}/10</span></div><div style="font-size:0.85rem;color:#6B8A72;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Plan</strong><br/>{f.get("treatment_plan","—")}</div></div>', unsafe_allow_html=True)
+                        if st.button(f"✏️ Edit this assessment", key=f"edit_btn_{f['id']}"):
+                            st.session_state[f"editing_form_{f['id']}"] = True
+                        if st.session_state.get(f"editing_form_{f['id']}"):
+                            with st.expander(f"✏️ Editing assessment from {f.get('filled_date','')}", expanded=True):
+                                ec1, ec2 = st.columns(2)
+                                with ec1:
+                                    e_complaint = st.text_input("Chief Complaint", value=f.get("chief_complaint","") or "", key=f"e_complaint_{f['id']}")
+                                    e_duration  = st.text_input("Duration", value=f.get("duration","") or "", key=f"e_duration_{f['id']}")
+                                    body_opts = ["— select —","Neck / Cervical","Upper back","Lower back / Lumbar","Shoulder","Elbow","Wrist / Hand","Hip","Knee","Ankle / Foot","Multiple areas","Other"]
+                                    cur_body = f.get("body_area","— select —") or "— select —"
+                                    e_body = st.selectbox("Body Area", body_opts, index=body_opts.index(cur_body) if cur_body in body_opts else 0, key=f"e_body_{f['id']}")
+                                    e_history = st.text_area("History", value=f.get("history","") or "", height=80, key=f"e_history_{f['id']}")
+                                with ec2:
+                                    e_problem  = st.text_area("Diagnosis", value=f.get("problem","") or "", height=80, key=f"e_problem_{f['id']}")
+                                    e_plan     = st.text_area("Treatment Plan", value=f.get("treatment_plan","") or "", height=80, key=f"e_plan_{f['id']}")
+                                    e_sessions = st.number_input("Sessions Needed", min_value=1, step=1, value=int(f.get("sessions_needed") or 10), key=f"e_sessions_{f['id']}")
+                                ep1, ep2 = st.columns(2)
+                                with ep1: e_pain_before = st.slider("Pain Before (0-10)", 0, 10, int(f.get("pain_before") or 0), key=f"e_pain_b_{f['id']}")
+                                with ep2: e_pain_after  = st.slider("Pain After (0-10)",  0, 10, int(f.get("pain_after") or 0),  key=f"e_pain_a_{f['id']}")
+                                outcome_opts = ["Pending","Full Recovery Expected","Partial Recovery Expected","Long-term Management","Successfully Relieved","Partially Improved","No Improvement","Patient Discontinued","Other"]
+                                cur_out = f.get("outcome","Pending") or "Pending"
+                                e_outcome = st.selectbox("Outcome", outcome_opts, index=outcome_opts.index(cur_out) if cur_out in outcome_opts else 0, key=f"e_outcome_{f['id']}")
+                                e_notes = st.text_area("Notes", value=f.get("notes","") or "", height=60, key=f"e_notes_{f['id']}")
+                                sc1, sc2 = st.columns(2)
+                                with sc1:
+                                    if st.button("💾 Save Changes", key=f"save_edit_{f['id']}", use_container_width=True):
+                                        sb_update("doctor_intake_form", {
+                                            "chief_complaint": e_complaint, "duration": e_duration,
+                                            "body_area": e_body if e_body != "— select —" else "",
+                                            "history": e_history, "problem": e_problem,
+                                            "treatment_plan": e_plan, "sessions_needed": int(e_sessions),
+                                            "pain_before": e_pain_before, "pain_after": e_pain_after,
+                                            "outcome": e_outcome, "notes": e_notes
+                                        }, "id", f["id"])
+                                        # Update session plan if sessions changed
+                                        existing_sess = sb_one("patient_sessions", filters={"patient_id": pid_doc})
+                                        if existing_sess:
+                                            sb_update("patient_sessions", {"total_sessions": int(e_sessions)}, "id", existing_sess["id"])
+                                        log_action(username, "Edit Assessment", f"#{f['id']} for {sel_pat_doc}")
+                                        del st.session_state[f"editing_form_{f['id']}"]
+                                        play_ding(); st.success("Assessment updated!"); st.rerun()
+                                with sc2:
+                                    if st.button("Cancel", key=f"cancel_edit_{f['id']}", use_container_width=True):
+                                        del st.session_state[f"editing_form_{f['id']}"]
+                                        st.rerun()
 
                 st.markdown('<div class="editorial-divider"><span>New Assessment</span></div>', unsafe_allow_html=True)
                 st.markdown('<div class="doctor-form-card">', unsafe_allow_html=True)
