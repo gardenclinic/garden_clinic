@@ -167,9 +167,9 @@ def fmt(amount):
 @st.cache_resource
 def get_sb(): return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
-@st.cache_data(ttl=10, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def _fetch_table(table):
-    """Fetch a whole table once and cache it for 10 seconds. Repeated reads are instant."""
+    """Fetch a whole table once and cache it for 60 seconds. Repeated reads are instant."""
     try: return get_sb().table(table).select("*").execute().data or []
     except: return []
 
@@ -414,7 +414,7 @@ def page_header(kicker, title, desc=""):
 def render_receipt(r, cp):
     inv = r.get("invoice", "")
     inv_line = f"&nbsp;·&nbsp; {inv}" if inv else ""
-    st.markdown(f"""<div class="receipt-wrap">
+    receipt_html = f"""<div class="receipt-wrap" id="printable-receipt">
         <div class="receipt-header">
             <div class="receipt-leaf">❦</div>
             <div class="receipt-clinic-name">{cp.get('clinic_name','Garden Clinic')}</div>
@@ -441,14 +441,57 @@ def render_receipt(r, cp):
                 {'<div class="receipt-footer-clinic">📞 ' + cp.get('phone','') + '</div>' if cp.get('phone') else ''}
                 {'<div class="receipt-footer-clinic">✉ ' + cp.get('email','') + '</div>' if cp.get('email') else ''}
                 <div class="receipt-footer-text" style="margin-top:14px;">Thank you for choosing {cp.get('clinic_name','Garden Clinic')}</div>
-                <div class="receipt-footer-text">We wish you a speedy recovery</div></div></div></div>""", unsafe_allow_html=True)
+                <div class="receipt-footer-text">We wish you a speedy recovery</div></div></div></div>"""
+    st.markdown(receipt_html, unsafe_allow_html=True)
+    # Print button — opens a clean print window with ONLY the receipt
+    receipt_js = receipt_html.replace("`", "\\`").replace("</div>", "</div>")
+    components.html(f"""
+    <style>
+    .print-btn {{ background:#0D3D2B; color:#FFF; border:none; border-radius:50px; font-weight:600; font-size:0.85rem; padding:12px 28px; font-family:'Plus Jakarta Sans',sans-serif; letter-spacing:0.02em; cursor:pointer; box-shadow:0 2px 10px rgba(13,61,43,0.2); transition:all 0.2s; margin-top:12px; }}
+    .print-btn:hover {{ background:#1A5C3E; transform:translateY(-2px); }}
+    </style>
+    <button class="print-btn" onclick="printReceipt()">🖨️ Print Receipt</button>
+    <script>
+    function printReceipt() {{
+        var fonts = '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">';
+        var styles = `
+        body {{ margin:0; padding:20px; display:flex; justify-content:center; background:#FFF; font-family:'Plus Jakarta Sans',sans-serif; }}
+        .receipt-wrap {{ background:#FFFFFF; border-radius:24px; max-width:440px; font-size:0.88rem; color:#0D1F14; border:1px solid #DDE8E1; overflow:hidden; }}
+        .receipt-header {{ background:linear-gradient(135deg,#0D3D2B 0%,#1A5C3E 60%,#0D3D2B 100%); padding:40px 28px 28px; text-align:center; }}
+        .receipt-leaf {{ font-size:1.2rem; color:#C9A84C; margin-bottom:8px; }}
+        .receipt-clinic-name {{ font-family:'Cormorant Garamond',serif; font-size:2rem; font-weight:600; color:#FFF; font-style:italic; margin:0; }}
+        .receipt-clinic-sub {{ font-size:0.65rem; color:#6FCF97; letter-spacing:0.32em; text-transform:uppercase; margin-top:10px; font-weight:700; }}
+        .receipt-gold-line {{ width:40px; height:2px; background:linear-gradient(90deg,transparent,#C9A84C,transparent); margin:12px auto; }}
+        .receipt-body {{ padding:28px 32px 32px; }}
+        .receipt-date-badge {{ background:#F2F5F1; border-radius:50px; padding:8px 16px; text-align:center; font-size:0.7rem; color:#4A6B52; font-weight:700; letter-spacing:0.1em; margin-bottom:24px; border:1px solid #DDE8E1; }}
+        .receipt-section-title {{ font-size:0.6rem; font-weight:700; color:#9AB5A0; text-transform:uppercase; letter-spacing:0.2em; margin:18px 0 10px; }}
+        .receipt-row {{ display:flex; justify-content:space-between; align-items:center; margin:9px 0; font-size:0.88rem; }}
+        .receipt-row span:first-child {{ color:#6B8A72; }} .receipt-row span:last-child {{ color:#0D1F14; font-weight:600; }}
+        .receipt-divider {{ border:none; border-top:1px dashed #DDE8E1; margin:18px 0; }}
+        .receipt-total-box {{ background:linear-gradient(135deg,#0D3D2B,#1A5C3E); border-radius:18px; padding:18px 22px; margin:20px 0; }}
+        .receipt-total-label {{ font-size:0.62rem; color:#6FCF97; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; }}
+        .receipt-total-amount {{ font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:500; color:#FFF; margin-top:4px; }}
+        .receipt-discount {{ color:#C0392B !important; }}
+        .receipt-footer-area {{ text-align:center; padding-top:12px; border-top:1px dashed #DDE8E1; margin-top:22px; }}
+        .receipt-footer-text {{ font-size:0.72rem; color:#9AB5A0; margin:4px 0; }}
+        .receipt-footer-clinic {{ font-size:0.75rem; color:#4A6B52; font-weight:600; margin-top:8px; }}
+        `;
+        var content = `{receipt_js}`;
+        var w = window.open('', '_blank', 'width=480,height=800');
+        w.document.write('<html><head><title>Receipt</title>' + fonts + '<style>' + styles + '</style></head><body>' + content + '</body></html>');
+        w.document.close();
+        setTimeout(function() {{ w.focus(); w.print(); }}, 600);
+    }}
+    </script>
+    """, height=70)
+
+
 
 def auto_payroll():
     month = datetime.now().strftime("%Y-%m"); tag = f"Monthly Payroll — {month}"
     if not sb_exists("expenses", "description", tag):
         total = sb_sum("employees", "salary")
         if total > 0: sb_insert("expenses", {"description": tag, "category": "Payroll", "amount": total, "date": f"{month}-01", "added_by": "System"})
-auto_payroll()
 
 def auto_subscriptions():
     month = datetime.now().strftime("%Y-%m")
@@ -457,7 +500,12 @@ def auto_subscriptions():
         if not sb_exists("expenses", "description", tag):
             day = int(sub.get("billing_day") or 1)
             sb_insert("expenses", {"description": tag, "category": "Subscription", "amount": float(sub["amount"]), "date": f"{month}-{day:02d}", "added_by": "System"})
-auto_subscriptions()
+
+# Run monthly auto-tasks only once per session (not on every page load) — big speed gain
+if "auto_tasks_done" not in st.session_state:
+    auto_payroll()
+    auto_subscriptions()
+    st.session_state.auto_tasks_done = True
 
 gross_income, base_expenses, total_commissions, total_outflows, net_profit, doc_visits = get_financials()
 today_str = date.today().isoformat()
