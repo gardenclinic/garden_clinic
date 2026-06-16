@@ -167,30 +167,39 @@ def fmt(amount):
 @st.cache_resource
 def get_sb(): return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
-def sb_all(table, filters=None, order=None, desc_order=False, limit=None):
-    try:
-        q = get_sb().table(table).select("*")
-        if filters:
-            for k, v in filters.items(): q = q.eq(k, v)
-        if order: q = q.order(order, desc=desc_order)
-        if limit: q = q.limit(limit)
-        return q.execute().data or []
+@st.cache_data(ttl=10, show_spinner=False)
+def _fetch_table(table):
+    """Fetch a whole table once and cache it for 10 seconds. Repeated reads are instant."""
+    try: return get_sb().table(table).select("*").execute().data or []
     except: return []
+
+def sb_all(table, filters=None, order=None, desc_order=False, limit=None):
+    rows = list(_fetch_table(table))
+    if filters:
+        for k, v in filters.items():
+            rows = [r for r in rows if r.get(k) == v]
+    if order:
+        rows = sorted(rows, key=lambda r: (r.get(order) is None, r.get(order)), reverse=desc_order)
+    if limit: rows = rows[:limit]
+    return rows
+
+def _clear_cache():
+    try: _fetch_table.clear()
+    except: pass
 
 def sb_one(table, filters):
     r = sb_all(table, filters=filters); return r[0] if r else None
 def sb_insert(table, data):
-    try: get_sb().table(table).insert(data).execute(); return True
+    try: get_sb().table(table).insert(data).execute(); _clear_cache(); return True
     except: return False
 def sb_delete(table, col, val):
-    try: get_sb().table(table).delete().eq(col, val).execute(); return True
+    try: get_sb().table(table).delete().eq(col, val).execute(); _clear_cache(); return True
     except: return False
 def sb_update(table, data, col, val):
-    try: get_sb().table(table).update(data).eq(col, val).execute(); return True
+    try: get_sb().table(table).update(data).eq(col, val).execute(); _clear_cache(); return True
     except: return False
 def sb_exists(table, col, val):
-    try: return len(get_sb().table(table).select("id").eq(col, val).execute().data) > 0
-    except: return False
+    return any(r.get(col) == val for r in sb_all(table))
 def sb_sum(table, col, filters=None): return sum(float(r.get(col) or 0) for r in sb_all(table, filters=filters))
 def sb_count(table, filters=None): return len(sb_all(table, filters=filters))
 
