@@ -411,7 +411,7 @@ def hash_password(pw): return hashlib.sha256(pw.encode()).hexdigest()
 def log_action(uname, action, details=""):
     sb_insert("audit_log", {"username": uname, "action": action, "details": details, "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
 def play_ding():
-    components.html("""<script>try{var c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(1100,c.currentTime);g.gain.setValueAtTime(0.18,c.currentTime);g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+0.45);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+0.45);}catch(e){}</script>""", height=0, width=0)
+    components.html("""<script>try{var c=new(window.AudioContext||window.webkitAudioContext)();function n(f,t,d){var o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(f,c.currentTime+t);g.gain.setValueAtTime(0.0001,c.currentTime+t);g.gain.exponentialRampToValueAtTime(0.16,c.currentTime+t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+t+d);o.connect(g);g.connect(c.destination);o.start(c.currentTime+t);o.stop(c.currentTime+t+d);}n(880,0,0.5);n(1318.5,0.13,0.55);}catch(e){}</script>""", height=0, width=0)
 def get_clinic_profile():
     rows = sb_all("clinic_profile")
     return rows[0] if rows else {"clinic_name": "Garden Clinic", "address": "", "phone": "", "email": "", "tagline": "Physical Therapy Center"}
