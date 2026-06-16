@@ -17,21 +17,24 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 *, *::before, *::after { box-sizing: border-box; }
-html, body, .stApp { background: linear-gradient(135deg, #0A1410 0%, #0D1F16 40%, #08120D 70%, #0A1812 100%) !important; color: #EAF2EC !important; font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important; }
+html, body, .stApp { background: linear-gradient(135deg, #03100B 0%, #062018 35%, #010A07 65%, #052016 100%) !important; color: #EAF2EC !important; font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important; }
 .stApp::before { content: ''; position: fixed; inset: -30%; z-index: 0; pointer-events: none; background:
-    radial-gradient(circle 560px at 8% 12%, rgba(26,92,62,0.55) 0%, transparent 52%),
-    radial-gradient(circle 500px at 92% 8%, rgba(201,168,76,0.42) 0%, transparent 52%),
-    radial-gradient(circle 660px at 85% 90%, rgba(13,61,43,0.6) 0%, transparent 52%),
-    radial-gradient(circle 520px at 15% 92%, rgba(40,120,80,0.4) 0%, transparent 52%),
-    radial-gradient(circle 460px at 50% 45%, rgba(201,168,76,0.22) 0%, transparent 58%);
-    filter: blur(55px); animation: floatOrbs 16s ease-in-out infinite alternate; }
-@keyframes floatOrbs { 0% { transform: translate(-4%,-2%) scale(1); } 25% { transform: translate(5%,3%) scale(1.12); } 50% { transform: translate(6%,-4%) scale(1.08); } 75% { transform: translate(-5%,4%) scale(1.14); } 100% { transform: translate(3%,-3%) scale(1.05); } }
+    radial-gradient(circle 600px at 5% 10%, rgba(16,120,90,0.7) 0%, transparent 50%),
+    radial-gradient(circle 520px at 95% 8%, rgba(201,168,76,0.32) 0%, transparent 48%),
+    radial-gradient(circle 700px at 90% 92%, rgba(20,150,110,0.6) 0%, transparent 50%),
+    radial-gradient(circle 540px at 12% 95%, rgba(12,90,68,0.6) 0%, transparent 50%),
+    radial-gradient(circle 480px at 55% 50%, rgba(16,120,90,0.4) 0%, transparent 55%);
+    filter: blur(60px); animation: floatOrbs 18s ease-in-out infinite alternate; }
+@keyframes floatOrbs { 0% { transform: translate(-5%,-3%) scale(1) rotate(0deg); } 25% { transform: translate(6%,4%) scale(1.14) rotate(2deg); } 50% { transform: translate(7%,-5%) scale(1.08) rotate(-1deg); } 75% { transform: translate(-6%,5%) scale(1.16) rotate(1deg); } 100% { transform: translate(4%,-4%) scale(1.06) rotate(0deg); } }
 .stApp::after { content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; background:
-    radial-gradient(circle 300px at 30% 70%, rgba(201,168,76,0.18) 0%, transparent 50%),
-    radial-gradient(circle 350px at 70% 30%, rgba(40,120,80,0.2) 0%, transparent 50%);
-    filter: blur(40px); animation: floatOrbs2 13s ease-in-out infinite alternate; }
-@keyframes floatOrbs2 { 0% { transform: translate(0,0); } 50% { transform: translate(-8%,6%); } 100% { transform: translate(7%,-5%); } }
+    radial-gradient(ellipse 700px 120px at 40% 30%, rgba(201,168,76,0.22) 0%, transparent 60%),
+    radial-gradient(ellipse 600px 100px at 65% 70%, rgba(232,200,112,0.18) 0%, transparent 60%),
+    radial-gradient(circle 300px at 25% 60%, rgba(20,150,110,0.3) 0%, transparent 50%);
+    filter: blur(45px); animation: floatGold 14s ease-in-out infinite alternate; }
+@keyframes floatGold { 0% { transform: translate(0,0) rotate(0deg); opacity:0.7; } 50% { transform: translate(-9%,7%) rotate(3deg); opacity:1; } 100% { transform: translate(8%,-6%) rotate(-2deg); opacity:0.8; } }
 [data-testid="stAppViewContainer"] { position: relative; z-index: 1; }
+.main .block-container { animation: pagefade 0.55s cubic-bezier(0.22,1,0.36,1); }
+@keyframes pagefade { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
 
 /* SIDEBAR — deep frosted glass */
 [data-testid="stSidebar"] { background: linear-gradient(180deg, rgba(13,61,43,0.55) 0%, rgba(10,46,32,0.62) 100%) !important; backdrop-filter: blur(60px) saturate(200%) !important; -webkit-backdrop-filter: blur(60px) saturate(200%) !important; border-right: 1px solid rgba(255,255,255,0.18) !important; min-width: 252px !important; box-shadow: inset -1px 0 1px rgba(255,255,255,0.1), 4px 0 40px rgba(13,61,43,0.15) !important; }
@@ -58,17 +61,18 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #EA
 .pulse-divider { width: 1px; background: rgba(201,168,76,0.25); height: 40px; align-self: center; }
 
 /* CARDS — liquid glass */
-.card { background: linear-gradient(135deg, rgba(20,40,30,0.55), rgba(10,25,18,0.45)); backdrop-filter: blur(40px) saturate(160%); -webkit-backdrop-filter: blur(40px) saturate(160%); border: 1px solid rgba(201,168,76,0.25); border-radius: 28px; padding: 24px 28px; margin-bottom: 18px; transition: all 0.5s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 12px 40px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.4), inset 0 -10px 30px rgba(0,0,0,0.2); position: relative; overflow: hidden; }
-.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%; background: linear-gradient(180deg, rgba(255,255,255,0.22), transparent); pointer-events: none; border-radius: 28px 28px 50% 50%; }
-.card::after { content: ''; position: absolute; top: -80%; left: -60%; width: 60%; height: 260%; background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.3) 50%, rgba(201,168,76,0.15) 55%, transparent 80%); transform: rotate(8deg); pointer-events: none; animation: cardShine 7s ease-in-out infinite; }
-@keyframes cardShine { 0% { left: -70%; } 55% { left: 140%; } 100% { left: 140%; } }
-.card:hover { background: linear-gradient(135deg, rgba(28,55,40,0.7), rgba(14,32,23,0.6)); border-color: rgba(201,168,76,0.5); box-shadow: 0 20px 56px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.5), 0 0 30px rgba(201,168,76,0.12); transform: translateY(-5px); }
-.card h3 { font-family: 'Plus Jakarta Sans', sans-serif !important; margin: 0 0 8px 0; font-size: 0.68rem; color: #C9A84C !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; position: relative; }
+.card { background: linear-gradient(135deg, rgba(10,50,38,0.6), rgba(4,22,16,0.5)); backdrop-filter: blur(40px) saturate(170%); -webkit-backdrop-filter: blur(40px) saturate(170%); border: 1px solid rgba(201,168,76,0.28); border-radius: 28px; padding: 24px 28px; margin-bottom: 18px; transition: all 0.5s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 12px 40px rgba(0,0,0,0.45), inset 0 1px 2px rgba(120,220,180,0.3), inset 0 -10px 30px rgba(0,0,0,0.25); position: relative; overflow: hidden; animation: cardRise 0.6s cubic-bezier(0.22,1,0.36,1) both; }
+@keyframes cardRise { 0% { opacity: 0; transform: translateY(18px) scale(0.98); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%; background: linear-gradient(180deg, rgba(120,220,180,0.16), transparent); pointer-events: none; border-radius: 28px 28px 50% 50%; }
+.card::after { content: ''; position: absolute; top: -80%; left: -60%; width: 60%; height: 260%; background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.28) 48%, rgba(201,168,76,0.35) 52%, transparent 78%); transform: rotate(8deg); pointer-events: none; animation: cardShine 7s ease-in-out infinite; }
+@keyframes cardShine { 0% { left: -70%; } 55% { left: 150%; } 100% { left: 150%; } }
+.card:hover { background: linear-gradient(135deg, rgba(16,72,54,0.72), rgba(6,30,22,0.62)); border-color: rgba(201,168,76,0.6); box-shadow: 0 22px 60px rgba(0,0,0,0.55), inset 0 1px 2px rgba(120,220,180,0.4), 0 0 36px rgba(201,168,76,0.18); transform: translateY(-6px) scale(1.01); }
+.card h3 { font-family: 'Plus Jakarta Sans', sans-serif !important; margin: 0 0 8px 0; font-size: 0.68rem; color: #D4B45C !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; position: relative; }
 .card .big-num { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 500; margin: 0; position: relative; }
-.card .big-num.green { color: #6FCF97; }
+.card .big-num.green { color: #2ECC8F; }
 .card .big-num.red { color: #FF8A7A; }
 .card .big-num.dark, .card .big-num.gold { color: #E8C870; }
-.card .sub { font-size: 0.78rem; color: #9DB5A6; margin-top: 8px; font-family: 'Plus Jakarta Sans', sans-serif; position: relative; }
+.card .sub { font-size: 0.78rem; color: #8FB8A6; margin-top: 8px; font-family: 'Plus Jakarta Sans', sans-serif; position: relative; }
 .card h3 { font-family: 'Plus Jakarta Sans', sans-serif !important; margin: 0 0 8px 0; font-size: 0.68rem; color: #2D5740 !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; position: relative; }
 .card .big-num { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 500; margin: 0; position: relative; }
 .card .big-num.green { color: #167346; }
@@ -77,17 +81,19 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #EA
 .card .sub { font-size: 0.78rem; color: #4A6B52; margin-top: 8px; font-family: 'Plus Jakarta Sans', sans-serif; position: relative; }
 
 /* TABS — liquid glass */
-.stTabs [data-baseweb="tab-list"] { background: rgba(255,255,255,0.28) !important; backdrop-filter: blur(44px) saturate(180%) !important; -webkit-backdrop-filter: blur(44px) saturate(180%) !important; border-radius: 26px !important; padding: 7px !important; border: 1px solid rgba(255,255,255,0.5) !important; gap: 4px !important; margin-bottom: 24px !important; box-shadow: inset 0 1px 2px rgba(255,255,255,0.75), 0 8px 24px rgba(13,31,20,0.08) !important; }
+.stTabs [data-baseweb="tab-list"] { background: linear-gradient(135deg, rgba(10,50,38,0.45), rgba(4,22,16,0.4)) !important; backdrop-filter: blur(44px) saturate(180%) !important; -webkit-backdrop-filter: blur(44px) saturate(180%) !important; border-radius: 26px !important; padding: 7px !important; border: 1px solid rgba(201,168,76,0.22) !important; gap: 4px !important; margin-bottom: 24px !important; box-shadow: inset 0 1px 2px rgba(120,220,180,0.18), 0 8px 24px rgba(0,0,0,0.3) !important; }
 .stTabs button[data-baseweb="tab"] { background: transparent !important; border: none !important; color: #9DB5A6 !important; font-size: 0.82rem !important; font-weight: 600 !important; padding: 9px 18px !important; border-radius: 16px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; transition: all 0.25s !important; }
 .stTabs button[data-baseweb="tab"]:hover { background: rgba(255,255,255,0.12) !important; color: #FFFFFF !important; }
-.stTabs button[aria-selected="true"] { background: rgba(255,255,255,0.85) !important; backdrop-filter: blur(20px) saturate(200%) !important; color: #0D3D2B !important; font-weight: 700 !important; border: 1px solid rgba(255,255,255,0.9) !important; box-shadow: 0 4px 14px rgba(13,61,43,0.15), inset 0 1px 2px rgba(255,255,255,1) !important; }
+.stTabs button[aria-selected="true"] { background: linear-gradient(135deg, rgba(22,120,88,0.85), rgba(12,56,42,0.7)) !important; backdrop-filter: blur(20px) saturate(200%) !important; color: #F0E6C8 !important; font-weight: 700 !important; border: 1px solid rgba(201,168,76,0.6) !important; box-shadow: 0 4px 16px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.4), 0 0 18px rgba(201,168,76,0.18) !important; }
 
-/* BUTTONS — Apple liquid glass (bright white frosted) */
-.stButton > button { background: rgba(255,255,255,0.55) !important; backdrop-filter: blur(30px) saturate(200%) !important; -webkit-backdrop-filter: blur(30px) saturate(200%) !important; color: #0A2E20 !important; border: 1px solid rgba(255,255,255,0.7) !important; border-radius: 50px !important; font-weight: 700 !important; font-size: 0.85rem !important; padding: 13px 30px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.01em !important; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1) !important; box-shadow: 0 8px 24px rgba(13,61,43,0.12), inset 0 1px 2px rgba(255,255,255,0.9), inset 0 -3px 8px rgba(13,61,43,0.04) !important; }
-.stButton > button:hover { background: rgba(255,255,255,0.8) !important; color: #0D3D2B !important; transform: translateY(-2px) scale(1.02) !important; box-shadow: 0 14px 36px rgba(13,61,43,0.18), inset 0 1px 2px rgba(255,255,255,1) !important; }
-.stButton > button:active { transform: scale(0.97) !important; }
-button[data-testid="baseButton-primary"] { background: rgba(192,57,43,0.85) !important; color: #FFFFFF !important; border: 1px solid rgba(255,255,255,0.4) !important; box-shadow: 0 8px 24px rgba(192,57,43,0.28), inset 0 1px 2px rgba(255,255,255,0.5) !important; }
-button[data-testid="baseButton-primary"]:hover { background: rgba(169,50,38,0.92) !important; color: #FFFFFF !important; }
+/* BUTTONS — emerald glass with rich motion */
+.stButton > button { background: linear-gradient(135deg, rgba(16,90,66,0.7), rgba(8,40,30,0.6)) !important; backdrop-filter: blur(24px) saturate(180%) !important; -webkit-backdrop-filter: blur(24px) saturate(180%) !important; color: #F0E6C8 !important; border: 1px solid rgba(201,168,76,0.45) !important; border-radius: 50px !important; font-weight: 700 !important; font-size: 0.85rem !important; padding: 13px 30px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.02em !important; transition: transform 0.25s cubic-bezier(0.34,1.8,0.5,1), background 0.3s, box-shadow 0.3s !important; box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.35), inset 0 -3px 10px rgba(0,0,0,0.2) !important; position: relative !important; overflow: hidden !important; }
+.stButton > button::after { content: ''; position: absolute; top: -100%; left: -60%; width: 50%; height: 300%; background: linear-gradient(115deg, transparent, rgba(255,255,255,0.3), rgba(201,168,76,0.2), transparent); transform: rotate(10deg); pointer-events: none; transition: left 0.6s ease; }
+.stButton > button:hover { background: linear-gradient(135deg, rgba(22,120,88,0.85), rgba(12,56,42,0.72)) !important; color: #FFFFFF !important; border-color: rgba(201,168,76,0.8) !important; transform: translateY(-3px) scale(1.03) !important; box-shadow: 0 16px 40px rgba(0,0,0,0.45), inset 0 1px 2px rgba(120,220,180,0.5), 0 0 28px rgba(201,168,76,0.25) !important; }
+.stButton > button:hover::after { left: 140%; }
+.stButton > button:active { transform: scale(0.94) translateY(0) !important; transition: transform 0.1s !important; }
+button[data-testid="baseButton-primary"] { background: linear-gradient(135deg, rgba(192,57,43,0.8), rgba(120,30,22,0.7)) !important; color: #FFEEEA !important; border: 1px solid rgba(255,180,160,0.4) !important; box-shadow: 0 8px 24px rgba(192,57,43,0.3), inset 0 1px 2px rgba(255,255,255,0.4) !important; }
+button[data-testid="baseButton-primary"]:hover { background: linear-gradient(135deg, rgba(210,70,55,0.9), rgba(140,40,30,0.78)) !important; color: #FFFFFF !important; }
 
 /* INPUTS — dark frosted glass */
 .stTextInput > div > div > input, .stNumberInput > div > div > input, .stDateInput > div > div > input { background: rgba(255,255,255,0.08) !important; backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important; border-radius: 16px !important; border: 1px solid rgba(201,168,76,0.3) !important; font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.9rem !important; color: #EAF2EC !important; padding: 12px 16px !important; transition: all 0.25s !important; box-shadow: inset 0 1px 2px rgba(255,255,255,0.1) !important; }
@@ -110,8 +116,8 @@ label, .stRadio label span, .stCheckbox label { color: #EAF2EC !important; }
 .stInfo > div { background: rgba(234,245,240,0.7) !important; backdrop-filter: blur(16px) !important; border: 1px solid rgba(26,92,62,0.35) !important; color: #145A38 !important; border-radius: 18px !important; }
 
 /* SECTION LABEL */
-.section-label { font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.68rem; font-weight: 700; color: #1A5C3E; text-transform: uppercase; letter-spacing: 0.22em; margin: 28px 0 16px; display: flex; align-items: center; gap: 10px; }
-.section-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(26,92,62,0.3), transparent); }
+.section-label { font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.68rem; font-weight: 700; color: #D4B45C; text-transform: uppercase; letter-spacing: 0.22em; margin: 28px 0 16px; display: flex; align-items: center; gap: 10px; }
+.section-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(201,168,76,0.4), transparent); }
 
 /* METRICS — liquid glass */
 [data-testid="stMetric"] { background: linear-gradient(135deg, rgba(20,40,30,0.55), rgba(10,25,18,0.45)) !important; backdrop-filter: blur(30px) saturate(160%) !important; -webkit-backdrop-filter: blur(30px) saturate(160%) !important; border: 1px solid rgba(201,168,76,0.3) !important; border-radius: 22px !important; padding: 20px 24px !important; box-shadow: 0 10px 32px rgba(0,0,0,0.35), inset 0 1px 2px rgba(255,255,255,0.35) !important; }
