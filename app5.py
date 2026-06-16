@@ -17,13 +17,20 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 *, *::before, *::after { box-sizing: border-box; }
-html, body, .stApp { background: #E8F0EA !important; color: #0D1F14 !important; font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important; }
-.stApp::before { content: ''; position: fixed; inset: 0; background: radial-gradient(ellipse 600px 500px at 12% 18%, rgba(26,92,62,0.18) 0%, transparent 60%), radial-gradient(ellipse 500px 400px at 88% 12%, rgba(201,168,76,0.15) 0%, transparent 55%), radial-gradient(ellipse 700px 600px at 75% 88%, rgba(13,61,43,0.16) 0%, transparent 60%), radial-gradient(ellipse 450px 400px at 25% 92%, rgba(111,207,151,0.12) 0%, transparent 55%); pointer-events: none; z-index: 0; }
+html, body, .stApp { background: linear-gradient(135deg, #DCEAE0 0%, #CFE3D6 40%, #E2EFD9 100%) !important; color: #0D1F14 !important; font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important; }
+.stApp::before { content: ''; position: fixed; inset: -20%; z-index: 0; pointer-events: none; background:
+    radial-gradient(circle 520px at 10% 15%, rgba(26,92,62,0.55) 0%, transparent 55%),
+    radial-gradient(circle 460px at 90% 10%, rgba(201,168,76,0.5) 0%, transparent 55%),
+    radial-gradient(circle 600px at 80% 85%, rgba(13,61,43,0.55) 0%, transparent 55%),
+    radial-gradient(circle 480px at 18% 90%, rgba(72,187,120,0.45) 0%, transparent 55%),
+    radial-gradient(circle 420px at 50% 50%, rgba(111,207,151,0.35) 0%, transparent 60%);
+    filter: blur(40px); animation: floatOrbs 18s ease-in-out infinite alternate; }
+@keyframes floatOrbs { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(3%,-2%) scale(1.08); } 100% { transform: translate(-3%,3%) scale(1.04); } }
 [data-testid="stAppViewContainer"] { position: relative; z-index: 1; }
 
-/* SIDEBAR — frosted glass */
-[data-testid="stSidebar"] { background: linear-gradient(180deg, rgba(13,61,43,0.82) 0%, rgba(10,46,32,0.88) 100%) !important; backdrop-filter: blur(40px) saturate(160%) !important; -webkit-backdrop-filter: blur(40px) saturate(160%) !important; border-right: 1px solid rgba(255,255,255,0.12) !important; min-width: 252px !important; }
-[data-testid="stSidebar"] * { color: #E4F2E9 !important; font-family: 'Plus Jakarta Sans', sans-serif !important; }
+/* SIDEBAR — deep frosted glass */
+[data-testid="stSidebar"] { background: linear-gradient(180deg, rgba(13,61,43,0.55) 0%, rgba(10,46,32,0.62) 100%) !important; backdrop-filter: blur(60px) saturate(200%) !important; -webkit-backdrop-filter: blur(60px) saturate(200%) !important; border-right: 1px solid rgba(255,255,255,0.18) !important; min-width: 252px !important; box-shadow: inset -1px 0 1px rgba(255,255,255,0.1), 4px 0 40px rgba(13,61,43,0.15) !important; }
+[data-testid="stSidebar"] * { color: #EAF5EE !important; font-family: 'Plus Jakarta Sans', sans-serif !important; }
 section[data-testid="stSidebarNav"] { display: none; }
 
 /* TYPOGRAPHY */
@@ -36,26 +43,30 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #0D
 .page-header p { font-size: 0.9rem; color: #6B8A72; margin: 8px 0 0 0; font-weight: 400; }
 
 /* PULSE BAR — liquid glass */
-.pulse-bar { background: linear-gradient(135deg, rgba(13,61,43,0.55) 0%, rgba(26,92,62,0.45) 100%); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); border: 1px solid rgba(255,255,255,0.18); border-radius: 28px; padding: 22px 32px; display: flex; gap: 44px; flex-wrap: wrap; align-items: center; margin-bottom: 32px; box-shadow: 0 8px 32px rgba(13,61,43,0.25), inset 0 1px 1px rgba(255,255,255,0.25); position: relative; overflow: hidden; }
-.pulse-bar::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%; background: linear-gradient(180deg, rgba(255,255,255,0.15), transparent); pointer-events: none; }
+.pulse-bar { background: linear-gradient(135deg, rgba(13,61,43,0.30) 0%, rgba(26,92,62,0.20) 100%); backdrop-filter: blur(55px) saturate(200%); -webkit-backdrop-filter: blur(55px) saturate(200%); border: 1px solid rgba(255,255,255,0.4); border-radius: 32px; padding: 24px 34px; display: flex; gap: 44px; flex-wrap: wrap; align-items: center; margin-bottom: 32px; box-shadow: 0 14px 44px rgba(13,61,43,0.18), inset 0 1px 2px rgba(255,255,255,0.7), inset 0 -12px 32px rgba(13,61,43,0.08); position: relative; overflow: hidden; }
+.pulse-bar::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 55%; background: linear-gradient(180deg, rgba(255,255,255,0.4), transparent); pointer-events: none; }
+.pulse-bar::after { content: ''; position: absolute; top: -50%; left: -30%; width: 60%; height: 200%; background: linear-gradient(115deg, transparent, rgba(255,255,255,0.25), transparent); transform: rotate(8deg); pointer-events: none; animation: shimmer 6s ease-in-out infinite; }
+@keyframes shimmer { 0%, 100% { left: -40%; } 50% { left: 110%; } }
 .pulse-stat { display: flex; flex-direction: column; position: relative; }
-.pulse-label { font-size: 0.65rem; color: #A8E6C0; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; font-family: 'Plus Jakarta Sans', sans-serif; }
-.pulse-value { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 500; color: #FFFFFF; margin-top: 4px; letter-spacing: -0.02em; }
-.pulse-divider { width: 1px; background: rgba(255,255,255,0.18); height: 40px; align-self: center; }
+.pulse-label { font-size: 0.65rem; color: #15543A; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; font-family: 'Plus Jakarta Sans', sans-serif; }
+.pulse-value { font-family: 'JetBrains Mono', monospace; font-size: 1.55rem; font-weight: 600; color: #08251A; margin-top: 4px; letter-spacing: -0.02em; }
+.pulse-divider { width: 1px; background: rgba(13,61,43,0.18); height: 40px; align-self: center; }
 
 /* CARDS — liquid glass */
-.card { background: rgba(255,255,255,0.55); backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%); border: 1px solid rgba(255,255,255,0.6); border-radius: 24px; padding: 24px 26px; margin-bottom: 18px; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 8px 32px rgba(13,31,20,0.08), inset 0 1px 1px rgba(255,255,255,0.7); position: relative; overflow: hidden; }
-.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 40%; background: linear-gradient(180deg, rgba(255,255,255,0.4), transparent); pointer-events: none; }
-.card:hover { background: rgba(255,255,255,0.72); box-shadow: 0 12px 40px rgba(13,61,43,0.14), inset 0 1px 1px rgba(255,255,255,0.8); transform: translateY(-3px); }
-.card h3 { font-family: 'Plus Jakarta Sans', sans-serif !important; margin: 0 0 8px 0; font-size: 0.68rem; color: #4A6B52 !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; position: relative; }
+.card { background: rgba(255,255,255,0.32); backdrop-filter: blur(44px) saturate(180%); -webkit-backdrop-filter: blur(44px) saturate(180%); border: 1px solid rgba(255,255,255,0.5); border-radius: 28px; padding: 24px 28px; margin-bottom: 18px; transition: all 0.4s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 14px 44px rgba(13,31,20,0.1), inset 0 1px 2px rgba(255,255,255,0.85), inset 0 -10px 28px rgba(13,61,43,0.04); position: relative; overflow: hidden; }
+.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 45%; background: linear-gradient(180deg, rgba(255,255,255,0.5), transparent); pointer-events: none; }
+.card::after { content: ''; position: absolute; top: -60%; left: -40%; width: 50%; height: 220%; background: linear-gradient(115deg, transparent, rgba(255,255,255,0.25), transparent); transform: rotate(10deg); pointer-events: none; transition: left 0.7s ease; }
+.card:hover { background: rgba(255,255,255,0.5); box-shadow: 0 22px 60px rgba(13,61,43,0.18), inset 0 1px 2px rgba(255,255,255,0.95); transform: translateY(-4px); }
+.card:hover::after { left: 130%; }
+.card h3 { font-family: 'Plus Jakarta Sans', sans-serif !important; margin: 0 0 8px 0; font-size: 0.68rem; color: #2D5740 !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; position: relative; }
 .card .big-num { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 500; margin: 0; position: relative; }
-.card .big-num.green { color: #1A7A4E; }
-.card .big-num.red { color: #C0392B; }
-.card .big-num.dark, .card .big-num.gold { color: #0D1F14; }
-.card .sub { font-size: 0.78rem; color: #6B8A72; margin-top: 8px; font-family: 'Plus Jakarta Sans', sans-serif; position: relative; }
+.card .big-num.green { color: #167346; }
+.card .big-num.red { color: #B83227; }
+.card .big-num.dark, .card .big-num.gold { color: #08251A; }
+.card .sub { font-size: 0.78rem; color: #4A6B52; margin-top: 8px; font-family: 'Plus Jakarta Sans', sans-serif; position: relative; }
 
 /* TABS — liquid glass */
-.stTabs [data-baseweb="tab-list"] { background: rgba(255,255,255,0.45) !important; backdrop-filter: blur(20px) saturate(160%) !important; -webkit-backdrop-filter: blur(20px) saturate(160%) !important; border-radius: 22px !important; padding: 6px !important; border: 1px solid rgba(255,255,255,0.6) !important; gap: 4px !important; margin-bottom: 24px !important; box-shadow: inset 0 1px 1px rgba(255,255,255,0.6), 0 4px 16px rgba(13,31,20,0.06) !important; }
+.stTabs [data-baseweb="tab-list"] { background: rgba(255,255,255,0.28) !important; backdrop-filter: blur(44px) saturate(180%) !important; -webkit-backdrop-filter: blur(44px) saturate(180%) !important; border-radius: 26px !important; padding: 7px !important; border: 1px solid rgba(255,255,255,0.5) !important; gap: 4px !important; margin-bottom: 24px !important; box-shadow: inset 0 1px 2px rgba(255,255,255,0.75), 0 8px 24px rgba(13,31,20,0.08) !important; }
 .stTabs button[data-baseweb="tab"] { background: transparent !important; border: none !important; color: #4A6B52 !important; font-size: 0.82rem !important; font-weight: 600 !important; padding: 9px 18px !important; border-radius: 16px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; transition: all 0.25s !important; }
 .stTabs button[data-baseweb="tab"]:hover { background: rgba(255,255,255,0.5) !important; color: #0D1F14 !important; }
 .stTabs button[aria-selected="true"] { background: linear-gradient(135deg, rgba(13,61,43,0.92), rgba(26,92,62,0.92)) !important; backdrop-filter: blur(10px) !important; color: #FFFFFF !important; font-weight: 700 !important; border: none !important; box-shadow: 0 4px 14px rgba(13,61,43,0.3), inset 0 1px 1px rgba(255,255,255,0.25) !important; }
@@ -66,11 +77,11 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #0D
 button[data-testid="baseButton-primary"] { background: linear-gradient(135deg, rgba(192,57,43,0.92), rgba(169,50,38,0.92)) !important; box-shadow: 0 4px 16px rgba(192,57,43,0.3), inset 0 1px 1px rgba(255,255,255,0.25) !important; }
 button[data-testid="baseButton-primary"]:hover { background: linear-gradient(135deg, rgba(169,50,38,0.95), rgba(140,40,30,0.95)) !important; }
 
-/* INPUTS */
-.stTextInput > div > div > input, .stNumberInput > div > div > input, .stDateInput > div > div > input { background: #FAFCFA !important; border-radius: 14px !important; border: 1.5px solid #DDE8E1 !important; font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.9rem !important; color: #0D1F14 !important; padding: 12px 16px !important; transition: all 0.2s !important; }
-.stTextInput > div > div > input:focus, .stNumberInput > div > div > input:focus { border-color: #0D3D2B !important; background: #FFFFFF !important; box-shadow: 0 0 0 4px rgba(13,61,43,0.08) !important; }
-.stSelectbox > div > div > div { background: #FAFCFA !important; border-radius: 14px !important; border: 1.5px solid #DDE8E1 !important; color: #0D1F14 !important; }
-.stTextArea textarea { background: #FAFCFA !important; border-radius: 14px !important; border: 1.5px solid #DDE8E1 !important; font-family: 'Plus Jakarta Sans', sans-serif !important; color: #0D1F14 !important; }
+/* INPUTS — frosted glass */
+.stTextInput > div > div > input, .stNumberInput > div > div > input, .stDateInput > div > div > input { background: rgba(255,255,255,0.45) !important; backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important; border-radius: 16px !important; border: 1px solid rgba(255,255,255,0.6) !important; font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 0.9rem !important; color: #0D1F14 !important; padding: 12px 16px !important; transition: all 0.25s !important; box-shadow: inset 0 1px 2px rgba(255,255,255,0.6) !important; }
+.stTextInput > div > div > input:focus, .stNumberInput > div > div > input:focus { border-color: rgba(26,92,62,0.6) !important; background: rgba(255,255,255,0.7) !important; box-shadow: 0 0 0 4px rgba(26,92,62,0.12), inset 0 1px 2px rgba(255,255,255,0.7) !important; }
+.stSelectbox > div > div > div { background: rgba(255,255,255,0.45) !important; backdrop-filter: blur(20px) !important; border-radius: 16px !important; border: 1px solid rgba(255,255,255,0.6) !important; color: #0D1F14 !important; }
+.stTextArea textarea { background: rgba(255,255,255,0.45) !important; backdrop-filter: blur(20px) !important; border-radius: 16px !important; border: 1px solid rgba(255,255,255,0.6) !important; font-family: 'Plus Jakarta Sans', sans-serif !important; color: #0D1F14 !important; }
 .stTextArea textarea:focus { border-color: #0D3D2B !important; box-shadow: 0 0 0 4px rgba(13,61,43,0.08) !important; }
 .stRadio > div { gap: 14px !important; }
 label, .stRadio label span, .stCheckbox label { color: #0D1F14 !important; }
