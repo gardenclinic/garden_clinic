@@ -974,8 +974,40 @@ elif selected == "📈  Dashboard":
 # RECEPTION
 # ═══════════════════════════════════════════════
 elif selected == "🖥️  Reception":
-    page_header("Front Desk", "Reception", "Patient intake, checkout, and management.")
-    pulse_bar([("Today's Revenue",fmt(today_revenue)),("Visits Today",str(today_visits_count)),("Total Patients",str(patient_count))])
+    # ── Notification bell (top-right) ──
+    followup_list_notif = get_followup_patients(days_after=20)
+    overdue_notif = get_overdue_patients()
+    expiring_notif = [s for s in sb_all("patient_subscriptions") if s.get("status")=="Active" and s.get("end_date") in [today_str, tomorrow_str]]
+    notif_count = len(followup_list_notif) + len(overdue_notif) + len(expiring_notif)
+
+    head_l, head_r = st.columns([4, 1])
+    with head_l:
+        page_header("Front Desk", "Reception", "Patient intake, checkout, and management.")
+    with head_r:
+        badge = f'<span style="position:absolute;top:-6px;right:-6px;background:#C0392B;color:#FFF;font-size:0.7rem;font-weight:700;min-width:20px;height:20px;border-radius:50px;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid #F2F5F1;">{notif_count}</span>' if notif_count > 0 else ''
+        st.markdown(f'<div style="text-align:right;padding-top:18px;"><div style="position:relative;display:inline-block;background:#FFFFFF;border:1px solid #DDE8E1;border-radius:50px;padding:12px 16px;box-shadow:0 2px 8px rgba(13,31,20,0.05);"><span style="font-size:1.3rem;">🔔</span>{badge}</div></div>', unsafe_allow_html=True)
+        if notif_count > 0:
+            with st.expander(f"🔔 {notif_count} notifications", expanded=False):
+                if followup_list_notif:
+                    st.markdown(f"**💬 {len(followup_list_notif)} follow-up{'s' if len(followup_list_notif)>1 else ''} needed** — open the Follow-up tab")
+                    for fu in followup_list_notif[:5]:
+                        st.caption(f"• {fu['name']} — finished {fu['days_passed']} days ago")
+                if overdue_notif:
+                    st.markdown(f"**⏰ {len(overdue_notif)} overdue patient{'s' if len(overdue_notif)>1 else ''}**")
+                    for od in overdue_notif[:5]:
+                        st.caption(f"• {od['name']} — {od['remaining']} sessions left, last visit {od['last_visit']}")
+                if expiring_notif:
+                    pmap_notif = {p["id"]: p["name"] for p in sb_all("patients")}
+                    st.markdown(f"**⚠️ {len(expiring_notif)} subscription{'s' if len(expiring_notif)>1 else ''} expiring**")
+                    for s in expiring_notif[:5]:
+                        st.caption(f"• {pmap_notif.get(s.get('patient_id'),'Unknown')} — '{s.get('plan_name','')}' expires {s.get('end_date','')}")
+
+    pulse_bar([("Today's Revenue",fmt(today_revenue)),("Visits Today",str(today_visits_count)),("Total Patients",str(patient_count)),("Notifications",str(notif_count))])
+
+    # ── Follow-up banner ──
+    if followup_list_notif:
+        names_fu = ", ".join([fu["name"] for fu in followup_list_notif[:4]])
+        st.info(f"💬 **{len(followup_list_notif)} patient{'s' if len(followup_list_notif)>1 else ''} need follow-up:** {names_fu} — open the **💬 Follow-up** tab to send WhatsApp messages.")
 
     # ── Today's appointments banner ──
     today_appts_top = [a for a in get_appointments_joined() if a.get("Date")==today_str and a.get("Status")=="Scheduled"]
