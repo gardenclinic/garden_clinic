@@ -439,6 +439,53 @@ def get_overdue_patients():
                 overdue.append({"name": all_patients.get(pid,"Unknown"), "remaining": total-done, "last_visit": last})
     return overdue
 
+def get_followup_patients(days_after=20):
+    """Patients who COMPLETED all sessions and `days_after` days have passed since their last visit.
+    Excludes those already marked as contacted for this completion."""
+    all_sessions = sb_all("patient_sessions")
+    all_patients = {p["id"]: p for p in sb_all("patients")}
+    all_visits = sb_all("visits", order="visit_date", desc_order=True)
+    contacted = sb_all("followup_log")
+    cutoff = (date.today() - timedelta(days=days_after)).isoformat()
+    followups = []
+    for s in all_sessions:
+        done = int(s.get("sessions_done") or 0)
+        total = int(s.get("total_sessions") or 0)
+        # completed all sessions
+        if total > 0 and done >= total:
+            pid = s.get("patient_id")
+            last = next((v.get("visit_date","") for v in all_visits if v.get("patient_id")==pid), None)
+            if last and last <= cutoff:
+                # already contacted after this last visit?
+                already = any(c.get("patient_id")==pid and c.get("last_visit")==last for c in contacted)
+                if not already:
+                    pat = all_patients.get(pid, {})
+                    days_passed = (date.today() - date.fromisoformat(last)).days
+                    followups.append({"patient_id": pid, "name": pat.get("name","Unknown"),
+                        "phone": pat.get("phone",""), "last_visit": last, "days_passed": days_passed,
+                        "total_sessions": total})
+    return followups
+
+def clean_phone(phone):
+    """Convert phone to international format for WhatsApp. Iraq default 964."""
+    if not phone: return ""
+    p = "".join(c for c in str(phone) if c.isdigit())
+    if p.startswith("00"): p = p[2:]
+    elif p.startswith("0"): p = "964" + p[1:]   # Iraq: drop leading 0, add 964
+    elif not p.startswith("964") and len(p) <= 10: p = "964" + p
+    return p
+
+def whatsapp_link(phone, message):
+    import urllib.parse
+    ph = clean_phone(phone)
+    msg = urllib.parse.quote(message)
+    return f"https://wa.me/{ph}?text={msg}"
+
+def get_followup_template():
+    rows = sb_all("clinic_settings", filters={"key": "followup_template"})
+    if rows: return rows[0].get("value","")
+    return "Hello {name}! 🌿 This is {clinic} checking in on you. It's been {days} days since you completed your treatment. We hope you're feeling great! If you need any follow-up care or have any concerns, we're here for you. Stay healthy! 💚"
+
 def render_discharge_summary(patient_name, patient_id, assessment, sessions_done, cp):
     pain_before = assessment.get("pain_before", "—")
     pain_after  = assessment.get("pain_after",  "—")
@@ -962,7 +1009,7 @@ elif selected == "🖥️  Reception":
         else:
             st.info("No patient found with that name or phone.")
 
-    t1,t2,tD,tQ,t3,t4,t5,t6,t7,t8,t9 = st.tabs(["Checkout","Patients","Doctor Notes","Quick View","Register","Edit","Sessions","Subscriptions","Check-in","History","Edit/Delete"])
+    t1,t2,tD,tQ,tW,t3,t4,t5,t6,t7,t8,t9 = st.tabs(["Checkout","Patients","Doctor Notes","Quick View","💬 Follow-up","Register","Edit","Sessions","Subscriptions","Check-in","History","Edit/Delete"])
 
     with t1:
         section_label("New Checkout")
@@ -1141,6 +1188,34 @@ elif selected == "🖥️  Reception":
                     for col in ["Base","Discount","Paid"]:
                         if col in df_v_qv.columns: df_v_qv[col] = df_v_qv[col].apply(fmt)
                     st.dataframe(df_v_qv, use_container_width=True, hide_index=True)
+
+    with tW:
+        section_label("💬 WhatsApp Follow-up")
+        st.info("💡 Patients who completed all their sessions and haven't returned in 20+ days. Click the WhatsApp button to send them a check-in message.")
+        cp_w = get_clinic_profile()
+        followups = get_followup_patients(days_after=20)
+        if followups:
+            template = get_followup_template()
+            for fu in followups:
+                msg = template.replace("{name}", fu["name"]).replace("{clinic}", cp_w.get("clinic_name","Garden Clinic")).replace("{days}", str(fu["days_passed"]))
+                wa_url = whatsapp_link(fu["phone"], msg)
+                phone_display = fu["phone"] if fu["phone"] else "⚠️ No phone number"
+                col_a, col_b = st.columns([3, 1])
+                with col_a:
+                    st.markdown(f'<div class="card" style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.3rem;color:#0D1F14;">{fu["name"]}</div><div style="font-size:0.8rem;color:#6B8A72;margin-top:4px;">📞 {phone_display} · Completed {fu["total_sessions"]} sessions · Last visit {fu["last_visit"]} ({fu["days_passed"]} days ago)</div></div></div></div>', unsafe_allow_html=True)
+                with col_b:
+                    if fu["phone"]:
+                        st.markdown(f'<a href="{wa_url}" target="_blank" style="display:inline-block;background:#25D366;color:#FFFFFF;padding:12px 20px;border-radius:50px;text-decoration:none;font-weight:600;font-size:0.85rem;text-align:center;width:100%;box-shadow:0 2px 10px rgba(37,211,102,0.3);">💬 WhatsApp</a>', unsafe_allow_html=True)
+                    if st.button("✓ Mark contacted", key=f"contacted_{fu['patient_id']}_{fu['last_visit']}"):
+                        sb_insert("followup_log", {"patient_id": fu["patient_id"], "last_visit": fu["last_visit"], "contacted_date": today_str, "contacted_by": username})
+                        log_action(username, "Follow-up Sent", f"{fu['name']} ({fu['days_passed']} days after completion)")
+                        play_ding(); st.success(f"Marked {fu['name']} as contacted."); st.rerun()
+            st.markdown("---")
+            section_label("Message preview")
+            st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#0D1F14;line-height:1.7;">{get_followup_template().replace("{name}", "[Patient Name]").replace("{clinic}", cp_w.get("clinic_name","Garden Clinic")).replace("{days}", "20")}</div></div>', unsafe_allow_html=True)
+            st.caption("You can customize this message in Settings → Clinic Profile.")
+        else:
+            st.success("✓ No follow-ups needed right now. All completed patients have been contacted or it hasn't been 20 days yet.")
 
     with t3:
         section_label("Register New Patient")
@@ -1887,3 +1962,17 @@ elif selected == "⚙️  Settings":
             if existing: sb_update("clinic_profile",data,"id",existing[0]["id"])
             else: sb_insert("clinic_profile",data)
             play_ding(); st.success("Saved!"); st.rerun()
+
+        st.markdown("---")
+        section_label("💬 WhatsApp Follow-up Message")
+        st.caption("This message is sent to patients 20+ days after they complete their sessions. Use {name} for patient name, {clinic} for clinic name, {days} for days passed.")
+        current_template = get_followup_template()
+        new_template = st.text_area("Message template", value=current_template, height=140, key="followup_template_input")
+        if st.button("Save Message Template", key="btn_save_template"):
+            existing_t = sb_all("clinic_settings", filters={"key": "followup_template"})
+            if existing_t: sb_update("clinic_settings", {"value": new_template}, "id", existing_t[0]["id"])
+            else: sb_insert("clinic_settings", {"key": "followup_template", "value": new_template})
+            play_ding(); st.success("Message template saved!"); st.rerun()
+        st.markdown("**Preview:**")
+        preview = new_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{days}", "20")
+        st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#0D1F14;line-height:1.7;">{preview}</div></div>', unsafe_allow_html=True)
