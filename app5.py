@@ -199,8 +199,40 @@ hr { border: none !important; border-top: 1px solid rgba(201,168,76,0.18) !impor
 .pain-scale { display: flex; gap: 6px; margin-top: 8px; }
 .body-chip { display: inline-block; padding: 6px 14px; margin: 4px; border-radius: 50px; font-size: 0.82rem; font-weight: 600; background: rgba(255,255,255,0.08); color: #C5D6CC; border: 1px solid rgba(201,168,76,0.25); }
 @media print { [data-testid="stSidebar"], .stTabs [data-baseweb="tab-list"], .stButton, .pulse-bar { display: none !important; } }
+
+/* FLOATING BOTANICAL PARTICLES */
+.leaf-field { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.leaf { position: absolute; opacity: 0; animation: leafFloat linear infinite; }
+.leaf svg { display: block; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.2)); }
+@keyframes leafFloat {
+    0%   { transform: translateY(110vh) translateX(0) rotate(0deg) scale(var(--s,1)); opacity: 0; }
+    8%   { opacity: var(--o,0.5); }
+    50%  { transform: translateY(45vh) translateX(40px) rotate(180deg) scale(var(--s,1)); }
+    92%  { opacity: var(--o,0.5); }
+    100% { transform: translateY(-15vh) translateX(-30px) rotate(360deg) scale(var(--s,1)); opacity: 0; }
+}
+@keyframes sporePulse { 0%,100% { opacity:0.15; transform: scale(1);} 50% { opacity:0.5; transform: scale(1.4);} }
+.spore { position:absolute; width:5px; height:5px; border-radius:50%; background: radial-gradient(circle, rgba(201,168,76,0.9), rgba(201,168,76,0)); animation: sporePulse ease-in-out infinite; }
 </style>
 """, unsafe_allow_html=True)
+
+# Floating botanical layer (leaves + glowing spores drifting upward)
+import random as _rnd
+_leaf_svgs = [
+    '<svg width="26" height="26" viewBox="0 0 24 24"><path d="M12 2C7 6 4 11 4 16c0 4 3 6 8 6 0-6 2-11 8-15-3 0-6 0-8 2-1-3-0-5 0-7z" fill="%2327AE60" fill-opacity="0.55"/><path d="M12 4C9 8 7 12 7 16" stroke="%23C9A84C" stroke-width="0.8" fill="none" opacity="0.6"/></svg>',
+    '<svg width="22" height="22" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="5" ry="10" fill="%231A7A4E" fill-opacity="0.5"/><line x1="12" y1="3" x2="12" y2="21" stroke="%23C9A84C" stroke-width="0.7" opacity="0.6"/></svg>',
+    '<svg width="28" height="28" viewBox="0 0 24 24"><path d="M12 3c-4 3-6 7-6 11 0 3 2 5 6 6 4-1 6-3 6-6 0-4-2-8-6-11z" fill="%232ECC8F" fill-opacity="0.45"/><path d="M12 5v15" stroke="%23D4B45C" stroke-width="0.7" opacity="0.55"/></svg>',
+]
+_particles = []
+for _i in range(13):
+    _left = _rnd.randint(2, 96); _dur = _rnd.randint(16, 34); _delay = _rnd.randint(0, 22)
+    _scale = round(_rnd.uniform(0.5, 1.25), 2); _op = round(_rnd.uniform(0.25, 0.6), 2)
+    _svg = _rnd.choice(_leaf_svgs)
+    _particles.append(f'<div class="leaf" style="left:{_left}%;--s:{_scale};--o:{_op};animation-duration:{_dur}s;animation-delay:-{_delay}s;"><img src="data:image/svg+xml,{_svg}" width="{int(26*_scale)}"/></div>')
+for _i in range(10):
+    _left = _rnd.randint(3, 97); _top = _rnd.randint(5, 92); _dur = _rnd.randint(3, 7); _delay = _rnd.randint(0, 6)
+    _particles.append(f'<div class="spore" style="left:{_left}%;top:{_top}%;animation-duration:{_dur}s;animation-delay:-{_delay}s;"></div>')
+st.markdown(f'<div class="leaf-field">{"".join(_particles)}</div>', unsafe_allow_html=True)
 
 # Currency
 def fmt(amount):
