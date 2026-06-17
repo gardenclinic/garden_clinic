@@ -27,10 +27,10 @@ html, body, .stApp { background: linear-gradient(135deg, #03100B 0%, #062018 35%
     filter: blur(60px); animation: floatOrbs 13s ease-in-out infinite alternate; }
 @keyframes floatOrbs { 0% { transform: translate(-6%,-4%) scale(1) rotate(0deg); } 20% { transform: translate(7%,5%) scale(1.16) rotate(3deg); } 40% { transform: translate(8%,-6%) scale(1.1) rotate(-2deg); } 60% { transform: translate(-7%,6%) scale(1.18) rotate(2deg); } 80% { transform: translate(5%,-5%) scale(1.12) rotate(-1deg); } 100% { transform: translate(6%,4%) scale(1.08) rotate(1deg); } }
 /* Flowing gold vein lines */
-.stApp::after { content: ''; position: fixed; inset: -10%; z-index: 0; pointer-events: none; opacity: 0.5;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800' viewBox='0 0 1200 800'%3E%3Cg fill='none' stroke='%23C9A84C' stroke-width='1.2' opacity='0.55'%3E%3Cpath d='M-50,180 C200,80 400,260 650,150 C900,40 1050,220 1300,120'/%3E%3Cpath d='M-50,360 C250,300 420,460 700,380 C950,310 1100,420 1300,360' stroke-width='0.8' opacity='0.4'/%3E%3Cpath d='M-50,560 C220,500 460,640 720,540 C980,440 1120,600 1300,520' stroke-width='1.5'/%3E%3Cpath d='M-50,700 C300,660 500,760 780,680 C1000,620 1150,720 1300,660' stroke-width='0.7' opacity='0.35'/%3E%3Cpath d='M150,-50 C200,200 120,400 260,650 C340,780 280,820 320,850' stroke-width='0.9' opacity='0.4'/%3E%3Cpath d='M820,-50 C880,220 760,420 900,680 C960,800 920,840 960,860' stroke-width='1.1' opacity='0.45'/%3E%3C/g%3E%3C/svg%3E");
-    background-size: cover; background-position: center; filter: blur(0.5px) drop-shadow(0 0 6px rgba(201,168,76,0.4)); animation: veinDrift 16s ease-in-out infinite alternate; }
-@keyframes veinDrift { 0% { transform: translate(0,0) scale(1.05) rotate(0deg); opacity:0.35; } 50% { transform: translate(-3%,2%) scale(1.12) rotate(1.5deg); opacity:0.6; } 100% { transform: translate(3%,-2%) scale(1.08) rotate(-1deg); opacity:0.45; } }
+.stApp::after { content: ''; position: fixed; inset: -10%; z-index: 0; pointer-events: none; opacity: 0.85;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800' viewBox='0 0 1200 800'%3E%3Cg fill='none' stroke='%23D4B45C' stroke-width='1.6' opacity='0.8'%3E%3Cpath d='M-50,180 C200,80 400,260 650,150 C900,40 1050,220 1300,120'/%3E%3Cpath d='M-50,360 C250,300 420,460 700,380 C950,310 1100,420 1300,360' stroke-width='1.1' opacity='0.6'/%3E%3Cpath d='M-50,560 C220,500 460,640 720,540 C980,440 1120,600 1300,520' stroke-width='2'/%3E%3Cpath d='M-50,700 C300,660 500,760 780,680 C1000,620 1150,720 1300,660' stroke-width='1' opacity='0.55'/%3E%3Cpath d='M150,-50 C200,200 120,400 260,650 C340,780 280,820 320,850' stroke-width='1.2' opacity='0.6'/%3E%3Cpath d='M820,-50 C880,220 760,420 900,680 C960,800 920,840 960,860' stroke-width='1.5' opacity='0.65'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: cover; background-position: center; filter: blur(0.4px) drop-shadow(0 0 8px rgba(201,168,76,0.7)); animation: veinDrift 16s ease-in-out infinite alternate; }
+@keyframes veinDrift { 0% { transform: translate(0,0) scale(1.05) rotate(0deg); opacity:0.6; } 50% { transform: translate(-3%,2%) scale(1.12) rotate(1.5deg); opacity:0.95; } 100% { transform: translate(3%,-2%) scale(1.08) rotate(-1deg); opacity:0.75; } }
 [data-testid="stAppViewContainer"] { position: relative; z-index: 1; }
 .main .block-container { animation: pagefade 0.55s cubic-bezier(0.22,1,0.36,1); }
 @keyframes pagefade { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
@@ -180,6 +180,14 @@ label, .stRadio label span, .stCheckbox label { color: #EAF2EC !important; }
 .doctor-form-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: linear-gradient(90deg, #0D3D2B 0%, #C9A84C 100%); border-radius: 24px 24px 0 0; }
 
 /* MISC */
+/* Universal soft hover-lift on interactive elements */
+[data-testid="stMetric"], .stTextInput, .stNumberInput, .stDateInput, .stTextArea, .stSelectbox, [data-testid="stDataFrame"], .stExpander { transition: transform 0.3s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.3s !important; }
+[data-testid="stMetric"]:hover, [data-testid="stDataFrame"]:hover { transform: translateY(-4px) !important; box-shadow: 0 16px 44px rgba(0,0,0,0.4), 0 0 24px rgba(201,168,76,0.15) !important; }
+.stTextInput:hover, .stNumberInput:hover, .stDateInput:hover, .stTextArea:hover, .stSelectbox:hover { transform: translateY(-2px) !important; }
+.stExpander:hover { transform: translateY(-2px) !important; }
+.tag-pill { transition: transform 0.25s cubic-bezier(0.34,1.6,0.64,1) !important; }
+.patient-chip { transition: transform 0.25s cubic-bezier(0.34,1.6,0.64,1) !important; }
+.patient-chip:hover { transform: translateY(-2px) scale(1.04) !important; }
 .stMarkdown, .stMarkdown p, .stMarkdown li, .stMarkdown span, .stCaption, [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p { color: #C5D6CC !important; }
 .stMarkdown a { color: #C9A84C !important; }
 .stMarkdown strong { color: #EAF2EC !important; }
@@ -391,7 +399,7 @@ def render_discharge_summary(patient_name, patient_id, assessment, sessions_done
         <div style="padding:32px 40px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
                 <div><div style="font-size:0.65rem;color:#9AB5A0;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;">Patient</div>
-                    <div style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:600;font-style:italic;color:#0D1F14;margin-top:4px;">{patient_name}</div>
+                    <div style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:600;font-style:italic;color:#EAF2EC;margin-top:4px;">{patient_name}</div>
                     <div style="font-size:0.8rem;color:#9AB5A0;">{patient_id_fmt(patient_id)}</div></div>
                 <div style="text-align:right;"><div style="font-size:0.65rem;color:#9AB5A0;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;">Outcome</div>
                     <div style="font-size:1rem;font-weight:700;color:#1A7A4E;margin-top:4px;">{assessment.get("outcome","Completed")}</div></div>
@@ -422,11 +430,11 @@ def render_discharge_summary(patient_name, patient_id, assessment, sessions_done
             <div style="background:#F2F5F1;border-radius:16px;padding:18px 24px;margin-bottom:24px;">
                 <div style="font-size:0.65rem;color:#6B8A72;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:6px;">Sessions Completed</div>
                 <div style="font-family:'JetBrains Mono',monospace;font-size:1.4rem;color:#0D1F14;">{sessions_done} sessions</div>
-                {f'<div style="font-size:0.85rem;color:#6B8A72;margin-top:4px;">Frequency: {assessment.get("frequency","—")}</div>' if assessment.get("frequency") else ''}
+                {f'<div style="font-size:0.85rem;color:#8FB8A6;margin-top:4px;">Frequency: {assessment.get("frequency","—")}</div>' if assessment.get("frequency") else ''}
             </div>
             <div style="text-align:center;padding-top:20px;border-top:1px dashed #DDE8E1;">
-                {'<div style="font-size:0.78rem;color:#4A6B52;margin-bottom:4px;">📍 ' + cp.get('address','') + '</div>' if cp.get('address') else ''}
-                {'<div style="font-size:0.78rem;color:#4A6B52;">📞 ' + cp.get('phone','') + '</div>' if cp.get('phone') else ''}
+                {'<div style="font-size:0.78rem;color:#9DC2B0;margin-bottom:4px;">📍 ' + cp.get('address','') + '</div>' if cp.get('address') else ''}
+                {'<div style="font-size:0.78rem;color:#9DC2B0;">📞 ' + cp.get('phone','') + '</div>' if cp.get('phone') else ''}
                 <div style="font-size:0.75rem;color:#9AB5A0;margin-top:10px;font-style:italic;">We wish you continued health and wellness.</div>
             </div>
         </div>
@@ -499,7 +507,7 @@ def render_receipt(r, cp):
         .receipt-clinic-sub {{ font-size:0.65rem; color:#6FCF97; letter-spacing:0.32em; text-transform:uppercase; margin-top:10px; font-weight:700; }}
         .receipt-gold-line {{ width:40px; height:2px; background:linear-gradient(90deg,transparent,#C9A84C,transparent); margin:12px auto; }}
         .receipt-body {{ padding:28px 32px 32px; }}
-        .receipt-date-badge {{ background:#F2F5F1; border-radius:50px; padding:8px 16px; text-align:center; font-size:0.7rem; color:#4A6B52; font-weight:700; letter-spacing:0.1em; margin-bottom:24px; border:1px solid #DDE8E1; }}
+        .receipt-date-badge {{ background:#F2F5F1; border-radius:50px; padding:8px 16px; text-align:center; font-size:0.7rem; color:#9DC2B0; font-weight:700; letter-spacing:0.1em; margin-bottom:24px; border:1px solid #DDE8E1; }}
         .receipt-section-title {{ font-size:0.6rem; font-weight:700; color:#9AB5A0; text-transform:uppercase; letter-spacing:0.2em; margin:18px 0 10px; }}
         .receipt-row {{ display:flex; justify-content:space-between; align-items:center; margin:9px 0; font-size:0.88rem; }}
         .receipt-row span:first-child {{ color:#6B8A72; }} .receipt-row span:last-child {{ color:#0D1F14; font-weight:600; }}
@@ -510,7 +518,7 @@ def render_receipt(r, cp):
         .receipt-discount {{ color:#C0392B !important; }}
         .receipt-footer-area {{ text-align:center; padding-top:12px; border-top:1px dashed #DDE8E1; margin-top:22px; }}
         .receipt-footer-text {{ font-size:0.72rem; color:#9AB5A0; margin:4px 0; }}
-        .receipt-footer-clinic {{ font-size:0.75rem; color:#4A6B52; font-weight:600; margin-top:8px; }}
+        .receipt-footer-clinic {{ font-size:0.75rem; color:#9DC2B0; font-weight:600; margin-top:8px; }}
         `;
         var content = `{receipt_js}`;
         var w = window.open('', '_blank', 'width=480,height=800');
@@ -686,7 +694,7 @@ if selected == "🩺  Clinical Workspace":
                     section_label(f"Previous Assessments ({len(prev_forms)})")
                     for f in prev_forms[:3]:
                         outcome_class = "tag-success" if f.get("outcome")=="Successfully Relieved" else ("tag-condition" if f.get("outcome") in ["No Improvement","Patient Discontinued"] else "tag-pending")
-                        st.markdown(f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.1rem;color:#0D1F14;">{f.get("filled_date","")}</div><span class="tag-pill {outcome_class}">{f.get("outcome","Pending")}</span></div><div style="font-size:0.88rem;color:#0D1F14;margin-bottom:8px;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Diagnosis</strong><br/>{f.get("problem","—")}</div><div style="font-size:0.88rem;color:#0D1F14;margin-bottom:8px;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Body Area</strong> <span style="color:#4A6B52;">{f.get("body_area","—")}</span> · <strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Pain</strong> <span style="color:#4A6B52;">{f.get("pain_before","—")}/10 → {f.get("pain_after","—")}/10</span></div><div style="font-size:0.85rem;color:#6B8A72;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Plan</strong><br/>{f.get("treatment_plan","—")}</div></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.1rem;color:#EAF2EC;">{f.get("filled_date","")}</div><span class="tag-pill {outcome_class}">{f.get("outcome","Pending")}</span></div><div style="font-size:0.88rem;color:#EAF2EC;margin-bottom:8px;"><strong style="color:#D4B45C;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Diagnosis</strong><br/>{f.get("problem","—")}</div><div style="font-size:0.88rem;color:#EAF2EC;margin-bottom:8px;"><strong style="color:#D4B45C;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Body Area</strong> <span style="color:#9DC2B0;">{f.get("body_area","—")}</span> · <strong style="color:#D4B45C;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Pain</strong> <span style="color:#9DC2B0;">{f.get("pain_before","—")}/10 → {f.get("pain_after","—")}/10</span></div><div style="font-size:0.85rem;color:#8FB8A6;"><strong style="color:#D4B45C;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Plan</strong><br/>{f.get("treatment_plan","—")}</div></div>', unsafe_allow_html=True)
                         if st.button(f"✏️ Edit this assessment", key=f"edit_btn_{f['id']}"):
                             st.session_state[f"editing_form_{f['id']}"] = True
                         if st.session_state.get(f"editing_form_{f['id']}"):
@@ -972,7 +980,7 @@ elif selected == "🖥️  Reception":
         if found:
             for p in found[:5]:
                 visits_p = len([v for v in sb_all("visits", filters={"patient_id": p["id"]}) ])
-                st.markdown(f'<div class="card" style="padding:14px 20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.2rem;color:#0D1F14;">{p["name"]}</div><div style="font-size:0.8rem;color:#6B8A72;margin-top:2px;">{patient_id_fmt(p["id"])} · 📞 {p.get("phone","—")} · {p.get("gender","—")} · {visits_p} visits</div></div></div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="card" style="padding:14px 20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.2rem;color:#EAF2EC;">{p["name"]}</div><div style="font-size:0.8rem;color:#8FB8A6;margin-top:2px;">{patient_id_fmt(p["id"])} · 📞 {p.get("phone","—")} · {p.get("gender","—")} · {visits_p} visits</div></div></div></div>', unsafe_allow_html=True)
         else:
             st.info("No patient found with that name or phone.")
 
@@ -1169,7 +1177,7 @@ elif selected == "🖥️  Reception":
                 phone_display = fu["phone"] if fu["phone"] else "⚠️ No phone number"
                 col_a, col_b = st.columns([3, 1])
                 with col_a:
-                    st.markdown(f'<div class="card" style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.3rem;color:#0D1F14;">{fu["name"]}</div><div style="font-size:0.8rem;color:#6B8A72;margin-top:4px;">📞 {phone_display} · Completed {fu["total_sessions"]} sessions · Last visit {fu["last_visit"]} ({fu["days_passed"]} days ago)</div></div></div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="card" style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.3rem;color:#EAF2EC;">{fu["name"]}</div><div style="font-size:0.8rem;color:#8FB8A6;margin-top:4px;">📞 {phone_display} · Completed {fu["total_sessions"]} sessions · Last visit {fu["last_visit"]} ({fu["days_passed"]} days ago)</div></div></div></div>', unsafe_allow_html=True)
                 with col_b:
                     if fu["phone"]:
                         st.markdown(f'<a href="{wa_url}" target="_blank" style="display:inline-block;background:#25D366;color:#FFFFFF;padding:12px 20px;border-radius:50px;text-decoration:none;font-weight:600;font-size:0.85rem;text-align:center;width:100%;box-shadow:0 2px 10px rgba(37,211,102,0.3);">💬 WhatsApp</a>', unsafe_allow_html=True)
@@ -1179,7 +1187,7 @@ elif selected == "🖥️  Reception":
                         play_ding(); st.success(f"Marked {fu['name']} as contacted."); st.rerun()
             st.markdown("---")
             section_label("Message preview")
-            st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#0D1F14;line-height:1.7;">{get_followup_template().replace("{name}", "[Patient Name]").replace("{clinic}", cp_w.get("clinic_name","Garden Clinic")).replace("{days}", "20")}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{get_followup_template().replace("{name}", "[Patient Name]").replace("{clinic}", cp_w.get("clinic_name","Garden Clinic")).replace("{days}", "20")}</div></div>', unsafe_allow_html=True)
             st.caption("You can customize this message in Settings → Clinic Profile.")
         else:
             st.success("✓ No follow-ups needed right now. All completed patients have been contacted or it hasn't been 20 days yet.")
@@ -1942,4 +1950,4 @@ elif selected == "⚙️  Settings":
             play_ding(); st.success("Message template saved!"); st.rerun()
         st.markdown("**Preview:**")
         preview = new_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{days}", "20")
-        st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#0D1F14;line-height:1.7;">{preview}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{preview}</div></div>', unsafe_allow_html=True)
