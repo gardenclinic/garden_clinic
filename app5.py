@@ -1240,7 +1240,7 @@ elif selected == "🖥️  Reception":
         section_label("Register New Patient")
         c1,c2 = st.columns(2)
         with c1:
-            p_name = st.text_input("Full name *"); p_phone = st.text_input(964"Phone number")
+            p_name = st.text_input("Full name *"); p_phone = st.text_input("Phone number")
             p_dob  = st.text_input("Date of birth (YYYY-MM-DD)", placeholder="2006-11-23")
         with c2:
             p_gender = st.selectbox("Gender", ["Prefer not to say","Male","Female","Other"])
