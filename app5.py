@@ -39,6 +39,16 @@ html, body, .stApp { background: linear-gradient(135deg, #03100B 0%, #062018 35%
 [data-testid="stSidebar"] { background: linear-gradient(180deg, rgba(13,61,43,0.55) 0%, rgba(10,46,32,0.62) 100%) !important; backdrop-filter: blur(60px) saturate(200%) !important; -webkit-backdrop-filter: blur(60px) saturate(200%) !important; border-right: 1px solid rgba(255,255,255,0.18) !important; min-width: 252px !important; box-shadow: inset -1px 0 1px rgba(255,255,255,0.1), 4px 0 40px rgba(13,61,43,0.15) !important; }
 [data-testid="stSidebar"] * { color: #EAF5EE !important; font-family: 'Plus Jakarta Sans', sans-serif !important; }
 section[data-testid="stSidebarNav"] { display: none; }
+/* Sidebar nav items as glass buttons */
+[data-testid="stSidebar"] [role="radiogroup"] { gap: 8px !important; display: flex; flex-direction: column; }
+[data-testid="stSidebar"] [role="radiogroup"] label { background: linear-gradient(135deg, rgba(16,72,54,0.35), rgba(6,30,22,0.28)) !important; border: 1px solid rgba(201,168,76,0.18) !important; border-radius: 16px !important; padding: 11px 16px !important; margin: 0 !important; transition: all 0.3s cubic-bezier(0.34,1.5,0.64,1) !important; cursor: pointer !important; box-shadow: inset 0 1px 1px rgba(120,220,180,0.12) !important; }
+[data-testid="stSidebar"] [role="radiogroup"] label:hover { background: linear-gradient(135deg, rgba(22,110,80,0.55), rgba(10,46,34,0.45)) !important; border-color: rgba(201,168,76,0.5) !important; transform: translateX(4px) scale(1.02) !important; box-shadow: 0 6px 18px rgba(0,0,0,0.3), 0 0 16px rgba(201,168,76,0.12) !important; }
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) { background: linear-gradient(135deg, rgba(26,130,95,0.7), rgba(12,56,42,0.6)) !important; border-color: rgba(201,168,76,0.7) !important; box-shadow: 0 6px 20px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.35), 0 0 18px rgba(201,168,76,0.2) !important; }
+[data-testid="stSidebar"] [role="radiogroup"] label > div:first-child { display: none !important; }
+[data-testid="stSidebar"] [role="radiogroup"] label p, [data-testid="stSidebar"] [role="radiogroup"] label span { font-size: 0.92rem !important; font-weight: 600 !important; }
+/* Hide broken Material icon text on sidebar collapse button */
+[data-testid="stSidebarCollapseButton"] span, [data-testid="baseButton-headerNoPadding"] span, [data-testid="stSidebarCollapsedControl"] span { font-size: 0 !important; }
+[data-testid="stSidebarCollapseButton"] span::before, [data-testid="baseButton-headerNoPadding"] span::before { font-family: 'Material Symbols Rounded','Material Symbols Outlined' !important; content: '\\00AB' !important; font-size: 1.2rem !important; color: #C9A84C !important; }
 
 /* TYPOGRAPHY */
 h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #EAF2EC !important; }
@@ -65,7 +75,7 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #EA
 .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%; background: linear-gradient(180deg, rgba(120,220,180,0.16), transparent); pointer-events: none; border-radius: 28px 28px 50% 50%; }
 .card::after { content: ''; position: absolute; top: -80%; left: -60%; width: 60%; height: 260%; background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.28) 48%, rgba(201,168,76,0.35) 52%, transparent 78%); transform: rotate(8deg); pointer-events: none; animation: cardShine 7s ease-in-out infinite; }
 @keyframes cardShine { 0% { left: -70%; } 55% { left: 150%; } 100% { left: 150%; } }
-.card:hover { background: linear-gradient(135deg, rgba(16,72,54,0.72), rgba(6,30,22,0.62)); border-color: rgba(201,168,76,0.6); box-shadow: 0 22px 60px rgba(0,0,0,0.55), inset 0 1px 2px rgba(120,220,180,0.4), 0 0 36px rgba(201,168,76,0.18); transform: translateY(-6px) scale(1.01); }
+.card:hover { background: linear-gradient(135deg, rgba(16,72,54,0.72), rgba(6,30,22,0.62)); border-color: rgba(201,168,76,0.6); box-shadow: 0 26px 64px rgba(0,0,0,0.55), inset 0 1px 2px rgba(120,220,180,0.4), 0 0 40px rgba(201,168,76,0.22); transform: translateY(-8px) scale(1.035); }
 .card h3 { font-family: 'Plus Jakarta Sans', sans-serif !important; margin: 0 0 8px 0; font-size: 0.68rem; color: #D4B45C !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; position: relative; }
 .card .big-num { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 500; margin: 0; position: relative; }
 .card .big-num.green { color: #2ECC8F; }
@@ -182,7 +192,7 @@ label, .stRadio label span, .stCheckbox label { color: #EAF2EC !important; }
 /* MISC */
 /* Universal soft hover-lift on interactive elements */
 [data-testid="stMetric"], .stTextInput, .stNumberInput, .stDateInput, .stTextArea, .stSelectbox, [data-testid="stDataFrame"], .stExpander { transition: transform 0.3s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.3s !important; }
-[data-testid="stMetric"]:hover, [data-testid="stDataFrame"]:hover { transform: translateY(-4px) !important; box-shadow: 0 16px 44px rgba(0,0,0,0.4), 0 0 24px rgba(201,168,76,0.15) !important; }
+[data-testid="stMetric"]:hover, [data-testid="stDataFrame"]:hover { transform: translateY(-6px) scale(1.03) !important; box-shadow: 0 20px 50px rgba(0,0,0,0.45), 0 0 28px rgba(201,168,76,0.2) !important; }
 .stTextInput:hover, .stNumberInput:hover, .stDateInput:hover, .stTextArea:hover, .stSelectbox:hover { transform: translateY(-2px) !important; }
 .stExpander:hover { transform: translateY(-2px) !important; }
 .tag-pill { transition: transform 0.25s cubic-bezier(0.34,1.6,0.64,1) !important; }
@@ -1985,3 +1995,4 @@ elif selected == "⚙️  Settings":
         st.markdown("**Preview:**")
         preview = new_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{days}", "20")
         st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{preview}</div></div>', unsafe_allow_html=True)
+        
