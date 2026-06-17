@@ -218,17 +218,19 @@ hr { border: none !important; border-top: 1px solid rgba(201,168,76,0.18) !impor
 
 # Floating botanical layer (leaves + glowing spores drifting upward)
 import random as _rnd
-_leaf_svgs = [
-    '<svg width="26" height="26" viewBox="0 0 24 24"><path d="M12 2C7 6 4 11 4 16c0 4 3 6 8 6 0-6 2-11 8-15-3 0-6 0-8 2-1-3-0-5 0-7z" fill="%2327AE60" fill-opacity="0.55"/><path d="M12 4C9 8 7 12 7 16" stroke="%23C9A84C" stroke-width="0.8" fill="none" opacity="0.6"/></svg>',
-    '<svg width="22" height="22" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="5" ry="10" fill="%231A7A4E" fill-opacity="0.5"/><line x1="12" y1="3" x2="12" y2="21" stroke="%23C9A84C" stroke-width="0.7" opacity="0.6"/></svg>',
-    '<svg width="28" height="28" viewBox="0 0 24 24"><path d="M12 3c-4 3-6 7-6 11 0 3 2 5 6 6 4-1 6-3 6-6 0-4-2-8-6-11z" fill="%232ECC8F" fill-opacity="0.45"/><path d="M12 5v15" stroke="%23D4B45C" stroke-width="0.7" opacity="0.55"/></svg>',
+import urllib.parse as _urlp
+_leaf_svgs_raw = [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24"><path d="M12 2C7 6 4 11 4 16c0 4 3 6 8 6 0-6 2-11 8-15-3 0-6 0-8 2-1-3 0-5 0-7z" fill="#27AE60" fill-opacity="0.55"/><path d="M12 4C9 8 7 12 7 16" stroke="#C9A84C" stroke-width="0.8" fill="none" opacity="0.6"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="5" ry="10" fill="#1A7A4E" fill-opacity="0.5"/><line x1="12" y1="3" x2="12" y2="21" stroke="#C9A84C" stroke-width="0.7" opacity="0.6"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"><path d="M12 3c-4 3-6 7-6 11 0 3 2 5 6 6 4-1 6-3 6-6 0-4-2-8-6-11z" fill="#2ECC8F" fill-opacity="0.45"/><path d="M12 5v15" stroke="#D4B45C" stroke-width="0.7" opacity="0.55"/></svg>',
 ]
+_leaf_svgs = ["data:image/svg+xml," + _urlp.quote(s) for s in _leaf_svgs_raw]
 _particles = []
 for _i in range(13):
     _left = _rnd.randint(2, 96); _dur = _rnd.randint(16, 34); _delay = _rnd.randint(0, 22)
     _scale = round(_rnd.uniform(0.5, 1.25), 2); _op = round(_rnd.uniform(0.25, 0.6), 2)
     _svg = _rnd.choice(_leaf_svgs)
-    _particles.append(f'<div class="leaf" style="left:{_left}%;--s:{_scale};--o:{_op};animation-duration:{_dur}s;animation-delay:-{_delay}s;"><img src="data:image/svg+xml,{_svg}" width="{int(26*_scale)}"/></div>')
+    _particles.append(f'<div class="leaf" style="left:{_left}%;--s:{_scale};--o:{_op};animation-duration:{_dur}s;animation-delay:-{_delay}s;"><img src="{_svg}" width="{int(26*_scale)}"/></div>')
 for _i in range(10):
     _left = _rnd.randint(3, 97); _top = _rnd.randint(5, 92); _dur = _rnd.randint(3, 7); _delay = _rnd.randint(0, 6)
     _particles.append(f'<div class="spore" style="left:{_left}%;top:{_top}%;animation-duration:{_dur}s;animation-delay:-{_delay}s;"></div>')
