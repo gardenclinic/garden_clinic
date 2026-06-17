@@ -24,14 +24,13 @@ html, body, .stApp { background: linear-gradient(135deg, #03100B 0%, #062018 35%
     radial-gradient(circle 700px at 90% 92%, rgba(20,150,110,0.6) 0%, transparent 50%),
     radial-gradient(circle 540px at 12% 95%, rgba(12,90,68,0.6) 0%, transparent 50%),
     radial-gradient(circle 480px at 55% 50%, rgba(16,120,90,0.4) 0%, transparent 55%);
-    filter: blur(60px); animation: floatOrbs 18s ease-in-out infinite alternate; }
-@keyframes floatOrbs { 0% { transform: translate(-5%,-3%) scale(1) rotate(0deg); } 25% { transform: translate(6%,4%) scale(1.14) rotate(2deg); } 50% { transform: translate(7%,-5%) scale(1.08) rotate(-1deg); } 75% { transform: translate(-6%,5%) scale(1.16) rotate(1deg); } 100% { transform: translate(4%,-4%) scale(1.06) rotate(0deg); } }
-.stApp::after { content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; background:
-    radial-gradient(ellipse 700px 120px at 40% 30%, rgba(201,168,76,0.22) 0%, transparent 60%),
-    radial-gradient(ellipse 600px 100px at 65% 70%, rgba(232,200,112,0.18) 0%, transparent 60%),
-    radial-gradient(circle 300px at 25% 60%, rgba(20,150,110,0.3) 0%, transparent 50%);
-    filter: blur(45px); animation: floatGold 14s ease-in-out infinite alternate; }
-@keyframes floatGold { 0% { transform: translate(0,0) rotate(0deg); opacity:0.7; } 50% { transform: translate(-9%,7%) rotate(3deg); opacity:1; } 100% { transform: translate(8%,-6%) rotate(-2deg); opacity:0.8; } }
+    filter: blur(60px); animation: floatOrbs 13s ease-in-out infinite alternate; }
+@keyframes floatOrbs { 0% { transform: translate(-6%,-4%) scale(1) rotate(0deg); } 20% { transform: translate(7%,5%) scale(1.16) rotate(3deg); } 40% { transform: translate(8%,-6%) scale(1.1) rotate(-2deg); } 60% { transform: translate(-7%,6%) scale(1.18) rotate(2deg); } 80% { transform: translate(5%,-5%) scale(1.12) rotate(-1deg); } 100% { transform: translate(6%,4%) scale(1.08) rotate(1deg); } }
+/* Flowing organic leaf veins — branching plant-like lines */
+.stApp::after { content: ''; position: fixed; inset: -10%; z-index: 0; pointer-events: none; opacity: 0.72;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800' viewBox='0 0 1200 800'%3E%3Cg fill='none' stroke='%23C9A84C' stroke-width='1.4' opacity='0.72'%3E%3Cpath d='M-50,200 C220,120 380,280 640,180 C880,90 1040,240 1300,150'/%3E%3Cpath d='M340,235 C400,180 440,150 500,140' stroke-width='0.6' opacity='0.5'/%3E%3Cpath d='M460,213 C520,260 560,290 620,300' stroke-width='0.6' opacity='0.5'/%3E%3Cpath d='M-50,420 C260,360 430,500 720,420 C960,350 1110,460 1300,400' stroke-width='1' opacity='0.55'/%3E%3Cpath d='M520,455 C570,410 610,385 660,378' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M-50,600 C240,540 470,680 740,580 C1000,480 1130,640 1300,560' stroke-width='1.7'/%3E%3Cpath d='M600,613 C660,665 700,695 760,705' stroke-width='0.7' opacity='0.5'/%3E%3Cpath d='M380,576 C440,530 480,505 540,500' stroke-width='0.6' opacity='0.45'/%3E%3Cpath d='M180,-50 C240,200 140,400 280,650 C360,780 300,820 340,860' stroke-width='1' opacity='0.5'/%3E%3Cpath d='M850,-50 C910,220 790,420 930,680 C990,800 950,840 990,870' stroke-width='1.3' opacity='0.55'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: cover; background-position: center; filter: blur(0.5px) drop-shadow(0 0 7px rgba(201,168,76,0.55)); animation: veinDrift 20s ease-in-out infinite alternate; }
+@keyframes veinDrift { 0% { transform: translate(0,0) scale(1.04) rotate(0deg); opacity:0.5; } 50% { transform: translate(-2.5%,1.5%) scale(1.1) rotate(1deg); opacity:0.82; } 100% { transform: translate(2.5%,-1.5%) scale(1.07) rotate(-0.8deg); opacity:0.64; } }
 [data-testid="stAppViewContainer"] { position: relative; z-index: 1; }
 .main .block-container { animation: pagefade 0.55s cubic-bezier(0.22,1,0.36,1); }
 @keyframes pagefade { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
@@ -87,12 +86,15 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #EA
 .stTabs button[aria-selected="true"] { background: linear-gradient(135deg, rgba(22,120,88,0.85), rgba(12,56,42,0.7)) !important; backdrop-filter: blur(20px) saturate(200%) !important; color: #F0E6C8 !important; font-weight: 700 !important; border: 1px solid rgba(201,168,76,0.6) !important; box-shadow: 0 4px 16px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.4), 0 0 18px rgba(201,168,76,0.18) !important; }
 
 /* BUTTONS — emerald glass with rich motion */
-.stButton > button { background: linear-gradient(135deg, rgba(16,90,66,0.7), rgba(8,40,30,0.6)) !important; backdrop-filter: blur(24px) saturate(180%) !important; -webkit-backdrop-filter: blur(24px) saturate(180%) !important; color: #F0E6C8 !important; border: 1px solid rgba(201,168,76,0.45) !important; border-radius: 50px !important; font-weight: 700 !important; font-size: 0.85rem !important; padding: 13px 30px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.02em !important; transition: transform 0.25s cubic-bezier(0.34,1.8,0.5,1), background 0.3s, box-shadow 0.3s !important; box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.35), inset 0 -3px 10px rgba(0,0,0,0.2) !important; position: relative !important; overflow: hidden !important; }
-.stButton > button::after { content: ''; position: absolute; top: -100%; left: -60%; width: 50%; height: 300%; background: linear-gradient(115deg, transparent, rgba(255,255,255,0.3), rgba(201,168,76,0.2), transparent); transform: rotate(10deg); pointer-events: none; transition: left 0.6s ease; }
-.stButton > button:hover { background: linear-gradient(135deg, rgba(22,120,88,0.85), rgba(12,56,42,0.72)) !important; color: #FFFFFF !important; border-color: rgba(201,168,76,0.8) !important; transform: translateY(-3px) scale(1.03) !important; box-shadow: 0 16px 40px rgba(0,0,0,0.45), inset 0 1px 2px rgba(120,220,180,0.5), 0 0 28px rgba(201,168,76,0.25) !important; }
-.stButton > button:hover::after { left: 140%; }
-.stButton > button:active { transform: scale(0.94) translateY(0) !important; transition: transform 0.1s !important; }
-button[data-testid="baseButton-primary"] { background: linear-gradient(135deg, rgba(192,57,43,0.8), rgba(120,30,22,0.7)) !important; color: #FFEEEA !important; border: 1px solid rgba(255,180,160,0.4) !important; box-shadow: 0 8px 24px rgba(192,57,43,0.3), inset 0 1px 2px rgba(255,255,255,0.4) !important; }
+.stButton > button { background: linear-gradient(135deg, rgba(16,90,66,0.7), rgba(8,40,30,0.6)) !important; backdrop-filter: blur(24px) saturate(180%) !important; -webkit-backdrop-filter: blur(24px) saturate(180%) !important; color: #F0E6C8 !important; border: 1px solid rgba(201,168,76,0.45) !important; border-radius: 50px !important; font-weight: 700 !important; font-size: 0.85rem !important; padding: 13px 30px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.02em !important; transition: transform 0.25s cubic-bezier(0.34,1.8,0.5,1), background 0.3s, box-shadow 0.3s, border-color 0.3s !important; box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.35), inset 0 -3px 10px rgba(0,0,0,0.2) !important; position: relative !important; overflow: hidden !important; animation: btnGlow 3.5s ease-in-out infinite !important; }
+@keyframes btnGlow { 0%,100% { box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.35), inset 0 -3px 10px rgba(0,0,0,0.2), 0 0 0px rgba(201,168,76,0); } 50% { box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.45), inset 0 -3px 10px rgba(0,0,0,0.2), 0 0 18px rgba(201,168,76,0.22); } }
+.stButton > button::after { content: ''; position: absolute; top: -100%; left: -70%; width: 45%; height: 300%; background: linear-gradient(115deg, transparent, rgba(255,255,255,0.35), rgba(201,168,76,0.3), transparent); transform: rotate(10deg); pointer-events: none; animation: btnSweep 4.5s ease-in-out infinite; }
+@keyframes btnSweep { 0% { left: -70%; } 45% { left: 160%; } 100% { left: 160%; } }
+.stButton > button:hover { background: linear-gradient(135deg, rgba(24,135,98,0.9), rgba(14,64,48,0.78)) !important; color: #FFFFFF !important; border-color: rgba(201,168,76,0.9) !important; transform: translateY(-4px) scale(1.04) !important; box-shadow: 0 18px 46px rgba(0,0,0,0.5), inset 0 1px 2px rgba(120,220,180,0.6), 0 0 34px rgba(201,168,76,0.35) !important; animation: none !important; }
+.stButton > button:hover::after { animation: btnSweepFast 0.7s ease forwards; }
+@keyframes btnSweepFast { 0% { left: -70%; } 100% { left: 160%; } }
+.stButton > button:active { transform: scale(0.92) translateY(0) !important; transition: transform 0.08s !important; }
+button[data-testid="baseButton-primary"] { background: linear-gradient(135deg, rgba(192,57,43,0.8), rgba(120,30,22,0.7)) !important; color: #FFEEEA !important; border: 1px solid rgba(255,180,160,0.4) !important; box-shadow: 0 8px 24px rgba(192,57,43,0.3), inset 0 1px 2px rgba(255,255,255,0.4) !important; animation: none !important; }
 button[data-testid="baseButton-primary"]:hover { background: linear-gradient(135deg, rgba(210,70,55,0.9), rgba(140,40,30,0.78)) !important; color: #FFFFFF !important; }
 
 /* INPUTS — dark frosted glass */
@@ -178,6 +180,14 @@ label, .stRadio label span, .stCheckbox label { color: #EAF2EC !important; }
 .doctor-form-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: linear-gradient(90deg, #0D3D2B 0%, #C9A84C 100%); border-radius: 24px 24px 0 0; }
 
 /* MISC */
+/* Universal soft hover-lift on interactive elements */
+[data-testid="stMetric"], .stTextInput, .stNumberInput, .stDateInput, .stTextArea, .stSelectbox, [data-testid="stDataFrame"], .stExpander { transition: transform 0.3s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.3s !important; }
+[data-testid="stMetric"]:hover, [data-testid="stDataFrame"]:hover { transform: translateY(-4px) !important; box-shadow: 0 16px 44px rgba(0,0,0,0.4), 0 0 24px rgba(201,168,76,0.15) !important; }
+.stTextInput:hover, .stNumberInput:hover, .stDateInput:hover, .stTextArea:hover, .stSelectbox:hover { transform: translateY(-2px) !important; }
+.stExpander:hover { transform: translateY(-2px) !important; }
+.tag-pill { transition: transform 0.25s cubic-bezier(0.34,1.6,0.64,1) !important; }
+.patient-chip { transition: transform 0.25s cubic-bezier(0.34,1.6,0.64,1) !important; }
+.patient-chip:hover { transform: translateY(-2px) scale(1.04) !important; }
 .stMarkdown, .stMarkdown p, .stMarkdown li, .stMarkdown span, .stCaption, [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p { color: #C5D6CC !important; }
 .stMarkdown a { color: #C9A84C !important; }
 .stMarkdown strong { color: #EAF2EC !important; }
@@ -189,8 +199,40 @@ hr { border: none !important; border-top: 1px solid rgba(201,168,76,0.18) !impor
 .pain-scale { display: flex; gap: 6px; margin-top: 8px; }
 .body-chip { display: inline-block; padding: 6px 14px; margin: 4px; border-radius: 50px; font-size: 0.82rem; font-weight: 600; background: rgba(255,255,255,0.08); color: #C5D6CC; border: 1px solid rgba(201,168,76,0.25); }
 @media print { [data-testid="stSidebar"], .stTabs [data-baseweb="tab-list"], .stButton, .pulse-bar { display: none !important; } }
+
+/* FLOATING BOTANICAL PARTICLES */
+.leaf-field { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.leaf { position: absolute; opacity: 0; animation: leafFloat linear infinite; }
+.leaf svg { display: block; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.2)); }
+@keyframes leafFloat {
+    0%   { transform: translateY(110vh) translateX(0) rotate(0deg) scale(var(--s,1)); opacity: 0; }
+    8%   { opacity: var(--o,0.5); }
+    50%  { transform: translateY(45vh) translateX(40px) rotate(180deg) scale(var(--s,1)); }
+    92%  { opacity: var(--o,0.5); }
+    100% { transform: translateY(-15vh) translateX(-30px) rotate(360deg) scale(var(--s,1)); opacity: 0; }
+}
+@keyframes sporePulse { 0%,100% { opacity:0.15; transform: scale(1);} 50% { opacity:0.5; transform: scale(1.4);} }
+.spore { position:absolute; width:5px; height:5px; border-radius:50%; background: radial-gradient(circle, rgba(201,168,76,0.9), rgba(201,168,76,0)); animation: sporePulse ease-in-out infinite; }
 </style>
 """, unsafe_allow_html=True)
+
+# Floating botanical layer (leaves + glowing spores drifting upward)
+import random as _rnd
+_leaf_svgs = [
+    '<svg width="26" height="26" viewBox="0 0 24 24"><path d="M12 2C7 6 4 11 4 16c0 4 3 6 8 6 0-6 2-11 8-15-3 0-6 0-8 2-1-3-0-5 0-7z" fill="%2327AE60" fill-opacity="0.55"/><path d="M12 4C9 8 7 12 7 16" stroke="%23C9A84C" stroke-width="0.8" fill="none" opacity="0.6"/></svg>',
+    '<svg width="22" height="22" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="5" ry="10" fill="%231A7A4E" fill-opacity="0.5"/><line x1="12" y1="3" x2="12" y2="21" stroke="%23C9A84C" stroke-width="0.7" opacity="0.6"/></svg>',
+    '<svg width="28" height="28" viewBox="0 0 24 24"><path d="M12 3c-4 3-6 7-6 11 0 3 2 5 6 6 4-1 6-3 6-6 0-4-2-8-6-11z" fill="%232ECC8F" fill-opacity="0.45"/><path d="M12 5v15" stroke="%23D4B45C" stroke-width="0.7" opacity="0.55"/></svg>',
+]
+_particles = []
+for _i in range(13):
+    _left = _rnd.randint(2, 96); _dur = _rnd.randint(16, 34); _delay = _rnd.randint(0, 22)
+    _scale = round(_rnd.uniform(0.5, 1.25), 2); _op = round(_rnd.uniform(0.25, 0.6), 2)
+    _svg = _rnd.choice(_leaf_svgs)
+    _particles.append(f'<div class="leaf" style="left:{_left}%;--s:{_scale};--o:{_op};animation-duration:{_dur}s;animation-delay:-{_delay}s;"><img src="data:image/svg+xml,{_svg}" width="{int(26*_scale)}"/></div>')
+for _i in range(10):
+    _left = _rnd.randint(3, 97); _top = _rnd.randint(5, 92); _dur = _rnd.randint(3, 7); _delay = _rnd.randint(0, 6)
+    _particles.append(f'<div class="spore" style="left:{_left}%;top:{_top}%;animation-duration:{_dur}s;animation-delay:-{_delay}s;"></div>')
+st.markdown(f'<div class="leaf-field">{"".join(_particles)}</div>', unsafe_allow_html=True)
 
 # Currency
 def fmt(amount):
@@ -389,7 +431,7 @@ def render_discharge_summary(patient_name, patient_id, assessment, sessions_done
         <div style="padding:32px 40px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
                 <div><div style="font-size:0.65rem;color:#9AB5A0;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;">Patient</div>
-                    <div style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:600;font-style:italic;color:#0D1F14;margin-top:4px;">{patient_name}</div>
+                    <div style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:600;font-style:italic;color:#EAF2EC;margin-top:4px;">{patient_name}</div>
                     <div style="font-size:0.8rem;color:#9AB5A0;">{patient_id_fmt(patient_id)}</div></div>
                 <div style="text-align:right;"><div style="font-size:0.65rem;color:#9AB5A0;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;">Outcome</div>
                     <div style="font-size:1rem;font-weight:700;color:#1A7A4E;margin-top:4px;">{assessment.get("outcome","Completed")}</div></div>
@@ -420,11 +462,11 @@ def render_discharge_summary(patient_name, patient_id, assessment, sessions_done
             <div style="background:#F2F5F1;border-radius:16px;padding:18px 24px;margin-bottom:24px;">
                 <div style="font-size:0.65rem;color:#6B8A72;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:6px;">Sessions Completed</div>
                 <div style="font-family:'JetBrains Mono',monospace;font-size:1.4rem;color:#0D1F14;">{sessions_done} sessions</div>
-                {f'<div style="font-size:0.85rem;color:#6B8A72;margin-top:4px;">Frequency: {assessment.get("frequency","—")}</div>' if assessment.get("frequency") else ''}
+                {f'<div style="font-size:0.85rem;color:#8FB8A6;margin-top:4px;">Frequency: {assessment.get("frequency","—")}</div>' if assessment.get("frequency") else ''}
             </div>
             <div style="text-align:center;padding-top:20px;border-top:1px dashed #DDE8E1;">
-                {'<div style="font-size:0.78rem;color:#4A6B52;margin-bottom:4px;">📍 ' + cp.get('address','') + '</div>' if cp.get('address') else ''}
-                {'<div style="font-size:0.78rem;color:#4A6B52;">📞 ' + cp.get('phone','') + '</div>' if cp.get('phone') else ''}
+                {'<div style="font-size:0.78rem;color:#9DC2B0;margin-bottom:4px;">📍 ' + cp.get('address','') + '</div>' if cp.get('address') else ''}
+                {'<div style="font-size:0.78rem;color:#9DC2B0;">📞 ' + cp.get('phone','') + '</div>' if cp.get('phone') else ''}
                 <div style="font-size:0.75rem;color:#9AB5A0;margin-top:10px;font-style:italic;">We wish you continued health and wellness.</div>
             </div>
         </div>
@@ -497,7 +539,7 @@ def render_receipt(r, cp):
         .receipt-clinic-sub {{ font-size:0.65rem; color:#6FCF97; letter-spacing:0.32em; text-transform:uppercase; margin-top:10px; font-weight:700; }}
         .receipt-gold-line {{ width:40px; height:2px; background:linear-gradient(90deg,transparent,#C9A84C,transparent); margin:12px auto; }}
         .receipt-body {{ padding:28px 32px 32px; }}
-        .receipt-date-badge {{ background:#F2F5F1; border-radius:50px; padding:8px 16px; text-align:center; font-size:0.7rem; color:#4A6B52; font-weight:700; letter-spacing:0.1em; margin-bottom:24px; border:1px solid #DDE8E1; }}
+        .receipt-date-badge {{ background:#F2F5F1; border-radius:50px; padding:8px 16px; text-align:center; font-size:0.7rem; color:#9DC2B0; font-weight:700; letter-spacing:0.1em; margin-bottom:24px; border:1px solid #DDE8E1; }}
         .receipt-section-title {{ font-size:0.6rem; font-weight:700; color:#9AB5A0; text-transform:uppercase; letter-spacing:0.2em; margin:18px 0 10px; }}
         .receipt-row {{ display:flex; justify-content:space-between; align-items:center; margin:9px 0; font-size:0.88rem; }}
         .receipt-row span:first-child {{ color:#6B8A72; }} .receipt-row span:last-child {{ color:#0D1F14; font-weight:600; }}
@@ -508,7 +550,7 @@ def render_receipt(r, cp):
         .receipt-discount {{ color:#C0392B !important; }}
         .receipt-footer-area {{ text-align:center; padding-top:12px; border-top:1px dashed #DDE8E1; margin-top:22px; }}
         .receipt-footer-text {{ font-size:0.72rem; color:#9AB5A0; margin:4px 0; }}
-        .receipt-footer-clinic {{ font-size:0.75rem; color:#4A6B52; font-weight:600; margin-top:8px; }}
+        .receipt-footer-clinic {{ font-size:0.75rem; color:#9DC2B0; font-weight:600; margin-top:8px; }}
         `;
         var content = `{receipt_js}`;
         var w = window.open('', '_blank', 'width=480,height=800');
@@ -684,7 +726,7 @@ if selected == "🩺  Clinical Workspace":
                     section_label(f"Previous Assessments ({len(prev_forms)})")
                     for f in prev_forms[:3]:
                         outcome_class = "tag-success" if f.get("outcome")=="Successfully Relieved" else ("tag-condition" if f.get("outcome") in ["No Improvement","Patient Discontinued"] else "tag-pending")
-                        st.markdown(f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.1rem;color:#0D1F14;">{f.get("filled_date","")}</div><span class="tag-pill {outcome_class}">{f.get("outcome","Pending")}</span></div><div style="font-size:0.88rem;color:#0D1F14;margin-bottom:8px;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Diagnosis</strong><br/>{f.get("problem","—")}</div><div style="font-size:0.88rem;color:#0D1F14;margin-bottom:8px;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Body Area</strong> <span style="color:#4A6B52;">{f.get("body_area","—")}</span> · <strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Pain</strong> <span style="color:#4A6B52;">{f.get("pain_before","—")}/10 → {f.get("pain_after","—")}/10</span></div><div style="font-size:0.85rem;color:#6B8A72;"><strong style="color:#1A5C3E;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Plan</strong><br/>{f.get("treatment_plan","—")}</div></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.1rem;color:#EAF2EC;">{f.get("filled_date","")}</div><span class="tag-pill {outcome_class}">{f.get("outcome","Pending")}</span></div><div style="font-size:0.88rem;color:#EAF2EC;margin-bottom:8px;"><strong style="color:#D4B45C;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Diagnosis</strong><br/>{f.get("problem","—")}</div><div style="font-size:0.88rem;color:#EAF2EC;margin-bottom:8px;"><strong style="color:#D4B45C;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Body Area</strong> <span style="color:#9DC2B0;">{f.get("body_area","—")}</span> · <strong style="color:#D4B45C;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Pain</strong> <span style="color:#9DC2B0;">{f.get("pain_before","—")}/10 → {f.get("pain_after","—")}/10</span></div><div style="font-size:0.85rem;color:#8FB8A6;"><strong style="color:#D4B45C;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;">Plan</strong><br/>{f.get("treatment_plan","—")}</div></div>', unsafe_allow_html=True)
                         if st.button(f"✏️ Edit this assessment", key=f"edit_btn_{f['id']}"):
                             st.session_state[f"editing_form_{f['id']}"] = True
                         if st.session_state.get(f"editing_form_{f['id']}"):
@@ -865,7 +907,7 @@ elif selected == "📈  Dashboard":
         for i, a in enumerate(today_appts[:4]):
             with cols[i%4]:
                 sc = {"Scheduled":"#C47649","Completed":"#4A6752","Cancelled":"#B85C3A","No-show":"#8A7E60"}.get(a["Status"],"#C47649")
-                st.markdown(f'<div class="card" style="border-left:3px solid {sc};"><div style="font-family:Inter,sans-serif;font-size:0.65rem;color:#8A7E60;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;">{a["Time"]}</div><div style="font-family:Fraunces,serif;font-size:1.3rem;font-style:italic;color:#1F2924;margin:6px 0;letter-spacing:-0.01em;">{a["Patient"]}</div><div style="font-size:0.85rem;color:#4A5A52;">Dr. {a["Doctor"]}</div><div style="font-size:0.78rem;color:#8A7E60;margin-top:4px;font-style:italic;">{a.get("Reason","")}</div><span class="tag-pill" style="background:{sc}25;color:{sc};margin-top:8px;display:inline-block;">{a["Status"]}</span></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="card" style="border-left:3px solid {sc};"><div style="font-family:Inter,sans-serif;font-size:0.65rem;color:#9DC2B0;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;">{a["Time"]}</div><div style="font-family:Fraunces,serif;font-size:1.3rem;font-style:italic;color:#EAF2EC;margin:6px 0;letter-spacing:-0.01em;">{a["Patient"]}</div><div style="font-size:0.85rem;color:#C5D6CC;">Dr. {a["Doctor"]}</div><div style="font-size:0.78rem;color:#9DC2B0;margin-top:4px;font-style:italic;">{a.get("Reason","")}</div><span class="tag-pill" style="background:{sc}25;color:{sc};margin-top:8px;display:inline-block;">{a["Status"]}</span></div>', unsafe_allow_html=True)
     else: st.info("No appointments scheduled for today.")
 
     ca,cb = st.columns([3,2])
@@ -970,7 +1012,7 @@ elif selected == "🖥️  Reception":
         if found:
             for p in found[:5]:
                 visits_p = len([v for v in sb_all("visits", filters={"patient_id": p["id"]}) ])
-                st.markdown(f'<div class="card" style="padding:14px 20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.2rem;color:#0D1F14;">{p["name"]}</div><div style="font-size:0.8rem;color:#6B8A72;margin-top:2px;">{patient_id_fmt(p["id"])} · 📞 {p.get("phone","—")} · {p.get("gender","—")} · {visits_p} visits</div></div></div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="card" style="padding:14px 20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.2rem;color:#EAF2EC;">{p["name"]}</div><div style="font-size:0.8rem;color:#8FB8A6;margin-top:2px;">{patient_id_fmt(p["id"])} · 📞 {p.get("phone","—")} · {p.get("gender","—")} · {visits_p} visits</div></div></div></div>', unsafe_allow_html=True)
         else:
             st.info("No patient found with that name or phone.")
 
@@ -1014,7 +1056,7 @@ elif selected == "🖥️  Reception":
                     rem = max(0, int(sess_chk.get("total_sessions",0) or 0) - int(sess_chk.get("sessions_done",0) or 0)) if sess_chk else "—"
                     done_count = sess_chk.get("sessions_done",0) if sess_chk else 0
                     total_count = assessment.get("sessions_needed",0)
-                    st.markdown(f'<div class="card" style="border-left:3px solid #4A6752;"><div style="font-size:0.65rem;color:#4A6752;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;">Doctor\'s Plan</div><div style="margin-top:8px;font-family:Fraunces,serif;font-size:1.1rem;font-style:italic;color:#1F2924;">{assessment.get("problem","")}</div><div style="margin-top:6px;font-size:0.88rem;color:#4A5A52;">Sessions: <strong>{done_count}/{total_count}</strong> · Remaining: <strong>{rem}</strong> · Body area: {assessment.get("body_area","—")}</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="card" style="border-left:3px solid #4A6752;"><div style="font-size:0.65rem;color:#4A6752;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;">Doctor\'s Plan</div><div style="margin-top:8px;font-family:Fraunces,serif;font-size:1.1rem;font-style:italic;color:#EAF2EC;">{assessment.get("problem","")}</div><div style="margin-top:6px;font-size:0.88rem;color:#C5D6CC;">Sessions: <strong>{done_count}/{total_count}</strong> · Remaining: <strong>{rem}</strong> · Body area: {assessment.get("body_area","—")}</div></div>', unsafe_allow_html=True)
 
             final_due = base_price
             if disc_type == "Fixed (IQD)": final_due = max(0.0, base_price-disc_val)
@@ -1024,7 +1066,7 @@ elif selected == "🖥️  Reception":
             referral_options = ["Walk-in / Direct","Instagram / Social Media","Google Search","Friend / Word of mouth"]+ref_names
             how_found = st.selectbox("How did the patient find us?", referral_options)
             referred_by_val = how_found if how_found in ref_names else None
-            st.markdown(f'<div style="font-family:Fraunces,serif;font-size:1.8rem;font-style:italic;color:#1F2924;margin:20px 0;">Total due: <strong style="color:#C47649;">{fmt(final_due)}</strong></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-family:Fraunces,serif;font-size:1.8rem;font-style:italic;color:#EAF2EC;margin:20px 0;">Total due: <strong style="color:#D4B45C;">{fmt(final_due)}</strong></div>', unsafe_allow_html=True)
             if st.button("Save & Print Receipt", use_container_width=True):
                 if target_p == "— select —": st.error("Please select a patient.")
                 elif base_price == 0.0: st.error("Please select a service or bundle.")
@@ -1110,7 +1152,7 @@ elif selected == "🖥️  Reception":
                     done_f = int(sess_f.get("sessions_done") or 0); total_f = int(sess_f.get("total_sessions") or 0)
                     rem_text = f"{done_f} of {total_f} sessions"
                 outcome_class = "tag-success" if f.get("outcome")=="Successfully Relieved" else ("tag-condition" if f.get("outcome") in ["No Improvement","Patient Discontinued"] else "tag-pending")
-                st.markdown(f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Fraunces,serif;font-size:1.4rem;font-style:italic;color:#1F2924;letter-spacing:-0.01em;">{pname}</div><span class="tag-pill {outcome_class}">{f.get("outcome","Pending")}</span></div><div style="font-size:0.75rem;color:#8A7E60;margin-top:6px;font-family:Inter,sans-serif;letter-spacing:0.04em;">Dr. {dname} · {f.get("filled_date","")} · {rem_text}</div><div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;">{f"<span class=patient-chip>{f.get('body_area','')}</span>" if f.get('body_area') else ''}{f"<span class=patient-chip>{f.get('duration','')}</span>" if f.get('duration') else ''}{f"<span class=patient-chip accent>Pain: {f.get('pain_before','—')}/10</span>"}</div><div style="margin-top:14px;font-size:0.9rem;color:#1F2924;"><strong style="color:#C47649;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Diagnosis</strong><br/>{f.get("problem","—")}</div><div style="margin-top:10px;font-size:0.88rem;color:#4A5A52;"><strong style="color:#C47649;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Treatment Plan</strong><br/>{f.get("treatment_plan","—")}</div>{f"<div style=margin-top:10px;font-size:0.85rem;color:#B85C3A;><strong style=color:#B85C3A;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;>Red Flags</strong><br/>{f.get('red_flags','')}</div>" if f.get("red_flags") else ""}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Cormorant Garamond,serif;font-size:1.5rem;font-style:italic;color:#FFFFFF;letter-spacing:-0.01em;">{pname}</div><span class="tag-pill {outcome_class}">{f.get("outcome","Pending")}</span></div><div style="font-size:0.78rem;color:#9DC2B0;margin-top:6px;font-family:Inter,sans-serif;letter-spacing:0.04em;">Dr. {dname} · {f.get("filled_date","")} · {rem_text}</div><div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;">{f"<span class=patient-chip>{f.get('body_area','')}</span>" if f.get('body_area') else ''}{f"<span class=patient-chip>{f.get('duration','')}</span>" if f.get('duration') else ''}{f"<span class=patient-chip accent>Pain: {f.get('pain_before','—')}/10</span>"}</div><div style="margin-top:14px;font-size:0.9rem;color:#EAF2EC;"><strong style="color:#D4B45C;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Diagnosis</strong><br/>{f.get("problem","—")}</div><div style="margin-top:10px;font-size:0.88rem;color:#C5D6CC;"><strong style="color:#D4B45C;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Treatment Plan</strong><br/>{f.get("treatment_plan","—")}</div>{f"<div style=margin-top:10px;font-size:0.85rem;color:#FF8A7A;><strong style=color:#FF8A7A;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;>Red Flags</strong><br/>{f.get('red_flags','')}</div>" if f.get("red_flags") else ""}</div>', unsafe_allow_html=True)
         else: st.info("No doctor assessments yet.")
 
     with tQ:
@@ -1137,7 +1179,7 @@ elif selected == "🖥️  Reception":
                 assessment_q = sb_one("doctor_intake_form", filters={"patient_id": pid})
                 if assessment_q:
                     section_label("Doctor's Assessment")
-                    st.markdown(f'<div class="card"><div style="font-size:0.88rem;color:#1F2924;"><strong style="color:#C47649;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Problem</strong><br/>{assessment_q.get("problem","")}</div><div style="margin-top:10px;font-size:0.88rem;color:#1F2924;"><strong style="color:#C47649;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Plan</strong><br/>{assessment_q.get("treatment_plan","")}</div><div style="margin-top:10px;font-size:0.85rem;color:#4A5A52;">Outcome: {assessment_q.get("outcome","Pending")} · Pain: {assessment_q.get("pain_before","—")}/10 → {assessment_q.get("pain_after","—")}/10</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="card"><div style="font-size:0.88rem;color:#EAF2EC;"><strong style="color:#D4B45C;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Problem</strong><br/>{assessment_q.get("problem","")}</div><div style="margin-top:10px;font-size:0.88rem;color:#EAF2EC;"><strong style="color:#D4B45C;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;">Plan</strong><br/>{assessment_q.get("treatment_plan","")}</div><div style="margin-top:10px;font-size:0.85rem;color:#C5D6CC;">Outcome: {assessment_q.get("outcome","Pending")} · Pain: {assessment_q.get("pain_before","—")}/10 → {assessment_q.get("pain_after","—")}/10</div></div>', unsafe_allow_html=True)
                 if sess_p:
                     done = int(sess_p.get("sessions_done") or 0); total = int(sess_p.get("total_sessions") or 0)
                     rem = max(0, total-done); pct = int((done/total*100)) if total>0 else 0
@@ -1167,7 +1209,7 @@ elif selected == "🖥️  Reception":
                 phone_display = fu["phone"] if fu["phone"] else "⚠️ No phone number"
                 col_a, col_b = st.columns([3, 1])
                 with col_a:
-                    st.markdown(f'<div class="card" style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.3rem;color:#0D1F14;">{fu["name"]}</div><div style="font-size:0.8rem;color:#6B8A72;margin-top:4px;">📞 {phone_display} · Completed {fu["total_sessions"]} sessions · Last visit {fu["last_visit"]} ({fu["days_passed"]} days ago)</div></div></div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="card" style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.3rem;color:#EAF2EC;">{fu["name"]}</div><div style="font-size:0.8rem;color:#8FB8A6;margin-top:4px;">📞 {phone_display} · Completed {fu["total_sessions"]} sessions · Last visit {fu["last_visit"]} ({fu["days_passed"]} days ago)</div></div></div></div>', unsafe_allow_html=True)
                 with col_b:
                     if fu["phone"]:
                         st.markdown(f'<a href="{wa_url}" target="_blank" style="display:inline-block;background:#25D366;color:#FFFFFF;padding:12px 20px;border-radius:50px;text-decoration:none;font-weight:600;font-size:0.85rem;text-align:center;width:100%;box-shadow:0 2px 10px rgba(37,211,102,0.3);">💬 WhatsApp</a>', unsafe_allow_html=True)
@@ -1177,7 +1219,7 @@ elif selected == "🖥️  Reception":
                         play_ding(); st.success(f"Marked {fu['name']} as contacted."); st.rerun()
             st.markdown("---")
             section_label("Message preview")
-            st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#0D1F14;line-height:1.7;">{get_followup_template().replace("{name}", "[Patient Name]").replace("{clinic}", cp_w.get("clinic_name","Garden Clinic")).replace("{days}", "20")}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{get_followup_template().replace("{name}", "[Patient Name]").replace("{clinic}", cp_w.get("clinic_name","Garden Clinic")).replace("{days}", "20")}</div></div>', unsafe_allow_html=True)
             st.caption("You can customize this message in Settings → Clinic Profile.")
         else:
             st.success("✓ No follow-ups needed right now. All completed patients have been contacted or it hasn't been 20 days yet.")
@@ -1186,8 +1228,8 @@ elif selected == "🖥️  Reception":
         section_label("Register New Patient")
         c1,c2 = st.columns(2)
         with c1:
-            p_name = st.text_input("Full name *"); p_phone = st.text_input(964"Phone number")
-            p_dob  = st.text_input("Date of birth (YYYY-MM-DD)", placeholder="2006-11-23")
+            p_name = st.text_input("Full name *"); p_phone = st.text_input("Phone number")
+            p_dob  = st.text_input("Date of birth (YYYY-MM-DD)", placeholder="1990-01-15")
         with c2:
             p_gender = st.selectbox("Gender", ["Prefer not to say","Male","Female","Other"])
             p_notes  = st.text_area("Notes", height=100)
@@ -1689,7 +1731,7 @@ elif selected == "🔬  Research":
     narrative = ""
     if total_treated > 0:
         narrative = f"In this period, we successfully treated <strong>{total_treated} patients</strong>. Of those, <strong>{relieved} ({success_rate:.1f}%)</strong> experienced full pain relief, and <strong>{relieved+partial} ({improvement_rate:.1f}%)</strong> showed measurable improvement. This data reflects our commitment to evidence-based, results-driven physical therapy care."
-    st.markdown(f'<div class="card" style="padding:28px 32px;"><div style="font-family:Fraunces,serif;font-size:1.2rem;font-style:italic;color:#1F2924;line-height:1.7;">{narrative if narrative else "No data yet for this period."}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="card" style="padding:28px 32px;"><div style="font-family:Fraunces,serif;font-size:1.2rem;font-style:italic;color:#EAF2EC;line-height:1.7;">{narrative if narrative else "No data yet for this period."}</div></div>', unsafe_allow_html=True)
     section_label("By Doctor")
     doctors_r = sb_all("doctors", order="name")
     rows_dr = []
@@ -1940,4 +1982,4 @@ elif selected == "⚙️  Settings":
             play_ding(); st.success("Message template saved!"); st.rerun()
         st.markdown("**Preview:**")
         preview = new_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{days}", "20")
-        st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#0D1F14;line-height:1.7;">{preview}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{preview}</div></div>', unsafe_allow_html=True)
