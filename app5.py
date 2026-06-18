@@ -446,10 +446,13 @@ def get_tomorrow_appointments():
 
 def get_doctor_noshows():
     """Patients whose doctor has a fixed schedule day that has already passed (today or before),
-    who have remaining sessions, but have no visit logged on that scheduled day."""
+    who have remaining sessions, but have no visit logged on that scheduled day.
+    Uses the patient's assigned_doctor_id when set (accurate, works even for brand-new patients);
+    falls back to 'ever had a visit with this doctor' for older patients registered before assignment existed."""
     doctors_sched = sb_all("doctors")
     sessions_all = sb_all("patient_sessions")
-    patients_map = {p["id"]: p["name"] for p in sb_all("patients")}
+    patients_all = sb_all("patients")
+    patients_map = {p["id"]: p["name"] for p in patients_all}
     visits_all = sb_all("visits")
     weekday_names = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
     today_name = weekday_names[date.today().weekday()]
@@ -458,9 +461,12 @@ def get_doctor_noshows():
         sched_days = (d.get("schedule_days") or "").split(",")
         sched_days = [s.strip() for s in sched_days if s.strip()]
         if today_name not in sched_days: continue
-        # patients linked to this doctor's care with remaining sessions
-        doc_visits_patient_ids = set(v.get("patient_id") for v in visits_all if v.get("doctor_id")==d["id"])
-        for pid in doc_visits_patient_ids:
+        # Primary: patients explicitly assigned to this doctor
+        assigned_ids = set(p["id"] for p in patients_all if p.get("assigned_doctor_id")==d["id"])
+        # Fallback: older patients with no assignment but past visit history with this doctor
+        unassigned_with_history = set(v.get("patient_id") for v in visits_all if v.get("doctor_id")==d["id"]) - set(p["id"] for p in patients_all if p.get("assigned_doctor_id"))
+        candidate_ids = assigned_ids | unassigned_with_history
+        for pid in candidate_ids:
             sess = next((s for s in sessions_all if s.get("patient_id")==pid), None)
             if not sess: continue
             done = int(sess.get("sessions_done") or 0); total = int(sess.get("total_sessions") or 0)
@@ -1386,6 +1392,9 @@ elif selected == "🖥️  Reception":
             p_dob  = st.text_input("Date of birth (YYYY-MM-DD)", placeholder="1990-01-15")
         with c2:
             p_gender = st.selectbox("Gender", ["Prefer not to say","Male","Female","Other"])
+            all_docs_reg = sb_all("doctors", order="name")
+            doc_names_reg = ["Not assigned yet"] + [d["name"] for d in all_docs_reg]
+            p_assigned_doc = st.selectbox("Assigned Doctor", doc_names_reg, help="Which doctor will be treating this patient? Used for no-show tracking.")
             p_notes  = st.text_area("Notes", height=100)
         p_phone = (p_country_code.strip() + p_phone_local.strip()) if p_phone_local.strip() else ""
         if p_phone_local.strip(): st.caption(f"📞 Will be saved as: {p_phone}")
@@ -1394,13 +1403,14 @@ elif selected == "🖥️  Reception":
             if p_name.strip():
                 if sb_exists("patients","name",p_name.strip()): st.error("Already exists.")
                 else:
-                    sb_insert("patients",{"name":p_name.strip(),"phone":p_phone.strip(),"date_of_birth":p_dob.strip(),"gender":p_gender,"notes":p_notes.strip(),"created_at":today_str})
+                    assigned_doc_id = next((d["id"] for d in all_docs_reg if d["name"]==p_assigned_doc), None)
+                    sb_insert("patients",{"name":p_name.strip(),"phone":p_phone.strip(),"date_of_birth":p_dob.strip(),"gender":p_gender,"notes":p_notes.strip(),"created_at":today_str,"assigned_doctor_id":assigned_doc_id})
                     log_action(username,"New Patient",f"{p_name.strip()} | {p_gender}")
                     new_pat = sb_one("patients", filters={"name": p_name.strip()})
                     pid_new = new_pat["id"] if new_pat else 0
                     play_ding(); st.success(f"✅ Patient '{p_name}' registered — ID: **{patient_id_fmt(pid_new)}**")
                     if give_receipt:
-                        st.session_state.intake_rcpt = {"patient":p_name.strip(),"doctor":"To be assigned","item":"Initial Intake","base":0,"disc":0,"net":0,"method":"—","date":today_str,"invoice":"","patient_id_fmt":patient_id_fmt(pid_new)}
+                        st.session_state.intake_rcpt = {"patient":p_name.strip(),"doctor":p_assigned_doc if p_assigned_doc!="Not assigned yet" else "To be assigned","item":"Initial Intake","base":0,"disc":0,"net":0,"method":"—","date":today_str,"invoice":"","patient_id_fmt":patient_id_fmt(pid_new)}
         if "intake_rcpt" in st.session_state: render_receipt(st.session_state.intake_rcpt, get_clinic_profile())
 
     with t4:
@@ -1421,9 +1431,15 @@ elif selected == "🖥️  Reception":
                     gopts = ["Prefer not to say","Male","Female","Other"]
                     cg = pat.get("gender","Prefer not to say") or "Prefer not to say"
                     new_gender = st.selectbox("Gender", gopts, index=gopts.index(cg) if cg in gopts else 0, key="ep_gender")
+                    all_docs_edit = sb_all("doctors", order="name")
+                    doc_names_edit = ["Not assigned yet"] + [d["name"] for d in all_docs_edit]
+                    cur_assigned_id = pat.get("assigned_doctor_id")
+                    cur_assigned_name = next((d["name"] for d in all_docs_edit if d["id"]==cur_assigned_id), "Not assigned yet")
+                    new_assigned_doc = st.selectbox("Assigned Doctor", doc_names_edit, index=doc_names_edit.index(cur_assigned_name) if cur_assigned_name in doc_names_edit else 0, key="ep_assigned_doc")
                     new_notes = st.text_area("Notes", value=pat.get("notes","") or "", height=100, key="ep_notes")
                 if st.button("Save Changes", key="btn_edit_patient"):
-                    sb_update("patients",{"name":new_name.strip(),"phone":new_phone.strip(),"date_of_birth":new_dob.strip(),"gender":new_gender,"notes":new_notes.strip()},"id",pat["id"])
+                    new_assigned_id = next((d["id"] for d in all_docs_edit if d["name"]==new_assigned_doc), None)
+                    sb_update("patients",{"name":new_name.strip(),"phone":new_phone.strip(),"date_of_birth":new_dob.strip(),"gender":new_gender,"notes":new_notes.strip(),"assigned_doctor_id":new_assigned_id},"id",pat["id"])
                     play_ding(); st.success("Updated."); st.rerun()
 
     with t5:
