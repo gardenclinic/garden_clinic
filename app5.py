@@ -425,6 +425,51 @@ def get_followup_template():
     if rows: return rows[0].get("value","")
     return "Hello {name}! 🌿 This is {clinic} checking in on you. It's been {days} days since you completed your treatment. We hope you're feeling great! If you need any follow-up care or have any concerns, we're here for you. Stay healthy! 💚"
 
+def get_reminder_template():
+    rows = sb_all("clinic_settings", filters={"key": "reminder_template"})
+    if rows: return rows[0].get("value","")
+    return "Hello {name}! 🌿 This is a friendly reminder from {clinic} that you have an appointment tomorrow, {date} at {time} with Dr. {doctor}. We look forward to seeing you! If you need to reschedule, please let us know."
+
+def get_tomorrow_appointments():
+    """Appointments scheduled for tomorrow that are still 'Scheduled'."""
+    tmrw = (date.today() + timedelta(days=1)).isoformat()
+    appts = sb_all("appointments", filters={"appt_date": tmrw, "status": "Scheduled"})
+    patients_map = {p["id"]: p for p in sb_all("patients")}
+    doctors_map = {d["id"]: d["name"] for d in sb_all("doctors")}
+    out = []
+    for a in appts:
+        pat = patients_map.get(a.get("patient_id"), {})
+        out.append({"appt_id": a["id"], "name": pat.get("name","Unknown"), "phone": pat.get("phone",""),
+            "date": a.get("appt_date",""), "time": a.get("appt_time",""), "doctor": doctors_map.get(a.get("doctor_id"),"—"),
+            "reason": a.get("reason","")})
+    return out
+
+def get_doctor_noshows():
+    """Patients whose doctor has a fixed schedule day that has already passed (today or before),
+    who have remaining sessions, but have no visit logged on that scheduled day."""
+    doctors_sched = sb_all("doctors")
+    sessions_all = sb_all("patient_sessions")
+    patients_map = {p["id"]: p["name"] for p in sb_all("patients")}
+    visits_all = sb_all("visits")
+    weekday_names = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+    today_name = weekday_names[date.today().weekday()]
+    noshows = []
+    for d in doctors_sched:
+        sched_days = (d.get("schedule_days") or "").split(",")
+        sched_days = [s.strip() for s in sched_days if s.strip()]
+        if today_name not in sched_days: continue
+        # patients linked to this doctor's care with remaining sessions
+        doc_visits_patient_ids = set(v.get("patient_id") for v in visits_all if v.get("doctor_id")==d["id"])
+        for pid in doc_visits_patient_ids:
+            sess = next((s for s in sessions_all if s.get("patient_id")==pid), None)
+            if not sess: continue
+            done = int(sess.get("sessions_done") or 0); total = int(sess.get("total_sessions") or 0)
+            if total <= 0 or done >= total: continue
+            visited_today = any(v.get("patient_id")==pid and v.get("visit_date")==today_str and v.get("doctor_id")==d["id"] for v in visits_all)
+            if not visited_today:
+                noshows.append({"name": patients_map.get(pid,"Unknown"), "doctor": d["name"], "remaining": total-done})
+    return noshows
+
 def render_discharge_summary(patient_name, patient_id, assessment, sessions_done, cp):
     pain_before = assessment.get("pain_before", "—")
     pain_after  = assessment.get("pain_after",  "—")
@@ -654,7 +699,7 @@ if not st.session_state.logged_in:
             code = st.text_input("Admin code", type="password", key="reg_code")
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Create Account", use_container_width=True, key="btn_create_acc"):
-                if code != "1011": st.error("ASK MR.HARYAD TO MAKE AN ACCOUNT FOR YOU.")
+                if code != "1011": st.error("Invalid admin code.")
                 elif rs == "Doctor" and not linked_doc_id: st.error("Please link a doctor.")
                 elif ru and rp:
                     if sb_exists("users","username",ru.strip()): st.error("Username already taken.")
@@ -702,7 +747,7 @@ if selected == "🩺  Clinical Workspace":
     doc_info = sb_one("doctors", filters={"id": linked_doctor_id})
     page_header("Clinical Workspace", f"Dr. {doc_info['name'] if doc_info else 'Unknown'}", doc_info.get("specialty","") if doc_info else "")
 
-    df_tabs = st.tabs(["Patient Assessment","Past Assessments"])
+    df_tabs = st.tabs(["Patient Assessment","Past Assessments","🩻 Imaging"])
 
     with df_tabs[0]:
         section_label("Find Patient")
@@ -891,6 +936,68 @@ if selected == "🩺  Clinical Workspace":
                 "Sessions": f.get("sessions_needed",0), "Outcome": f.get("outcome","Pending")} for f in my_forms]
             st.dataframe(pd.DataFrame(rows_df), use_container_width=True, hide_index=True)
 
+    with df_tabs[2]:
+        import os as _os
+        section_label("🩻 X-Ray / CT / Imaging")
+        st.caption("Upload images received from the imaging department (X-ray, CT scan, MRI, etc.) sent via WhatsApp. They'll be saved here under the patient's name.")
+        img_search = st.text_input("Search patient by name or phone", key="img_search", placeholder="Type to search...")
+        all_p_img = sb_all("patients", order="name")
+        if img_search: all_p_img = [p for p in all_p_img if img_search.lower() in (p.get("name","")).lower() or img_search in (p.get("phone","") or "")]
+        if all_p_img:
+            sel_pat_img = st.selectbox("Select patient", ["— select —"]+[p["name"] for p in all_p_img], key="img_pat_sel")
+            if sel_pat_img != "— select —":
+                pat_img = next(p for p in all_p_img if p["name"]==sel_pat_img)
+                pid_img = pat_img["id"]
+                st.markdown(f'<div class="patient-chip-bar"><div class="patient-chip-name">{pat_img["name"]}</div><span class="patient-chip">{patient_id_fmt(pid_img)}</span></div>', unsafe_allow_html=True)
+
+                with st.form("upload_image_form", clear_on_submit=True):
+                    up_files = st.file_uploader("Drag & drop or browse image files", type=["png","jpg","jpeg","webp","pdf"], accept_multiple_files=True, key="img_uploader")
+                    up_label = st.selectbox("Image type", ["X-Ray","CT Scan","MRI","Ultrasound","Lab Report","Other"], key="img_label_sel")
+                    up_notes = st.text_input("Notes (optional)", placeholder="e.g. Lumbar spine, lateral view", key="img_notes_input")
+                    submitted_img = st.form_submit_button("📤 Save to Patient Record", use_container_width=True)
+                    if submitted_img:
+                        if not up_files:
+                            st.error("Please select at least one file.")
+                        else:
+                            save_dir = f"/mnt/user-data/outputs/patient_images/{pid_img}"
+                            _os.makedirs(save_dir, exist_ok=True)
+                            saved = 0
+                            for uf in up_files:
+                                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                safe_name = f"{ts}_{uf.name}".replace(" ", "_")
+                                fpath = f"{save_dir}/{safe_name}"
+                                with open(fpath, "wb") as out_f: out_f.write(uf.getbuffer())
+                                sb_insert("patient_images", {"patient_id": pid_img, "file_path": fpath, "file_name": uf.name, "image_type": up_label, "notes": up_notes.strip(), "uploaded_by": username, "uploaded_at": today_str})
+                                saved += 1
+                            log_action(username, "Upload Imaging", f"{saved} file(s) for {sel_pat_img}")
+                            play_ding(); st.success(f"✅ Saved {saved} image(s) to {sel_pat_img}'s record."); st.rerun()
+
+                st.markdown("---")
+                section_label(f"Imaging History")
+                patient_imgs = sb_all("patient_images", filters={"patient_id": pid_img}, order="id", desc_order=True)
+                if patient_imgs:
+                    for pi in patient_imgs:
+                        ic1, ic2 = st.columns([4,1])
+                        with ic1:
+                            fpath_show = pi.get("file_path","")
+                            is_image = fpath_show.lower().endswith((".png",".jpg",".jpeg",".webp"))
+                            notes_line = pi.get("notes","") or ""
+                            notes_html = f'<div style="margin-top:6px;font-size:0.85rem;color:#C5D6CC;">{notes_line}</div>' if notes_line else ""
+                            st.markdown(f'<div class="card" style="padding:14px 20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><span class="tag-pill tag-pending">{pi.get("image_type","")}</span> <span style="color:#EAF2EC;font-weight:600;margin-left:8px;">{pi.get("file_name","")}</span></div><div style="font-size:0.78rem;color:#9DC2B0;">{pi.get("uploaded_at","")} · by {pi.get("uploaded_by","")}</div></div>{notes_html}</div>', unsafe_allow_html=True)
+                            if is_image and _os.path.exists(fpath_show):
+                                st.image(fpath_show, width=280)
+                        with ic2:
+                            if st.button("🗑️ Delete", key=f"del_img_{pi['id']}"):
+                                try:
+                                    if _os.path.exists(fpath_show): _os.remove(fpath_show)
+                                except: pass
+                                sb_delete("patient_images", "id", pi["id"])
+                                play_ding(); st.success("Deleted."); st.rerun()
+                else:
+                    st.info("No images uploaded yet for this patient.")
+        else:
+            st.info("No patients found.")
+
 # ═══════════════════════════════════════════════
 # DASHBOARD
 # ═══════════════════════════════════════════════
@@ -965,7 +1072,9 @@ elif selected == "🖥️  Reception":
     followup_list_notif = get_followup_patients(days_after=20)
     overdue_notif = get_overdue_patients()
     expiring_notif = [s for s in sb_all("patient_subscriptions") if s.get("status")=="Active" and s.get("end_date") in [today_str, tomorrow_str]]
-    notif_count = len(followup_list_notif) + len(overdue_notif) + len(expiring_notif)
+    tomorrow_appts_notif = get_tomorrow_appointments()
+    noshow_notif = get_doctor_noshows()
+    notif_count = len(followup_list_notif) + len(overdue_notif) + len(expiring_notif) + len(tomorrow_appts_notif) + len(noshow_notif)
 
     head_l, head_r = st.columns([4, 1])
     with head_l:
@@ -975,6 +1084,14 @@ elif selected == "🖥️  Reception":
         st.markdown(f'<div style="text-align:right;padding-top:18px;"><div style="position:relative;display:inline-block;background:#FFFFFF;border:1px solid #DDE8E1;border-radius:50px;padding:12px 16px;box-shadow:0 2px 8px rgba(13,31,20,0.05);"><span style="font-size:1.3rem;">🔔</span>{badge}</div></div>', unsafe_allow_html=True)
         if notif_count > 0:
             with st.expander(f"🔔 {notif_count} notifications", expanded=False):
+                if tomorrow_appts_notif:
+                    st.markdown(f"**📅 {len(tomorrow_appts_notif)} appointment{'s' if len(tomorrow_appts_notif)>1 else ''} tomorrow** — remind patients below")
+                    for ta in tomorrow_appts_notif[:5]:
+                        st.caption(f"• {ta['name']} — {ta['time']} with Dr. {ta['doctor']}")
+                if noshow_notif:
+                    st.markdown(f"**❗ {len(noshow_notif)} patient{'s' if len(noshow_notif)>1 else ''} didn't come today** (doctor's scheduled day)")
+                    for ns in noshow_notif[:5]:
+                        st.caption(f"• {ns['name']} — Dr. {ns['doctor']}, {ns['remaining']} sessions left")
                 if followup_list_notif:
                     st.markdown(f"**💬 {len(followup_list_notif)} follow-up{'s' if len(followup_list_notif)>1 else ''} needed** — open the Follow-up tab")
                     for fu in followup_list_notif[:5]:
@@ -990,6 +1107,28 @@ elif selected == "🖥️  Reception":
                         st.caption(f"• {pmap_notif.get(s.get('patient_id'),'Unknown')} — '{s.get('plan_name','')}' expires {s.get('end_date','')}")
 
     pulse_bar([("Today's Revenue",fmt(today_revenue)),("Visits Today",str(today_visits_count)),("Total Patients",str(patient_count)),("Notifications",str(notif_count))])
+
+    # ── No-show banner ──
+    if noshow_notif:
+        names_ns = ", ".join([f"{ns['name']} (Dr. {ns['doctor']})" for ns in noshow_notif[:4]])
+        st.warning(f"❗ **{len(noshow_notif)} patient{'s' if len(noshow_notif)>1 else ''} didn't come in today** despite it being their doctor's scheduled day: {names_ns} — consider calling to ask why.")
+
+    # ── Tomorrow's appointment reminders ──
+    if tomorrow_appts_notif:
+        with st.expander(f"📅 {len(tomorrow_appts_notif)} appointment{'s' if len(tomorrow_appts_notif)>1 else ''} tomorrow — send reminders", expanded=False):
+            cp_rem = get_clinic_profile()
+            rem_template = get_reminder_template()
+            for ta in tomorrow_appts_notif:
+                msg_rem = rem_template.replace("{name}", ta["name"]).replace("{clinic}", cp_rem.get("clinic_name","Garden Clinic")).replace("{date}", ta["date"]).replace("{time}", ta["time"]).replace("{doctor}", ta["doctor"])
+                wa_url_rem = whatsapp_link(ta["phone"], msg_rem)
+                rcol1, rcol2 = st.columns([3,1])
+                with rcol1:
+                    st.markdown(f'<div class="card" style="margin-bottom:8px;padding:14px 20px;"><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.15rem;color:#EAF2EC;">{ta["name"]}</div><div style="font-size:0.8rem;color:#9DC2B0;margin-top:2px;">📞 {ta["phone"] or "No phone"} · {ta["time"]} with Dr. {ta["doctor"]}{" · " + ta["reason"] if ta.get("reason") else ""}</div></div>', unsafe_allow_html=True)
+                with rcol2:
+                    if ta["phone"]:
+                        st.markdown(f'<a href="{wa_url_rem}" target="_blank" style="display:inline-block;background:#25D366;color:#FFFFFF;padding:10px 18px;border-radius:50px;text-decoration:none;font-weight:600;font-size:0.82rem;text-align:center;width:100%;box-shadow:0 2px 10px rgba(37,211,102,0.3);">💬 Remind</a>', unsafe_allow_html=True)
+                    else:
+                        st.caption("⚠️ No phone")
 
     # ── Follow-up banner ──
     if followup_list_notif:
@@ -1240,11 +1379,16 @@ elif selected == "🖥️  Reception":
         section_label("Register New Patient")
         c1,c2 = st.columns(2)
         with c1:
-            p_name = st.text_input("Full name *"); p_phone = st.text_input("Phone number")
-            p_dob  = st.text_input("Date of birth (YYYY-MM-DD)", placeholder="2006-11-23")
+            p_name = st.text_input("Full name *")
+            pc1, pc2 = st.columns([1, 2])
+            with pc1: p_country_code = st.text_input("Code", value="964", key="p_country_code")
+            with pc2: p_phone_local = st.text_input("Phone number", placeholder="7701234567", key="p_phone_local")
+            p_dob  = st.text_input("Date of birth (YYYY-MM-DD)", placeholder="1990-01-15")
         with c2:
             p_gender = st.selectbox("Gender", ["Prefer not to say","Male","Female","Other"])
             p_notes  = st.text_area("Notes", height=100)
+        p_phone = (p_country_code.strip() + p_phone_local.strip()) if p_phone_local.strip() else ""
+        if p_phone_local.strip(): st.caption(f"📞 Will be saved as: {p_phone}")
         give_receipt = st.checkbox("📄 Print intake receipt", value=True)
         if st.button("Register Patient"):
             if p_name.strip():
@@ -1631,7 +1775,7 @@ elif selected == "📊  Accounting":
 # ═══════════════════════════════════════════════
 elif selected == "📑  Reports":
     page_header("Insights", "Reports", "Daily summary, top patients, services, and doctor monthly.")
-    rep_tabs = st.tabs(["Daily Report","Top Patients","Top Services","Doctor Monthly"])
+    rep_tabs = st.tabs(["Daily Report","Top Patients","Top Services","Doctor Monthly","Machine Performance"])
     with rep_tabs[0]:
         rep_date = st.date_input("Date", value=date.today(), key="dr_date")
         rep_date_str = str(rep_date)
@@ -1706,6 +1850,35 @@ elif selected == "📑  Reports":
             comm = rev * rate
             rows_dm.append({"Doctor":d["name"],"Visits":len(doc_v),"Revenue":fmt(rev),"Rate":f"{rate*100:.1f}%","Commission":fmt(comm)})
         if rows_dm: st.dataframe(pd.DataFrame(rows_dm), use_container_width=True, hide_index=True)
+
+    with rep_tabs[4]:
+        section_label("🖥️ Revenue by Machine")
+        mp_month = st.text_input("Month (YYYY-MM)", value=datetime.now().strftime("%Y-%m"), key="mp_month")
+        all_svc_mp = {s["id"]: s for s in sb_all("services")}
+        all_v_mp = [v for v in sb_all("visits") if (v.get("visit_date") or "")[:7]==mp_month and v.get("service_id")]
+        machine_rev = {}
+        for v in all_v_mp:
+            svc = all_svc_mp.get(v.get("service_id"))
+            if svc and svc.get("delivery_type")=="Machine" and svc.get("machine_name"):
+                mname = svc["machine_name"]
+                if mname not in machine_rev: machine_rev[mname] = {"revenue":0.0,"visits":0,"services":set()}
+                machine_rev[mname]["revenue"] += float(v.get("net_paid") or 0)
+                machine_rev[mname]["visits"] += 1
+                machine_rev[mname]["services"].add(svc["name"])
+        if machine_rev:
+            ranked = sorted(machine_rev.items(), key=lambda x: x[1]["revenue"], reverse=True)
+            medals = ["🥇","🥈","🥉"]
+            cols_mach = st.columns(min(len(ranked), 3))
+            for idx, (mname, info) in enumerate(ranked[:3]):
+                with cols_mach[idx]:
+                    st.markdown(card(f"{medals[idx]} {mname}", fmt(info["revenue"]), "gold", f"{info['visits']} visits this month"), unsafe_allow_html=True)
+            if len(ranked) > 3:
+                st.markdown("---")
+                section_label("All Machines")
+            rows_mp = [{"Rank": medals[i] if i<3 else f"#{i+1}", "Machine": m, "Revenue": fmt(info["revenue"]), "Visits": info["visits"], "Services Used": ", ".join(info["services"])} for i,(m,info) in enumerate(ranked)]
+            st.dataframe(pd.DataFrame(rows_mp), use_container_width=True, hide_index=True)
+        else:
+            st.info("No machine-based services recorded for this month yet. Mark services as 'Machine' in Settings → Services to track this.")
 
 # ═══════════════════════════════════════════════
 # RESEARCH
@@ -1815,16 +1988,26 @@ elif selected == "⚙️  Settings":
         section_label("Add Doctor")
         c1,c2 = st.columns(2)
         with c1: d_name = st.text_input("Doctor name"); d_spec = st.text_input("Specialty")
+        with c2: d_days = st.multiselect("Work days (for no-show tracking)", ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"], key="d_days_new")
         if st.button("Add Doctor"):
             if d_name.strip():
                 if sb_exists("doctors","name",d_name.strip()): st.error("Already exists.")
                 else:
-                    sb_insert("doctors",{"name":d_name.strip(),"specialty":d_spec.strip(),"comm_type":"tiered","fixed_rate":0})
+                    sb_insert("doctors",{"name":d_name.strip(),"specialty":d_spec.strip(),"comm_type":"tiered","fixed_rate":0,"schedule_days":",".join(d_days)})
                     play_ding(); st.success("Added."); st.rerun()
         section_label("Current Doctors")
         all_docs = sb_all("doctors", order="name")
         if all_docs:
-            st.dataframe(pd.DataFrame(all_docs), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame([{"id":d["id"],"name":d["name"],"specialty":d.get("specialty",""),"work_days":d.get("schedule_days","") or "Not set"} for d in all_docs]), use_container_width=True, hide_index=True)
+            section_label("Update Doctor's Work Days")
+            sel_doc_days = st.selectbox("Select doctor", ["— select —"]+[d["name"] for d in all_docs], key="sel_doc_days_upd")
+            if sel_doc_days != "— select —":
+                doc_obj_days = next(d for d in all_docs if d["name"]==sel_doc_days)
+                cur_days = [s.strip() for s in (doc_obj_days.get("schedule_days") or "").split(",") if s.strip()]
+                new_days = st.multiselect("Work days", ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"], default=cur_days, key="upd_doc_days")
+                if st.button("Save Work Days"):
+                    sb_update("doctors", {"schedule_days": ",".join(new_days)}, "id", doc_obj_days["id"])
+                    play_ding(); st.success("Updated."); st.rerun()
             del_doc = st.selectbox("Remove", ["— select —"]+[d["name"] for d in all_docs])
             if st.button("Remove Doctor", type="primary"):
                 if del_doc != "— select —":
@@ -1879,16 +2062,21 @@ elif selected == "⚙️  Settings":
         with c1: s_name = st.text_input("Service name")
         with c2: s_cat = st.selectbox("Category",["General","Consultation","Procedure","Therapy","Diagnostic","Other"])
         with c3: s_price = st.number_input("Price (IQD)", min_value=0.0, step=5000.0)
+        s_delivery = st.radio("How is this service performed?", ["Manual (by hand)","Machine"], horizontal=True, key="s_delivery")
+        s_machine_name = ""
+        if s_delivery == "Machine":
+            s_machine_name = st.text_input("Machine name", placeholder="e.g. Laser Decompression Unit, Shockwave Device", key="s_machine_name")
         if st.button("Add Service"):
             if s_name.strip():
                 if sb_exists("services","name",s_name.strip()): st.error("Already exists.")
+                elif s_delivery == "Machine" and not s_machine_name.strip(): st.error("Please enter the machine name.")
                 else:
-                    sb_insert("services",{"name":s_name.strip(),"category":s_cat,"price":s_price,"active":1})
+                    sb_insert("services",{"name":s_name.strip(),"category":s_cat,"price":s_price,"active":1,"delivery_type":s_delivery,"machine_name":s_machine_name.strip() if s_delivery=="Machine" else ""})
                     play_ding(); st.success("Added."); st.rerun()
         section_label("Current Services")
         all_svc = sb_all("services", order="name")
         if all_svc:
-            df_svc = pd.DataFrame([{"id":s["id"],"name":s["name"],"category":s.get("category",""),"price":fmt(s.get("price"))} for s in all_svc])
+            df_svc = pd.DataFrame([{"id":s["id"],"name":s["name"],"category":s.get("category",""),"price":fmt(s.get("price")),"type":s.get("delivery_type","Manual (by hand)"),"machine":s.get("machine_name","") or "—"} for s in all_svc])
             st.dataframe(df_svc, use_container_width=True, hide_index=True)
             del_svc = st.selectbox("Remove", ["— select —"]+[s["name"] for s in all_svc])
             if st.button("Remove Service", type="primary"):
@@ -1995,3 +2183,17 @@ elif selected == "⚙️  Settings":
         st.markdown("**Preview:**")
         preview = new_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{days}", "20")
         st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{preview}</div></div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+        section_label("📅 Appointment Reminder Message")
+        st.caption("This message is used for tomorrow's appointment reminders. Use {name}, {clinic}, {date}, {time}, {doctor}.")
+        current_rem_template = get_reminder_template()
+        new_rem_template = st.text_area("Reminder message", value=current_rem_template, height=120, key="reminder_template_input")
+        if st.button("Save Reminder Template", key="btn_save_reminder_template"):
+            existing_rt = sb_all("clinic_settings", filters={"key": "reminder_template"})
+            if existing_rt: sb_update("clinic_settings", {"value": new_rem_template}, "id", existing_rt[0]["id"])
+            else: sb_insert("clinic_settings", {"key": "reminder_template", "value": new_rem_template})
+            play_ding(); st.success("Reminder template saved!"); st.rerun()
+        st.markdown("**Preview:**")
+        preview_rem = new_rem_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{date}", "2026-06-19").replace("{time}", "10:30 AM").replace("{doctor}", "Haryad")
+        st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{preview_rem}</div></div>', unsafe_allow_html=True)
