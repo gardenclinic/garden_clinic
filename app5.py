@@ -357,6 +357,23 @@ def get_clinic_profile():
 
 def patient_id_fmt(pid): return f"#{int(pid):04d}"
 
+def get_patient_loyalty(patient_id, created_at, visits_count):
+    """Returns (tier_name, icon, color_hex, months_text) based on time since registration and visit count.
+    Bronze: 3+ months OR 10+ visits. Silver: 6+ months OR 25+ visits. Gold: 12+ months OR 50+ visits."""
+    months_since = 0
+    if created_at:
+        try:
+            created_date = datetime.strptime(created_at[:10], "%Y-%m-%d").date()
+            months_since = (date.today().year - created_date.year) * 12 + (date.today().month - created_date.month)
+        except: months_since = 0
+    if months_since >= 12 or visits_count >= 50:
+        return ("Gold", "🥇", "#C9A84C", f"{months_since} mo · {visits_count} visits")
+    elif months_since >= 6 or visits_count >= 25:
+        return ("Silver", "🥈", "#C5C5C5", f"{months_since} mo · {visits_count} visits")
+    elif months_since >= 3 or visits_count >= 10:
+        return ("Bronze", "🥉", "#B87333", f"{months_since} mo · {visits_count} visits")
+    return (None, None, None, None)
+
 def get_invoice_number():
     all_v = sb_all("visits")
     return f"INV-{date.today().year}-{(len(all_v)+1):04d}"
@@ -825,8 +842,11 @@ if selected == "🩺  Clinical Workspace":
                     except: age_text = pat_doc.get("date_of_birth","")
                 gender_icon = "♀" if pat_doc.get("gender")=="Female" else ("♂" if pat_doc.get("gender")=="Male" else "•")
                 visits_count = sb_count("visits", filters={"patient_id": pid_doc})
+                tier_name, tier_icon, tier_color, tier_sub = get_patient_loyalty(pid_doc, pat_doc.get("created_at"), visits_count)
+                tier_chip_html = f'<span class="patient-chip" style="border-color:{tier_color};color:{tier_color};font-weight:700;" title="{tier_sub}">{tier_icon} {tier_name}</span>' if tier_name else ""
                 st.markdown(f"""<div class="patient-chip-bar">
                     <div class="patient-chip-name">{pat_doc["name"]}</div>
+                    {tier_chip_html}
                     <span class="patient-chip">{gender_icon} {pat_doc.get("gender","—")}</span>
                     <span class="patient-chip">{age_text}</span>
                     <span class="patient-chip">📞 {pat_doc.get("phone","—")}</span>
@@ -1422,7 +1442,10 @@ elif selected == "🖥️  Reception":
             if filtered:
                 qv_sel = st.selectbox("Select patient", [p["name"] for p in filtered], key="qv_sel")
                 pat = next(p for p in filtered if p["name"]==qv_sel); pid = pat["id"]
-                st.markdown(f'<div class="profile-summary"><div class="profile-kicker">Patient Profile</div><div class="profile-name">{pat["name"]}</div><div class="profile-meta">📞 {pat.get("phone","—")} &nbsp;·&nbsp; 🎂 {pat.get("date_of_birth","—")} &nbsp;·&nbsp; {pat.get("gender","—")}</div></div>', unsafe_allow_html=True)
+                qv_visits_count = sb_count("visits", filters={"patient_id": pid})
+                qv_tier_name, qv_tier_icon, qv_tier_color, qv_tier_sub = get_patient_loyalty(pid, pat.get("created_at"), qv_visits_count)
+                qv_tier_badge = f' &nbsp;·&nbsp; <span style="color:{qv_tier_color};font-weight:700;">{qv_tier_icon} {qv_tier_name} Patient</span>' if qv_tier_name else ""
+                st.markdown(f'<div class="profile-summary"><div class="profile-kicker">Patient Profile</div><div class="profile-name">{pat["name"]}</div><div class="profile-meta">📞 {pat.get("phone","—")} &nbsp;·&nbsp; 🎂 {pat.get("date_of_birth","—")} &nbsp;·&nbsp; {pat.get("gender","—")}{qv_tier_badge}</div></div>', unsafe_allow_html=True)
                 visits_p = get_visits_joined(limit=1000, patient_id=pid)
                 total_spent = sum(v["Paid"] for v in visits_p)
                 last_visit = visits_p[0]["Date"] if visits_p else "Never"
