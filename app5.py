@@ -534,6 +534,56 @@ def render_discharge_summary(patient_name, patient_id, assessment, sessions_done
             </div>
         </div>
     </div>""", unsafe_allow_html=True)
+
+def render_doctor_daily_sheet(doctor_name, rows, sheet_date):
+    """Doctor's daily one-pager: today's patients, treatment stage, red flags. Print-only dark text on white."""
+    row_html = ""
+    for r in rows:
+        flag_html = f'<div style="margin-top:4px;font-size:12px;color:#A3271F;font-weight:700;">⚠ RED FLAG: {r["red_flags"]}</div>' if r.get("red_flags") else ""
+        time_html = r.get("time","") or "—"
+        row_html += f"""
+        <div style="border:1px solid #DDDDDD;border-radius:10px;padding:14px 18px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                <div style="font-size:16px;font-weight:700;color:#1A1A1A;">{r['name']} <span style="font-size:12px;color:#777;font-weight:400;">({time_html})</span></div>
+                <div style="font-size:12px;color:#0D3D2B;font-weight:700;background:#EAF3EC;padding:3px 10px;border-radius:20px;">Session {r['sessions_done']}/{r['sessions_total']}</div>
+            </div>
+            <div style="margin-top:6px;font-size:13px;color:#333;"><b>Diagnosis:</b> {r.get('problem','—')}</div>
+            <div style="margin-top:2px;font-size:13px;color:#333;"><b>Body area:</b> {r.get('body_area','—')} &nbsp;·&nbsp; <b>Plan:</b> {r.get('treatment_plan','—')}</div>
+            {flag_html}
+        </div>"""
+    if not rows:
+        row_html = '<div style="text-align:center;color:#888;padding:30px 0;">No patients scheduled or in active treatment for today.</div>'
+
+    sheet_html = f"""
+    <div id="doctor-sheet" style="background:#FFFFFF;color:#1A1A1A;font-family:Arial,Helvetica,sans-serif;padding:24px 28px;border:1px solid #DDDDDD;border-radius:12px;max-width:720px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0D3D2B;padding-bottom:10px;margin-bottom:16px;">
+            <div>
+                <div style="font-size:11px;letter-spacing:2px;color:#C9A84C;font-weight:700;">DAILY PATIENT SHEET</div>
+                <div style="font-size:22px;font-weight:800;color:#0D3D2B;">Dr. {doctor_name}</div>
+            </div>
+            <div style="font-size:13px;color:#555;">{sheet_date}</div>
+        </div>
+        {row_html}
+    </div>"""
+    st.markdown(sheet_html, unsafe_allow_html=True)
+
+    components.html(f"""
+    <style>
+    .print-doc-sheet-btn {{ background:#0D3D2B; color:#FFF; border:none; border-radius:50px; font-weight:600; font-size:0.85rem; padding:12px 28px; font-family:'Plus Jakarta Sans',sans-serif; cursor:pointer; box-shadow:0 2px 10px rgba(13,61,43,0.2); margin-top:10px; }}
+    .print-doc-sheet-btn:hover {{ background:#1A5C3E; }}
+    </style>
+    <button class="print-doc-sheet-btn" onclick="printDocSheet()">🖨️ Print Today's Sheet</button>
+    <script>
+    function printDocSheet() {{
+        var content = `{sheet_html}`;
+        var w = window.open('', '_blank', 'width=820,height=900');
+        w.document.write('<html><head><title>Daily Sheet</title></head><body style="margin:24px;">' + content + '</body></html>');
+        w.document.close();
+        setTimeout(function() {{ w.focus(); w.print(); }}, 600);
+    }}
+    </script>
+    """, height=70)
+
 def to_excel(df):
     out = io.BytesIO()
     with pd.ExcelWriter(out, engine="openpyxl") as w: df.to_excel(w, index=False, sheet_name="Data")
@@ -753,7 +803,7 @@ if selected == "🩺  Clinical Workspace":
     doc_info = sb_one("doctors", filters={"id": linked_doctor_id})
     page_header("Clinical Workspace", f"Dr. {doc_info['name'] if doc_info else 'Unknown'}", doc_info.get("specialty","") if doc_info else "")
 
-    df_tabs = st.tabs(["Patient Assessment","Past Assessments","🩻 Imaging"])
+    df_tabs = st.tabs(["Patient Assessment","Past Assessments","🩻 Imaging","📋 Today's Sheet"])
 
     with df_tabs[0]:
         section_label("Find Patient")
@@ -1003,6 +1053,57 @@ if selected == "🩺  Clinical Workspace":
                     st.info("No images uploaded yet for this patient.")
         else:
             st.info("No patients found.")
+
+    with df_tabs[3]:
+        section_label("📋 Today's Patient Sheet")
+        st.caption("A quick one-page summary of today's patients and their treatment stage — for a glance each morning, separate from reception's appointment printout.")
+
+        sheet_rows = []
+        seen_pids = set()
+
+        # 1) Today's scheduled appointments with this doctor
+        todays_appts_doc = sb_all("appointments", filters={"doctor_id": linked_doctor_id, "appt_date": today_str})
+        patients_map_sheet = {p["id"]: p for p in sb_all("patients")}
+        intake_all_sheet = sb_all("doctor_intake_form", filters={"doctor_id": linked_doctor_id})
+        sessions_all_sheet = sb_all("patient_sessions")
+
+        def _latest_intake(pid):
+            matches = [f for f in intake_all_sheet if f.get("patient_id")==pid]
+            return sorted(matches, key=lambda x: x.get("id",0), reverse=True)[0] if matches else {}
+
+        def _session_progress(pid):
+            s = next((s for s in sessions_all_sheet if s.get("patient_id")==pid), None)
+            if not s: return ("0","0")
+            return (str(int(s.get("sessions_done") or 0)), str(int(s.get("total_sessions") or 0)))
+
+        for a in todays_appts_doc:
+            pid = a.get("patient_id")
+            if pid in seen_pids: continue
+            pat = patients_map_sheet.get(pid)
+            if not pat: continue
+            intake = _latest_intake(pid)
+            done, total = _session_progress(pid)
+            sheet_rows.append({"name": pat["name"], "time": a.get("appt_time",""), "sessions_done": done, "sessions_total": total,
+                "problem": intake.get("problem",""), "body_area": intake.get("body_area",""), "treatment_plan": intake.get("treatment_plan",""),
+                "red_flags": intake.get("red_flags","")})
+            seen_pids.add(pid)
+
+        # 2) Patients assigned to this doctor with sessions still remaining (not already listed above), in case no appointment was booked
+        assigned_patients = [p for p in patients_map_sheet.values() if p.get("assigned_doctor_id")==linked_doctor_id]
+        for pat in assigned_patients:
+            pid = pat["id"]
+            if pid in seen_pids: continue
+            done, total = _session_progress(pid)
+            if total and int(done) >= int(total): continue
+            if not total or total == "0": continue
+            intake = _latest_intake(pid)
+            sheet_rows.append({"name": pat["name"], "time": "", "sessions_done": done, "sessions_total": total,
+                "problem": intake.get("problem",""), "body_area": intake.get("body_area",""), "treatment_plan": intake.get("treatment_plan",""),
+                "red_flags": intake.get("red_flags","")})
+            seen_pids.add(pid)
+
+        sheet_date_display = date.today().strftime("%A, %B %d, %Y")
+        render_doctor_daily_sheet(doc_info['name'] if doc_info else 'Unknown', sheet_rows, sheet_date_display)
 
 # ═══════════════════════════════════════════════
 # DASHBOARD
