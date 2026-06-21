@@ -70,12 +70,12 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #EA
 .pulse-divider { width: 1px; background: rgba(201,168,76,0.25); height: 40px; align-self: center; }
 
 /* CARDS — liquid glass */
-.card { background: linear-gradient(135deg, rgba(10,50,38,0.6), rgba(4,22,16,0.5)); backdrop-filter: blur(40px) saturate(170%); -webkit-backdrop-filter: blur(40px) saturate(170%); border: 1px solid rgba(201,168,76,0.28); border-radius: 28px; padding: 24px 28px; margin-bottom: 18px; transition: all 0.5s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 12px 40px rgba(0,0,0,0.45), inset 0 1px 2px rgba(120,220,180,0.3), inset 0 -10px 30px rgba(0,0,0,0.25); position: relative; overflow: hidden; animation: cardRise 0.6s cubic-bezier(0.22,1,0.36,1) both; }
-@keyframes cardRise { 0% { opacity: 0; transform: translateY(18px) scale(0.98); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+.card { background: linear-gradient(135deg, rgba(10,50,38,0.6), rgba(4,22,16,0.5)); backdrop-filter: blur(40px) saturate(170%); -webkit-backdrop-filter: blur(40px) saturate(170%); border: 1px solid rgba(201,168,76,0.28); border-radius: 28px; padding: 24px 28px; margin-bottom: 18px; transition: all 0.45s cubic-bezier(0.22,1,0.36,1); box-shadow: 0 4px 8px rgba(0,0,0,0.25), 0 14px 28px rgba(0,0,0,0.35), 0 32px 56px rgba(0,0,0,0.3), inset 0 1px 2px rgba(120,220,180,0.3), inset 0 -10px 30px rgba(0,0,0,0.25); position: relative; overflow: hidden; animation: cardRise 0.6s cubic-bezier(0.22,1,0.36,1) both; transform-style: preserve-3d; transform: perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0px); will-change: transform; }
+@keyframes cardRise { 0% { opacity: 0; transform: perspective(900px) translateY(18px) translateZ(-40px) scale(0.98); } 100% { opacity: 1; transform: perspective(900px) translateY(0) translateZ(0) scale(1); } }
 .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%; background: linear-gradient(180deg, rgba(120,220,180,0.16), transparent); pointer-events: none; border-radius: 28px 28px 50% 50%; }
 .card::after { content: ''; position: absolute; top: -80%; left: -60%; width: 60%; height: 260%; background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.28) 48%, rgba(201,168,76,0.35) 52%, transparent 78%); transform: rotate(8deg); pointer-events: none; animation: cardShine 7s ease-in-out infinite; }
 @keyframes cardShine { 0% { left: -70%; } 55% { left: 150%; } 100% { left: 150%; } }
-.card:hover { background: linear-gradient(135deg, rgba(16,72,54,0.72), rgba(6,30,22,0.62)); border-color: rgba(201,168,76,0.6); box-shadow: 0 26px 64px rgba(0,0,0,0.55), inset 0 1px 2px rgba(120,220,180,0.4), 0 0 40px rgba(201,168,76,0.22); transform: translateY(-8px) scale(1.035); }
+.card:hover { background: linear-gradient(135deg, rgba(16,72,54,0.72), rgba(6,30,22,0.62)); border-color: rgba(201,168,76,0.6); box-shadow: 0 6px 12px rgba(0,0,0,0.3), 0 20px 40px rgba(0,0,0,0.45), 0 48px 90px rgba(0,0,0,0.45), 0 0 50px rgba(201,168,76,0.25), inset 0 1px 2px rgba(120,220,180,0.4); transform: perspective(900px) rotateX(4deg) rotateY(-4deg) translateZ(28px) scale(1.02); }
 .card h3 { font-family: 'Plus Jakarta Sans', sans-serif !important; margin: 0 0 8px 0; font-size: 0.68rem; color: #D4B45C !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; position: relative; }
 .card .big-num { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 500; margin: 0; position: relative; }
 .card .big-num.green { color: #2ECC8F; }
@@ -96,15 +96,15 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #EA
 .stTabs button[aria-selected="true"] { background: linear-gradient(135deg, rgba(22,120,88,0.85), rgba(12,56,42,0.7)) !important; backdrop-filter: blur(20px) saturate(200%) !important; color: #F0E6C8 !important; font-weight: 700 !important; border: 1px solid rgba(201,168,76,0.6) !important; box-shadow: 0 4px 16px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.4), 0 0 18px rgba(201,168,76,0.18) !important; }
 
 /* BUTTONS — emerald glass with rich motion */
-.stButton > button { background: linear-gradient(135deg, rgba(16,90,66,0.7), rgba(8,40,30,0.6)) !important; backdrop-filter: blur(24px) saturate(180%) !important; -webkit-backdrop-filter: blur(24px) saturate(180%) !important; color: #F0E6C8 !important; border: 1px solid rgba(201,168,76,0.45) !important; border-radius: 50px !important; font-weight: 700 !important; font-size: 0.85rem !important; padding: 13px 30px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.02em !important; transition: transform 0.25s cubic-bezier(0.34,1.8,0.5,1), background 0.3s, box-shadow 0.3s, border-color 0.3s !important; box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.35), inset 0 -3px 10px rgba(0,0,0,0.2) !important; position: relative !important; overflow: hidden !important; animation: btnGlow 3.5s ease-in-out infinite !important; }
-@keyframes btnGlow { 0%,100% { box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.35), inset 0 -3px 10px rgba(0,0,0,0.2), 0 0 0px rgba(201,168,76,0); } 50% { box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.45), inset 0 -3px 10px rgba(0,0,0,0.2), 0 0 18px rgba(201,168,76,0.22); } }
+.stButton > button { background: linear-gradient(135deg, rgba(16,90,66,0.7), rgba(8,40,30,0.6)) !important; backdrop-filter: blur(24px) saturate(180%) !important; -webkit-backdrop-filter: blur(24px) saturate(180%) !important; color: #F0E6C8 !important; border: 1px solid rgba(201,168,76,0.45) !important; border-radius: 50px !important; font-weight: 700 !important; font-size: 0.85rem !important; padding: 13px 30px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.02em !important; transition: transform 0.25s cubic-bezier(0.34,1.8,0.5,1), background 0.3s, box-shadow 0.3s, border-color 0.3s !important; box-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.3), 0 16px 32px rgba(0,0,0,0.25), inset 0 1px 2px rgba(120,220,180,0.35), inset 0 -3px 10px rgba(0,0,0,0.2) !important; position: relative !important; overflow: hidden !important; animation: btnGlow 3.5s ease-in-out infinite !important; transform: perspective(600px) translateZ(0px) !important; }
+@keyframes btnGlow { 0%,100% { box-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.3), 0 16px 32px rgba(0,0,0,0.25), inset 0 1px 2px rgba(120,220,180,0.35), inset 0 -3px 10px rgba(0,0,0,0.2), 0 0 0px rgba(201,168,76,0); } 50% { box-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.3), 0 16px 32px rgba(0,0,0,0.25), inset 0 1px 2px rgba(120,220,180,0.45), inset 0 -3px 10px rgba(0,0,0,0.2), 0 0 18px rgba(201,168,76,0.22); } }
 .stButton > button::after { content: ''; position: absolute; top: -100%; left: -70%; width: 45%; height: 300%; background: linear-gradient(115deg, transparent, rgba(255,255,255,0.35), rgba(201,168,76,0.3), transparent); transform: rotate(10deg); pointer-events: none; animation: btnSweep 4.5s ease-in-out infinite; }
 @keyframes btnSweep { 0% { left: -70%; } 45% { left: 160%; } 100% { left: 160%; } }
-.stButton > button:hover { background: linear-gradient(135deg, rgba(24,135,98,0.9), rgba(14,64,48,0.78)) !important; color: #FFFFFF !important; border-color: rgba(201,168,76,0.9) !important; transform: translateY(-4px) scale(1.04) !important; box-shadow: 0 18px 46px rgba(0,0,0,0.5), inset 0 1px 2px rgba(120,220,180,0.6), 0 0 34px rgba(201,168,76,0.35) !important; animation: none !important; }
+.stButton > button:hover { background: linear-gradient(135deg, rgba(24,135,98,0.9), rgba(14,64,48,0.78)) !important; color: #FFFFFF !important; border-color: rgba(201,168,76,0.9) !important; transform: perspective(600px) translateY(-5px) translateZ(20px) scale(1.045) rotateX(3deg) !important; box-shadow: 0 4px 8px rgba(0,0,0,0.35), 0 14px 28px rgba(0,0,0,0.4), 0 32px 56px rgba(0,0,0,0.35), inset 0 1px 2px rgba(120,220,180,0.6), 0 0 36px rgba(201,168,76,0.35) !important; animation: none !important; }
 .stButton > button:hover::after { animation: btnSweepFast 0.7s ease forwards; }
 @keyframes btnSweepFast { 0% { left: -70%; } 100% { left: 160%; } }
-.stButton > button:active { transform: scale(0.92) translateY(0) !important; transition: transform 0.08s !important; }
-button[data-testid="baseButton-primary"] { background: linear-gradient(135deg, rgba(192,57,43,0.8), rgba(120,30,22,0.7)) !important; color: #FFEEEA !important; border: 1px solid rgba(255,180,160,0.4) !important; box-shadow: 0 8px 24px rgba(192,57,43,0.3), inset 0 1px 2px rgba(255,255,255,0.4) !important; animation: none !important; }
+.stButton > button:active { transform: perspective(600px) translateZ(-6px) scale(0.92) translateY(0) rotateX(0deg) !important; transition: transform 0.08s !important; }
+button[data-testid="baseButton-primary"] { background: linear-gradient(135deg, rgba(192,57,43,0.8), rgba(120,30,22,0.7)) !important; color: #FFEEEA !important; border: 1px solid rgba(255,180,160,0.4) !important; box-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 8px 16px rgba(192,57,43,0.3), 0 16px 32px rgba(192,57,43,0.15), inset 0 1px 2px rgba(255,255,255,0.4) !important; animation: none !important; }
 button[data-testid="baseButton-primary"]:hover { background: linear-gradient(135deg, rgba(210,70,55,0.9), rgba(140,40,30,0.78)) !important; color: #FFFFFF !important; }
 
 /* INPUTS — dark frosted glass */
@@ -132,7 +132,7 @@ label, .stRadio label span, .stCheckbox label { color: #EAF2EC !important; }
 .section-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(201,168,76,0.4), transparent); }
 
 /* METRICS — liquid glass */
-[data-testid="stMetric"] { background: linear-gradient(135deg, rgba(20,40,30,0.55), rgba(10,25,18,0.45)) !important; backdrop-filter: blur(30px) saturate(160%) !important; -webkit-backdrop-filter: blur(30px) saturate(160%) !important; border: 1px solid rgba(201,168,76,0.3) !important; border-radius: 22px !important; padding: 20px 24px !important; box-shadow: 0 10px 32px rgba(0,0,0,0.35), inset 0 1px 2px rgba(255,255,255,0.35) !important; }
+[data-testid="stMetric"] { background: linear-gradient(135deg, rgba(20,40,30,0.55), rgba(10,25,18,0.45)) !important; backdrop-filter: blur(30px) saturate(160%) !important; -webkit-backdrop-filter: blur(30px) saturate(160%) !important; border: 1px solid rgba(201,168,76,0.3) !important; border-radius: 22px !important; padding: 20px 24px !important; box-shadow: 0 3px 6px rgba(0,0,0,0.25), 0 10px 20px rgba(0,0,0,0.3), 0 24px 40px rgba(0,0,0,0.25), inset 0 1px 2px rgba(255,255,255,0.35) !important; transition: transform 0.35s cubic-bezier(0.22,1,0.36,1), box-shadow 0.35s !important; }
 [data-testid="stMetricLabel"] { font-size: 0.68rem !important; color: #C9A84C !important; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 700 !important; }
 [data-testid="stMetricValue"] { font-family: 'JetBrains Mono', monospace !important; font-size: 1.7rem !important; color: #FFFFFF !important; font-weight: 500 !important; }
 
@@ -192,7 +192,7 @@ label, .stRadio label span, .stCheckbox label { color: #EAF2EC !important; }
 /* MISC */
 /* Universal soft hover-lift on interactive elements */
 [data-testid="stMetric"], .stTextInput, .stNumberInput, .stDateInput, .stTextArea, .stSelectbox, [data-testid="stDataFrame"], .stExpander { transition: transform 0.3s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.3s !important; }
-[data-testid="stMetric"]:hover, [data-testid="stDataFrame"]:hover { transform: translateY(-6px) scale(1.03) !important; box-shadow: 0 20px 50px rgba(0,0,0,0.45), 0 0 28px rgba(201,168,76,0.2) !important; }
+[data-testid="stMetric"]:hover, [data-testid="stDataFrame"]:hover { transform: perspective(700px) translateY(-7px) translateZ(16px) scale(1.03) rotateX(2deg) !important; box-shadow: 0 4px 8px rgba(0,0,0,0.3), 0 16px 32px rgba(0,0,0,0.4), 0 36px 64px rgba(0,0,0,0.35), 0 0 32px rgba(201,168,76,0.22) !important; }
 .stTextInput:hover, .stNumberInput:hover, .stDateInput:hover, .stTextArea:hover, .stSelectbox:hover { transform: translateY(-2px) !important; }
 .stExpander:hover { transform: translateY(-2px) !important; }
 .tag-pill { transition: transform 0.25s cubic-bezier(0.34,1.6,0.64,1) !important; }
@@ -245,6 +245,39 @@ for _i in range(10):
     _left = _rnd.randint(3, 97); _top = _rnd.randint(5, 92); _dur = _rnd.randint(3, 7); _delay = _rnd.randint(0, 6)
     _particles.append(f'<div class="spore" style="left:{_left}%;top:{_top}%;animation-duration:{_dur}s;animation-delay:-{_delay}s;"></div>')
 st.markdown(f'<div class="leaf-field">{"".join(_particles)}</div>', unsafe_allow_html=True)
+
+# 3D mouse-tracking tilt for cards — reaches into the parent document since Streamlit renders this in an iframe
+components.html("""
+<script>
+(function() {
+    function attachTilt() {
+        try {
+            var doc = window.parent.document;
+            var cards = doc.querySelectorAll('.card');
+            cards.forEach(function(card) {
+                if (card.dataset.tiltBound) return;
+                card.dataset.tiltBound = "1";
+                card.addEventListener('mousemove', function(e) {
+                    var rect = card.getBoundingClientRect();
+                    var x = e.clientX - rect.left;
+                    var y = e.clientY - rect.top;
+                    var cx = rect.width / 2;
+                    var cy = rect.height / 2;
+                    var rotateY = ((x - cx) / cx) * 7;
+                    var rotateX = -((y - cy) / cy) * 7;
+                    card.style.transform = 'perspective(900px) rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg) translateZ(28px) scale(1.02)';
+                });
+                card.addEventListener('mouseleave', function() {
+                    card.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0px) scale(1)';
+                });
+            });
+        } catch (e) {}
+    }
+    setInterval(attachTilt, 800);
+    attachTilt();
+})();
+</script>
+""", height=0, width=0)
 
 # Currency
 def fmt(amount):
