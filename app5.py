@@ -390,6 +390,11 @@ def get_clinic_profile():
 
 def patient_id_fmt(pid): return f"#{int(pid):04d}"
 
+def auto_cap_name(name):
+    """Auto-capitalize each word of a name: 'ahmed ali' -> 'Ahmed Ali'."""
+    if not name: return name
+    return " ".join(w[:1].upper() + w[1:] if w else w for w in name.strip().split(" "))
+
 def get_patient_loyalty(patient_id, created_at, visits_count):
     """Returns (tier_name, icon, color_hex, months_text) based on time since registration and visit count.
     Bronze: 3+ months OR 10+ visits. Silver: 6+ months OR 25+ visits. Gold: 12+ months OR 50+ visits."""
@@ -829,6 +834,7 @@ st.sidebar.markdown(f"""
     <div style="font-size:0.6rem;color:#6FCF97;text-transform:uppercase;letter-spacing:0.22em;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;">Signed in as</div>
     <div style="font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:600;font-style:italic;color:#FFFFFF;margin-top:6px;letter-spacing:-0.01em;">{username}</div>
     <div style="font-size:0.66rem;background:rgba(201,168,76,0.15);color:#C9A84C;display:inline-block;padding:4px 14px;border-radius:50px;margin-top:8px;font-weight:700;letter-spacing:0.06em;border:1px solid rgba(201,168,76,0.25);font-family:'Plus Jakarta Sans',sans-serif;">{role}</div>
+    <div style="margin-top:10px;font-size:0.72rem;color:#9DC2B0;font-family:'Plus Jakarta Sans',sans-serif;">👥 <span style="color:#FFFFFF;font-weight:700;">{sb_count("patients")}</span> total patients</div>
 </div>""", unsafe_allow_html=True)
 
 menu_map = {
@@ -1315,17 +1321,41 @@ elif selected == "🖥️  Reception":
             pname = patients_map_r.get(s.get("patient_id"),"Unknown")
             st.warning(f"⚠️ **{pname}** subscription **'{s.get('plan_name','')}'** expires {'TODAY' if s.get('end_date')==today_str else 'TOMORROW'}!")
 
-    # ── Quick phone search ──
+    # ── Quick phone search (auto-focused on load) ──
     quick_search = st.text_input("🔍 Quick search — name or phone number", placeholder="Type anything to find a patient instantly...", key="reception_quick_search")
+    components.html("""<script>
+    setTimeout(function(){
+        try {
+            var inputs = window.parent.document.querySelectorAll('input[aria-label*="Quick search"]');
+            if (inputs.length) { inputs[0].focus(); }
+        } catch(e) {}
+    }, 300);
+    </script>""", height=0, width=0)
+
     if quick_search:
         all_p_qs = sb_all("patients", order="name")
         found = [p for p in all_p_qs if quick_search.lower() in (p.get("name","")).lower() or quick_search in (p.get("phone","") or "")]
         if found:
             for p in found[:5]:
                 visits_p = len([v for v in sb_all("visits", filters={"patient_id": p["id"]}) ])
-                st.markdown(f'<div class="card" style="padding:14px 20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.2rem;color:#EAF2EC;">{p["name"]}</div><div style="font-size:0.8rem;color:#8FB8A6;margin-top:2px;">{patient_id_fmt(p["id"])} · 📞 {p.get("phone","—")} · {p.get("gender","—")} · {visits_p} visits</div></div></div></div>', unsafe_allow_html=True)
+                phone_disp = p.get("phone","—")
+                st.markdown(f'<div class="card" style="padding:14px 20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.2rem;color:#EAF2EC;">{p["name"]}</div><div style="font-size:0.8rem;color:#8FB8A6;margin-top:2px;">{patient_id_fmt(p["id"])} · 📞 {phone_disp} · {p.get("gender","—")} · {visits_p} visits</div></div></div></div>', unsafe_allow_html=True)
+                if phone_disp != "—" and phone_disp:
+                    components.html(f"""<button onclick="navigator.clipboard.writeText('{phone_disp}')" style="background:rgba(201,168,76,0.15);color:#D4B45C;border:1px solid rgba(201,168,76,0.4);border-radius:50px;padding:5px 14px;font-size:0.75rem;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;margin-top:-8px;margin-bottom:8px;">📋 Copy phone</button>""", height=36)
+                st.session_state.setdefault("recent_patients", [])
+                if p["name"] not in st.session_state["recent_patients"]:
+                    st.session_state["recent_patients"] = [p["name"]] + st.session_state["recent_patients"]
+                    st.session_state["recent_patients"] = st.session_state["recent_patients"][:5]
         else:
             st.info("No patient found with that name or phone.")
+
+    # ── Recently viewed patients shortcut ──
+    if st.session_state.get("recent_patients"):
+        with st.expander(f"🕘 Recently viewed ({len(st.session_state['recent_patients'])})", expanded=False):
+            recent_cols = st.columns(len(st.session_state["recent_patients"]))
+            for i, rname in enumerate(st.session_state["recent_patients"]):
+                with recent_cols[i]:
+                    st.markdown(f'<span class="patient-chip">{rname}</span>', unsafe_allow_html=True)
 
     t1,t2,tD,tQ,tW,t3,t4,t5,t6,t7,t8,t9 = st.tabs(["Checkout","Patients","Doctor Notes","Quick View","💬 Follow-up","Register","Edit","Sessions","Subscriptions","Check-in","History","Edit/Delete"])
 
@@ -1440,10 +1470,14 @@ elif selected == "🖥️  Reception":
         if all_p:
             st.dataframe(pd.DataFrame(all_p), use_container_width=True, hide_index=True)
             del_target = st.selectbox("Remove patient", ["— select —"]+[p["name"] for p in all_p])
-            if st.button("Remove Patient", type="primary"):
-                if del_target != "— select —":
-                    sb_delete("patients","name",del_target); log_action(username,"Remove Patient",del_target)
-                    play_ding(); st.success(f"Removed."); st.rerun()
+            if del_target != "— select —":
+                confirm_del_patient = st.checkbox(f"⚠️ Yes, I'm sure I want to permanently delete '{del_target}'", key="confirm_del_patient")
+                if st.button("Remove Patient", type="primary"):
+                    if not confirm_del_patient:
+                        st.error("Please check the confirmation box above first.")
+                    else:
+                        sb_delete("patients","name",del_target); log_action(username,"Remove Patient",del_target)
+                        play_ding(); st.success(f"Removed."); st.rerun()
 
     with tD:
         section_label("Doctor's Assessments")
@@ -1540,34 +1574,38 @@ elif selected == "🖥️  Reception":
 
     with t3:
         section_label("Register New Patient")
-        c1,c2 = st.columns(2)
-        with c1:
-            p_name = st.text_input("Full name *")
-            pc1, pc2 = st.columns([1, 2])
-            with pc1: p_country_code = st.text_input("Code", value="964", key="p_country_code")
-            with pc2: p_phone_local = st.text_input("Phone number", placeholder="7701234567", key="p_phone_local")
-            p_dob  = st.text_input("Date of birth (YYYY-MM-DD)", placeholder="1990-01-15")
-        with c2:
-            p_gender = st.selectbox("Gender", ["Prefer not to say","Male","Female","Other"])
-            all_docs_reg = sb_all("doctors", order="name")
-            doc_names_reg = ["Not assigned yet"] + [d["name"] for d in all_docs_reg]
-            p_assigned_doc = st.selectbox("Assigned Doctor", doc_names_reg, help="Which doctor will be treating this patient? Used for no-show tracking.")
-            p_notes  = st.text_area("Notes", height=100)
-        p_phone = (p_country_code.strip() + p_phone_local.strip()) if p_phone_local.strip() else ""
-        if p_phone_local.strip(): st.caption(f"📞 Will be saved as: {p_phone}")
-        give_receipt = st.checkbox("📄 Print intake receipt", value=True)
-        if st.button("Register Patient"):
-            if p_name.strip():
-                if sb_exists("patients","name",p_name.strip()): st.error("Already exists.")
+        with st.form("register_patient_form", clear_on_submit=True):
+            c1,c2 = st.columns(2)
+            with c1:
+                p_name = st.text_input("Full name *")
+                pc1, pc2 = st.columns([1, 2])
+                with pc1: p_country_code = st.text_input("Code", value="964", key="p_country_code")
+                with pc2: p_phone_local = st.text_input("Phone number", placeholder="7701234567", key="p_phone_local")
+                p_dob  = st.text_input("Date of birth (YYYY-MM-DD)", placeholder="1990-01-15")
+            with c2:
+                p_gender = st.selectbox("Gender", ["Prefer not to say","Male","Female","Other"])
+                all_docs_reg = sb_all("doctors", order="name")
+                doc_names_reg = ["Not assigned yet"] + [d["name"] for d in all_docs_reg]
+                p_assigned_doc = st.selectbox("Assigned Doctor", doc_names_reg, help="Which doctor will be treating this patient? Used for no-show tracking.")
+                p_notes  = st.text_area("Notes", height=100)
+            p_phone = (p_country_code.strip() + p_phone_local.strip()) if p_phone_local.strip() else ""
+            give_receipt = st.checkbox("📄 Print intake receipt", value=True)
+            submitted_reg = st.form_submit_button("Register Patient", use_container_width=True)
+            if submitted_reg:
+                if p_name.strip():
+                    p_name_clean = auto_cap_name(p_name)
+                    if sb_exists("patients","name",p_name_clean): st.error("Already exists.")
+                    else:
+                        assigned_doc_id = next((d["id"] for d in all_docs_reg if d["name"]==p_assigned_doc), None)
+                        sb_insert("patients",{"name":p_name_clean,"phone":p_phone.strip(),"date_of_birth":p_dob.strip(),"gender":p_gender,"notes":p_notes.strip(),"created_at":today_str,"assigned_doctor_id":assigned_doc_id})
+                        log_action(username,"New Patient",f"{p_name_clean} | {p_gender}")
+                        new_pat = sb_one("patients", filters={"name": p_name_clean})
+                        pid_new = new_pat["id"] if new_pat else 0
+                        play_ding(); st.success(f"✅ Patient '{p_name_clean}' registered — ID: **{patient_id_fmt(pid_new)}**" + (f" · 📞 {p_phone}" if p_phone else ""))
+                        if give_receipt:
+                            st.session_state.intake_rcpt = {"patient":p_name_clean,"doctor":p_assigned_doc if p_assigned_doc!="Not assigned yet" else "To be assigned","item":"Initial Intake","base":0,"disc":0,"net":0,"method":"—","date":today_str,"invoice":"","patient_id_fmt":patient_id_fmt(pid_new)}
                 else:
-                    assigned_doc_id = next((d["id"] for d in all_docs_reg if d["name"]==p_assigned_doc), None)
-                    sb_insert("patients",{"name":p_name.strip(),"phone":p_phone.strip(),"date_of_birth":p_dob.strip(),"gender":p_gender,"notes":p_notes.strip(),"created_at":today_str,"assigned_doctor_id":assigned_doc_id})
-                    log_action(username,"New Patient",f"{p_name.strip()} | {p_gender}")
-                    new_pat = sb_one("patients", filters={"name": p_name.strip()})
-                    pid_new = new_pat["id"] if new_pat else 0
-                    play_ding(); st.success(f"✅ Patient '{p_name}' registered — ID: **{patient_id_fmt(pid_new)}**")
-                    if give_receipt:
-                        st.session_state.intake_rcpt = {"patient":p_name.strip(),"doctor":p_assigned_doc if p_assigned_doc!="Not assigned yet" else "To be assigned","item":"Initial Intake","base":0,"disc":0,"net":0,"method":"—","date":today_str,"invoice":"","patient_id_fmt":patient_id_fmt(pid_new)}
+                    st.error("Name is required.")
         if "intake_rcpt" in st.session_state: render_receipt(st.session_state.intake_rcpt, get_clinic_profile())
 
     with t4:
@@ -1596,7 +1634,7 @@ elif selected == "🖥️  Reception":
                     new_notes = st.text_area("Notes", value=pat.get("notes","") or "", height=100, key="ep_notes")
                 if st.button("Save Changes", key="btn_edit_patient"):
                     new_assigned_id = next((d["id"] for d in all_docs_edit if d["name"]==new_assigned_doc), None)
-                    sb_update("patients",{"name":new_name.strip(),"phone":new_phone.strip(),"date_of_birth":new_dob.strip(),"gender":new_gender,"notes":new_notes.strip(),"assigned_doctor_id":new_assigned_id},"id",pat["id"])
+                    sb_update("patients",{"name":auto_cap_name(new_name),"phone":new_phone.strip(),"date_of_birth":new_dob.strip(),"gender":new_gender,"notes":new_notes.strip(),"assigned_doctor_id":new_assigned_id},"id",pat["id"])
                     play_ding(); st.success("Updated."); st.rerun()
 
     with t5:
@@ -2138,9 +2176,13 @@ elif selected == "👥  Accounts":
             st.dataframe(pd.DataFrame(rows_acc), use_container_width=True, hide_index=True)
             killable = ["— select —"]+[u["username"] for u in accounts if u["username"]!=username]
             target_del = st.selectbox("Remove", killable, key="burn_user_select")
-            if st.button("Delete Account", type="primary", key="btn_del_account"):
-                if target_del != "— select —":
-                    sb_delete("users","username",target_del); play_ding(); st.success("Removed."); st.rerun()
+            if target_del != "— select —":
+                confirm_del_user = st.checkbox(f"⚠️ Yes, I'm sure I want to permanently delete the account '{target_del}'", key="confirm_del_user")
+                if st.button("Delete Account", type="primary", key="btn_del_account"):
+                    if not confirm_del_user:
+                        st.error("Please check the confirmation box above first.")
+                    else:
+                        sb_delete("users","username",target_del); play_ding(); st.success("Removed."); st.rerun()
     with at2:
         al_search = st.text_input("Search", key="al_search")
         pf = ["All"]+[u["username"] for u in accounts]
@@ -2182,11 +2224,15 @@ elif selected == "⚙️  Settings":
                     sb_update("doctors", {"schedule_days": ",".join(new_days)}, "id", doc_obj_days["id"])
                     play_ding(); st.success("Updated."); st.rerun()
             del_doc = st.selectbox("Remove", ["— select —"]+[d["name"] for d in all_docs])
-            if st.button("Remove Doctor", type="primary"):
-                if del_doc != "— select —":
-                    doc_id = next(d["id"] for d in all_docs if d["name"]==del_doc)
-                    sb_delete("doctors","name",del_doc); sb_delete("doctor_commission_tiers","doctor_id",doc_id)
-                    play_ding(); st.success("Removed."); st.rerun()
+            if del_doc != "— select —":
+                confirm_del_doc = st.checkbox(f"⚠️ Yes, I'm sure I want to permanently delete '{del_doc}'", key="confirm_del_doc")
+                if st.button("Remove Doctor", type="primary"):
+                    if not confirm_del_doc:
+                        st.error("Please check the confirmation box above first.")
+                    else:
+                        doc_id = next(d["id"] for d in all_docs if d["name"]==del_doc)
+                        sb_delete("doctors","name",del_doc); sb_delete("doctor_commission_tiers","doctor_id",doc_id)
+                        play_ding(); st.success("Removed."); st.rerun()
     with s2:
         section_label("Commission Tiers Per Doctor")
         st.info("Highest qualifying tier applies. E.g. 3% at 5+ visits, 7% at 15+.")
@@ -2226,9 +2272,13 @@ elif selected == "⚙️  Settings":
             st.dataframe(df_emp, use_container_width=True, hide_index=True)
             st.markdown(f"**Monthly payroll: {fmt(sum(float(e.get('salary') or 0) for e in all_emp))}**")
             del_emp = st.selectbox("Remove", ["— select —"]+[e["name"] for e in all_emp])
-            if st.button("Remove Employee", type="primary"):
-                if del_emp != "— select —":
-                    sb_delete("employees","name",del_emp); play_ding(); st.success("Removed."); st.rerun()
+            if del_emp != "— select —":
+                confirm_del_emp = st.checkbox(f"⚠️ Yes, I'm sure I want to permanently delete '{del_emp}'", key="confirm_del_emp")
+                if st.button("Remove Employee", type="primary"):
+                    if not confirm_del_emp:
+                        st.error("Please check the confirmation box above first.")
+                    else:
+                        sb_delete("employees","name",del_emp); play_ding(); st.success("Removed."); st.rerun()
     with s4:
         section_label("Add Service")
         c1,c2,c3 = st.columns(3)
@@ -2252,9 +2302,13 @@ elif selected == "⚙️  Settings":
             df_svc = pd.DataFrame([{"id":s["id"],"name":s["name"],"category":s.get("category",""),"price":fmt(s.get("price")),"type":s.get("delivery_type","Manual (by hand)"),"machine":s.get("machine_name","") or "—"} for s in all_svc])
             st.dataframe(df_svc, use_container_width=True, hide_index=True)
             del_svc = st.selectbox("Remove", ["— select —"]+[s["name"] for s in all_svc])
-            if st.button("Remove Service", type="primary"):
-                if del_svc != "— select —":
-                    sb_delete("services","name",del_svc); play_ding(); st.success("Removed."); st.rerun()
+            if del_svc != "— select —":
+                confirm_del_svc = st.checkbox(f"⚠️ Yes, I'm sure I want to permanently delete '{del_svc}'", key="confirm_del_svc")
+                if st.button("Remove Service", type="primary"):
+                    if not confirm_del_svc:
+                        st.error("Please check the confirmation box above first.")
+                    else:
+                        sb_delete("services","name",del_svc); play_ding(); st.success("Removed."); st.rerun()
     with s5:
         section_label("Create Bundle")
         c1,c2 = st.columns(2)
