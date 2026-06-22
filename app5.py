@@ -485,6 +485,24 @@ def get_reminder_template():
     if rows: return rows[0].get("value","")
     return "Hello {name}! 🌿 This is a friendly reminder from {clinic} that you have an appointment tomorrow, {date} at {time} with Dr. {doctor}. We look forward to seeing you! If you need to reschedule, please let us know."
 
+def record_backup_download():
+    """Records the timestamp of the most recent Excel export, used as a 'last backup' reminder."""
+    existing_bk = sb_all("clinic_settings", filters={"key": "last_backup_at"})
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    if existing_bk: sb_update("clinic_settings", {"value": now_str}, "id", existing_bk[0]["id"])
+    else: sb_insert("clinic_settings", {"key": "last_backup_at", "value": now_str})
+
+def get_last_backup_info():
+    """Returns (date_text, days_ago) for the last recorded backup, or (None, None) if never."""
+    rows = sb_all("clinic_settings", filters={"key": "last_backup_at"})
+    if not rows: return (None, None)
+    val = rows[0].get("value","")
+    try:
+        dt = datetime.strptime(val[:10], "%Y-%m-%d")
+        days_ago = (date.today() - dt.date()).days
+        return (val, days_ago)
+    except: return (val, None)
+
 def get_tomorrow_appointments():
     """Appointments scheduled for tomorrow that are still 'Scheduled'."""
     tmrw = (date.today() + timedelta(days=1)).isoformat()
@@ -782,10 +800,12 @@ if not st.session_state.logged_in:
         st.markdown("<br>", unsafe_allow_html=True)
         lt, rt = st.tabs(["Sign In", "Create Account"])
         with lt:
-            u = st.text_input("Username", placeholder="Enter your username", key="login_u")
-            p = st.text_input("Password", type="password", placeholder="Enter your password", key="login_p")
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Sign In →", use_container_width=True, key="btn_signin"):
+            with st.form("login_form", clear_on_submit=False):
+                u = st.text_input("Username", placeholder="Enter your username", key="login_u")
+                p = st.text_input("Password", type="password", placeholder="Enter your password", key="login_p")
+                st.markdown("<br>", unsafe_allow_html=True)
+                signin_clicked = st.form_submit_button("Sign In →", use_container_width=True)
+            if signin_clicked:
                 users = sb_all("users", filters={"username": u.strip()})
                 match = [x for x in users if x.get("password_hash") == hash_password(p)]
                 if match:
@@ -836,6 +856,20 @@ st.sidebar.markdown(f"""
     <div style="font-size:0.66rem;background:rgba(201,168,76,0.15);color:#C9A84C;display:inline-block;padding:4px 14px;border-radius:50px;margin-top:8px;font-weight:700;letter-spacing:0.06em;border:1px solid rgba(201,168,76,0.25);font-family:'Plus Jakarta Sans',sans-serif;">{role}</div>
     <div style="margin-top:10px;font-size:0.72rem;color:#9DC2B0;font-family:'Plus Jakarta Sans',sans-serif;">👥 <span style="color:#FFFFFF;font-weight:700;">{sb_count("patients")}</span> total patients</div>
 </div>""", unsafe_allow_html=True)
+
+if role in ["Boss","Accounting","Reception & Accounting"]:
+    backup_date, backup_days_ago = get_last_backup_info()
+    if backup_date is None:
+        backup_msg = "⚠️ No backup yet"; backup_color = "#FF8A7A"
+    elif backup_days_ago is None:
+        backup_msg = f"Backed up: {backup_date}"; backup_color = "#9DC2B0"
+    elif backup_days_ago == 0:
+        backup_msg = "✅ Backed up today"; backup_color = "#6FCF97"
+    elif backup_days_ago <= 30:
+        backup_msg = f"Backed up {backup_days_ago}d ago"; backup_color = "#9DC2B0"
+    else:
+        backup_msg = f"⚠️ Backup is {backup_days_ago}d old"; backup_color = "#FF8A7A"
+    st.sidebar.markdown(f"""<div style="padding:0 20px 16px;margin-top:-6px;"><div style="font-size:0.68rem;color:{backup_color};font-family:'Plus Jakarta Sans',sans-serif;">💾 {backup_msg}</div></div>""", unsafe_allow_html=True)
 
 menu_map = {
     "Boss": ["📈  Dashboard","🖥️  Reception","📊  Accounting","📅  Appointments","📑  Reports","🔬  Research","👥  Accounts","⚙️  Settings"],
@@ -1357,7 +1391,7 @@ elif selected == "🖥️  Reception":
                 with recent_cols[i]:
                     st.markdown(f'<span class="patient-chip">{rname}</span>', unsafe_allow_html=True)
 
-    t1,t2,tD,tQ,tW,t3,t4,t5,t6,t7,t8,t9 = st.tabs(["Checkout","Patients","Doctor Notes","Quick View","💬 Follow-up","Register","Edit","Sessions","Subscriptions","Check-in","History","Edit/Delete"])
+    t1,t3,t2,tD,tQ,tW,t4,t5,t6,t7,t8,t9 = st.tabs(["Checkout","Register","Patients","Doctor Notes","Quick View","💬 Follow-up","Edit","Sessions","Subscriptions","Check-in","History","Edit/Delete"])
 
     with t1:
         section_label("New Checkout")
@@ -1367,11 +1401,15 @@ elif selected == "🖥️  Reception":
         if not docs_db or (not services_db and not bundles_db):
             st.warning("Please add doctors and services in Settings before checkout.")
         else:
-            p_map = {p["name"]: p["id"] for p in patients_db}; d_map = {d["name"]: d["id"] for d in docs_db}
+            p_map = {p["name"]: p["id"] for p in patients_db}
+            doc_visit_counts = {d["id"]: sb_count("visits", filters={"doctor_id": d["id"]}) for d in docs_db}
+            doc_display_map = {f'{d["name"]} ({doc_visit_counts[d["id"]]} visits)': d["name"] for d in docs_db}
+            d_map = {d["name"]: d["id"] for d in docs_db}
             c1,c2 = st.columns(2)
             with c1:
                 target_p = st.selectbox("Patient", ["— select —"]+list(p_map.keys()))
-                chosen_doc = st.selectbox("Doctor", list(d_map.keys()))
+                chosen_doc_display = st.selectbox("Doctor", list(doc_display_map.keys()))
+                chosen_doc = doc_display_map[chosen_doc_display]
                 payment_method = st.selectbox("Payment method", ["Cash","Card","Insurance","Transfer"])
             with c2:
                 item_type = st.radio("Item type", ["Service","Bundle"], horizontal=True)
@@ -1468,7 +1506,18 @@ elif selected == "🖥️  Reception":
         all_p = sb_all("patients", order="name")
         if search: all_p = [p for p in all_p if search.lower() in (p.get("name","")).lower() or search in (p.get("phone","") or "")]
         if all_p:
-            st.dataframe(pd.DataFrame(all_p), use_container_width=True, hide_index=True)
+            all_visits_t2 = sb_all("visits", order="visit_date", desc_order=True)
+            last_visit_map = {}
+            for v in all_visits_t2:
+                pid_v = v.get("patient_id")
+                if pid_v not in last_visit_map:
+                    last_visit_map[pid_v] = v.get("visit_date","")
+            rows_t2 = []
+            for p in all_p:
+                row = dict(p)
+                row["last_visit"] = last_visit_map.get(p["id"], "Never")
+                rows_t2.append(row)
+            st.dataframe(pd.DataFrame(rows_t2), use_container_width=True, hide_index=True)
             del_target = st.selectbox("Remove patient", ["— select —"]+[p["name"] for p in all_p])
             if del_target != "— select —":
                 confirm_del_patient = st.checkbox(f"⚠️ Yes, I'm sure I want to permanently delete '{del_target}'", key="confirm_del_patient")
@@ -1963,23 +2012,23 @@ elif selected == "📊  Accounting":
         all_v_exp = sb_all("visits", order="visit_date", desc_order=True)
         if all_v_exp:
             df_ev = pd.DataFrame([{"ID":v["id"],"Date":v["visit_date"],"Paid":v.get("net_paid",0),"Method":v.get("payment_method","")} for v in all_v_exp])
-            st.download_button("Visits", data=to_excel(df_ev), file_name=f"visits_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            st.download_button("Visits", data=to_excel(df_ev), file_name=f"visits_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, on_click=record_backup_download)
     with ex2:
         all_e_exp = sb_all("expenses", order="date", desc_order=True)
         if all_e_exp:
             df_ee = pd.DataFrame([{"ID":e["id"],"Date":e["date"],"Description":e["description"],"Category":e.get("category",""),"Amount":e.get("amount",0)} for e in all_e_exp])
-            st.download_button("Expenses", data=to_excel(df_ee), file_name=f"expenses_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            st.download_button("Expenses", data=to_excel(df_ee), file_name=f"expenses_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, on_click=record_backup_download)
     with ex3:
         all_p_exp = sb_all("patients", order="name")
         if all_p_exp:
             df_ep = pd.DataFrame([{"Name":p["name"],"Phone":p.get("phone",""),"Gender":p.get("gender",""),"DOB":p.get("date_of_birth","")} for p in all_p_exp])
-            st.download_button("Patients", data=to_excel(df_ep), file_name=f"patients_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            st.download_button("Patients", data=to_excel(df_ep), file_name=f"patients_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, on_click=record_backup_download)
     with ex4:
         all_v_m = sb_all("visits")
         if all_v_m:
             df_em = pd.DataFrame([{"Month":v["visit_date"][:7],"Revenue":float(v.get("net_paid") or 0)} for v in all_v_m])
             df_em = df_em.groupby("Month").agg(Revenue=("Revenue","sum"),Visits=("Revenue","count")).reset_index().sort_values("Month",ascending=False)
-            st.download_button("Monthly", data=to_excel(df_em), file_name=f"monthly_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            st.download_button("Monthly", data=to_excel(df_em), file_name=f"monthly_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, on_click=record_backup_download)
 
 # ═══════════════════════════════════════════════
 # REPORTS
@@ -2159,7 +2208,7 @@ elif selected == "🔬  Research":
         patients_r_map = {p["id"]: p["name"] for p in sb_all("patients")}
         doctors_r_map = {d["id"]: d["name"] for d in doctors_r}
         df_research = pd.DataFrame([{"Date":f.get("filled_date",""),"Patient":patients_r_map.get(f.get("patient_id"),""),"Doctor":doctors_r_map.get(f.get("doctor_id"),""),"Body Area":f.get("body_area",""),"Problem":f.get("problem",""),"Pain Before":f.get("pain_before",0),"Pain After":f.get("pain_after",0),"Sessions":f.get("sessions_needed",0),"Outcome":f.get("outcome","Pending")} for f in filtered_forms])
-        st.download_button("Export to Excel", data=to_excel(df_research), file_name=f"research_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        st.download_button("Export to Excel", data=to_excel(df_research), file_name=f"research_{today_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, on_click=record_backup_download)
 
 # ═══════════════════════════════════════════════
 # ACCOUNTS
