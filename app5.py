@@ -171,10 +171,10 @@ label, .stRadio label span, .stCheckbox label { color: #EAF2EC !important; }
 .receipt-clinic-sub { font-size: 0.65rem; color: #6FCF97; letter-spacing: 0.32em; text-transform: uppercase; margin-top: 10px; font-weight: 700; }
 .receipt-gold-line { width: 40px; height: 2px; background: linear-gradient(90deg, transparent, #C9A84C, transparent); margin: 12px auto; border-radius: 2px; }
 .receipt-body { padding: 28px 32px 32px; }
-.receipt-date-badge { background: #F2F5F1; border-radius: 50px; padding: 8px 16px; text-align: center; font-size: 0.7rem; color: #4A6B52; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 24px; border: 1px solid #DDE8E1; }
-.receipt-section-title { font-size: 0.6rem; font-weight: 700; color: #9AB5A0; text-transform: uppercase; letter-spacing: 0.2em; margin: 18px 0 10px; }
+.receipt-date-badge { background: #F2F5F1; border-radius: 50px; padding: 8px 16px; text-align: center; font-size: 0.7rem; color: #1A5C3E !important; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 24px; border: 1px solid #DDE8E1; }
+.receipt-section-title { font-size: 0.6rem; font-weight: 700; color: #6B8A72 !important; text-transform: uppercase; letter-spacing: 0.2em; margin: 18px 0 10px; }
 .receipt-row { display: flex; justify-content: space-between; align-items: center; margin: 9px 0; font-size: 0.88rem; }
-.receipt-row span:first-child { color: #6B8A72; } .receipt-row span:last-child { color: #0D1F14; font-weight: 600; }
+.receipt-row span:first-child { color: #4A6B52 !important; } .receipt-row span:last-child { color: #0D1F14 !important; font-weight: 700; }
 .receipt-divider { border: none; border-top: 1px dashed #DDE8E1; margin: 18px 0; }
 .receipt-total-box { background: #051811; border-radius: 18px; padding: 18px 22px; margin: 20px 0; position: relative; overflow: hidden; }
 .receipt-total-box::before { content: ''; display: none; }
@@ -182,8 +182,8 @@ label, .stRadio label span, .stCheckbox label { color: #EAF2EC !important; }
 .receipt-total-amount { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 500; color: #FFFFFF; margin-top: 4px; }
 .receipt-discount { color: #C0392B !important; }
 .receipt-footer-area { text-align: center; padding-top: 12px; border-top: 1px dashed #DDE8E1; margin-top: 22px; }
-.receipt-footer-text { font-size: 0.72rem; color: #9AB5A0; margin: 4px 0; }
-.receipt-footer-clinic { font-size: 0.75rem; color: #4A6B52; font-weight: 600; margin-top: 8px; }
+.receipt-footer-text { font-size: 0.72rem; color: #6B8A72 !important; margin: 4px 0; }
+.receipt-footer-clinic { font-size: 0.75rem; color: #1A5C3E !important; font-weight: 600; margin-top: 8px; }
 
 /* DOCTOR FORM */
 .doctor-form-card { background: #FFFFFF; border: 1px solid #DDE8E1; border-radius: 24px; padding: 32px 36px; margin-bottom: 24px; position: relative; box-shadow: 0 2px 8px rgba(13,31,20,0.04); }
@@ -725,18 +725,18 @@ def render_receipt(r, cp):
         .receipt-clinic-sub {{ font-size:0.65rem; color:#6FCF97; letter-spacing:0.32em; text-transform:uppercase; margin-top:10px; font-weight:700; }}
         .receipt-gold-line {{ width:40px; height:2px; background:linear-gradient(90deg,transparent,#C9A84C,transparent); margin:12px auto; }}
         .receipt-body {{ padding:28px 32px 32px; }}
-        .receipt-date-badge {{ background:#F2F5F1; border-radius:50px; padding:8px 16px; text-align:center; font-size:0.7rem; color:#9DC2B0; font-weight:700; letter-spacing:0.1em; margin-bottom:24px; border:1px solid #DDE8E1; }}
-        .receipt-section-title {{ font-size:0.6rem; font-weight:700; color:#9AB5A0; text-transform:uppercase; letter-spacing:0.2em; margin:18px 0 10px; }}
+        .receipt-date-badge {{ background:#F2F5F1; border-radius:50px; padding:8px 16px; text-align:center; font-size:0.7rem; color:#1A5C3E; font-weight:700; letter-spacing:0.1em; margin-bottom:24px; border:1px solid #DDE8E1; }}
+        .receipt-section-title {{ font-size:0.6rem; font-weight:700; color:#6B8A72; text-transform:uppercase; letter-spacing:0.2em; margin:18px 0 10px; }}
         .receipt-row {{ display:flex; justify-content:space-between; align-items:center; margin:9px 0; font-size:0.88rem; }}
-        .receipt-row span:first-child {{ color:#6B8A72; }} .receipt-row span:last-child {{ color:#0D1F14; font-weight:600; }}
+        .receipt-row span:first-child {{ color:#4A6B52; }} .receipt-row span:last-child {{ color:#0D1F14; font-weight:700; }}
         .receipt-divider {{ border:none; border-top:1px dashed #DDE8E1; margin:18px 0; }}
         .receipt-total-box {{ background:#051811; border-radius:18px; padding:18px 22px; margin:20px 0; }}
         .receipt-total-label {{ font-size:0.62rem; color:#6FCF97; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; }}
         .receipt-total-amount {{ font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:500; color:#FFF; margin-top:4px; }}
         .receipt-discount {{ color:#C0392B !important; }}
         .receipt-footer-area {{ text-align:center; padding-top:12px; border-top:1px dashed #DDE8E1; margin-top:22px; }}
-        .receipt-footer-text {{ font-size:0.72rem; color:#9AB5A0; margin:4px 0; }}
-        .receipt-footer-clinic {{ font-size:0.75rem; color:#9DC2B0; font-weight:600; margin-top:8px; }}
+        .receipt-footer-text {{ font-size:0.72rem; color:#6B8A72; margin:4px 0; }}
+        .receipt-footer-clinic {{ font-size:0.75rem; color:#1A5C3E; font-weight:600; margin-top:8px; }}
         `;
         var content = `{receipt_js}`;
         var w = window.open('', '_blank', 'width=480,height=800');
@@ -2473,4 +2473,3 @@ elif selected == "⚙️  Settings":
         st.markdown("**Preview:**")
         preview_rem = new_rem_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{date}", "2026-06-19").replace("{time}", "10:30 AM").replace("{doctor}", "Haryad")
         st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{preview_rem}</div></div>', unsafe_allow_html=True)
-        
