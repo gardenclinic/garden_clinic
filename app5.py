@@ -72,7 +72,7 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #EA
 .pulse-divider { width: 1px; background: rgba(201,168,76,0.25); height: 40px; align-self: center; }
 
 /* CARDS — liquid glass */
-.card { background: linear-gradient(135deg, rgba(10,50,38,0.6), rgba(4,22,16,0.5)); backdrop-filter: blur(40px) saturate(170%); -webkit-backdrop-filter: blur(40px) saturate(170%); border: 1px solid rgba(201,168,76,0.28); border-radius: 28px; padding: 24px 28px; margin-bottom: 18px; transition: all 0.45s cubic-bezier(0.22,1,0.36,1); box-shadow: 0 4px 8px rgba(0,0,0,0.25), 0 14px 28px rgba(0,0,0,0.35), 0 32px 56px rgba(0,0,0,0.3), inset 0 1px 2px rgba(120,220,180,0.3), inset 0 -10px 30px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(201,168,76,0.08); position: relative; overflow: hidden; animation: cardRise 0.6s cubic-bezier(0.22,1,0.36,1) both; transform-style: preserve-3d; transform: perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0px); will-change: transform; }
+.card { background: linear-gradient(135deg, rgba(10,50,38,0.6), rgba(4,22,16,0.5)); backdrop-filter: blur(40px) saturate(170%); -webkit-backdrop-filter: blur(40px) saturate(170%); border: 1px solid rgba(201,168,76,0.28); border-radius: 28px; padding: 24px 28px; margin-bottom: 18px; transition: all 0.45s cubic-bezier(0.22,1,0.36,1); box-shadow: 0 4px 8px rgba(0,0,0,0.25), 0 14px 28px rgba(0,0,0,0.35), 0 32px 56px rgba(0,0,0,0.3), inset 0 1px 2px rgba(120,220,180,0.3), inset 0 -10px 30px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(201,168,76,0.08); position: relative; overflow: hidden; animation: cardRise 0.6s cubic-bezier(0.22,1,0.36,1) both; transform-style: preserve-3d; transform: perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0px); }
 @keyframes cardRise { 0% { opacity: 0; transform: perspective(900px) translateY(18px) translateZ(-40px) scale(0.98); } 100% { opacity: 1; transform: perspective(900px) translateY(0) translateZ(0) scale(1); } }
 .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%; background: linear-gradient(180deg, rgba(120,220,180,0.16), transparent); pointer-events: none; border-radius: 28px 28px 50% 50%; }
 .card::after { content: ''; position: absolute; top: -80%; left: -60%; width: 60%; height: 260%; background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.28) 48%, rgba(201,168,76,0.35) 52%, transparent 78%); transform: rotate(8deg); pointer-events: none; animation: cardShine 7s ease-in-out infinite; }
@@ -289,39 +289,6 @@ for _i in range(10):
     _particles.append(f'<div class="spore" style="left:{_left}%;top:{_top}%;animation-duration:{_dur}s;animation-delay:-{_delay}s;"></div>')
 st.markdown(f'<div class="leaf-field">{"".join(_particles)}</div>', unsafe_allow_html=True)
 st.markdown('<div class="lux-rays"></div><div class="lux-grain"></div>', unsafe_allow_html=True)
-
-# 3D mouse-tracking tilt for cards — reaches into the parent document since Streamlit renders this in an iframe
-components.html("""
-<script>
-(function() {
-    function attachTilt() {
-        try {
-            var doc = window.parent.document;
-            var cards = doc.querySelectorAll('.card');
-            cards.forEach(function(card) {
-                if (card.dataset.tiltBound) return;
-                card.dataset.tiltBound = "1";
-                card.addEventListener('mousemove', function(e) {
-                    var rect = card.getBoundingClientRect();
-                    var x = e.clientX - rect.left;
-                    var y = e.clientY - rect.top;
-                    var cx = rect.width / 2;
-                    var cy = rect.height / 2;
-                    var rotateY = ((x - cx) / cx) * 7;
-                    var rotateX = -((y - cy) / cy) * 7;
-                    card.style.transform = 'perspective(900px) rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg) translateZ(28px) scale(1.02)';
-                });
-                card.addEventListener('mouseleave', function() {
-                    card.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0px) scale(1)';
-                });
-            });
-        } catch (e) {}
-    }
-    setInterval(attachTilt, 800);
-    attachTilt();
-})();
-</script>
-""", height=0, width=0)
 
 # Currency
 def fmt(amount):
@@ -831,31 +798,76 @@ if not st.session_state.logged_in:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("""
         <style>
-        @keyframes crestRise { 0% { opacity:0; transform: translateY(24px) scale(0.96); } 100% { opacity:1; transform: translateY(0) scale(1); } }
-        @keyframes monogramGlow { 0%,100% { filter: drop-shadow(0 0 8px rgba(201,168,76,0.4)); } 50% { filter: drop-shadow(0 0 22px rgba(201,168,76,0.75)); } }
-        @keyframes ringSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes sheen { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
-        .login-crest { background: linear-gradient(150deg, #06291C 0%, #0D3D2B 45%, #04190F 100%); border-radius: 30px 30px 0 0; padding: 52px 40px 40px; text-align:center; position:relative; overflow:hidden; border:1px solid rgba(201,168,76,0.3); border-bottom:none; box-shadow: inset 0 1px 2px rgba(120,220,180,0.25); animation: crestRise 0.9s cubic-bezier(0.22,1,0.36,1) both; }
-        .login-crest::before { content:''; position:absolute; top:-60%; left:-30%; width:160%; height:220%; background: conic-gradient(from 0deg, transparent 0deg, rgba(201,168,76,0.10) 40deg, transparent 80deg, transparent 180deg, rgba(120,220,180,0.08) 220deg, transparent 260deg); animation: ringSpin 28s linear infinite; pointer-events:none; }
+        @keyframes crestBoxIn { from { opacity:0; transform: scale(0.9); } to { opacity:1; transform: scale(1); } }
+        @keyframes sparkIgnite { 0% { width:0;height:0;opacity:0; } 60% { width:11px;height:11px;opacity:1; } 100% { width:6px;height:6px;opacity:1; } }
+        @keyframes sparkFade { to { opacity:0; } }
+        @keyframes ringShow { to { opacity:1; } }
+        @keyframes drawRing { to { stroke-dashoffset:0; } }
+        @keyframes dashIn { to { opacity:1; } }
+        @keyframes introSpin { to { transform:rotate(360deg); } }
+        @keyframes leafPop { to { transform:translate(-50%,-50%) scale(1); } }
+        @keyframes leafGlowing { 0%,100% { filter:drop-shadow(0 0 6px rgba(201,168,76,0.4)); } 50% { filter:drop-shadow(0 0 18px rgba(201,168,76,0.7)); } }
+        @keyframes letterIn { to { opacity:1; transform:translateY(0); } }
+        @keyframes ruleExpand { to { width:48px; } }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(8px);} to { opacity:1; transform:translateY(0);} }
+
+        /* DEFAULT (no intro): everything fully visible — safe, no flash on reruns */
+        .login-crest { background: linear-gradient(150deg, #06291C 0%, #0D3D2B 45%, #04190F 100%); border-radius: 30px 30px 0 0; padding: 52px 40px 40px; text-align:center; position:relative; overflow:hidden; border:1px solid rgba(201,168,76,0.3); border-bottom:none; box-shadow: inset 0 1px 2px rgba(120,220,180,0.25); }
+        .login-crest::before { content:''; position:absolute; top:-60%; left:-30%; width:160%; height:220%; background: conic-gradient(from 0deg, transparent 0deg, rgba(201,168,76,0.10) 40deg, transparent 80deg, transparent 180deg, rgba(120,220,180,0.08) 220deg, transparent 260deg); animation: introSpin 28s linear infinite; pointer-events:none; }
         .login-crest > * { position: relative; z-index: 1; }
-        .monogram-ring { width: 92px; height: 92px; margin: 0 auto 20px; border-radius: 50%; border: 1.5px solid rgba(201,168,76,0.6); display:flex; align-items:center; justify-content:center; position:relative; background: radial-gradient(circle, rgba(201,168,76,0.12), transparent 70%); animation: monogramGlow 4s ease-in-out infinite; }
-        .monogram-ring::before { content:''; position:absolute; inset:-7px; border-radius:50%; border:1px dashed rgba(201,168,76,0.35); animation: ringSpin 22s linear infinite; }
-        .monogram-leaf { font-size: 2.5rem; line-height:1; background: linear-gradient(135deg, #F0E6C8, #C9A84C, #F0E6C8); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
-        .login-title { font-family:'Cormorant Garamond',serif; font-size:2.8rem; font-weight:600; font-style:italic; letter-spacing:-0.025em; line-height:1.05; margin:0;
-            background: linear-gradient(90deg, #FFFFFF 20%, #F0E6C8 40%, #FFFFFF 60%); background-size: 200% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation: sheen 6s linear infinite; }
+        .ring-stage { width:92px; height:92px; margin:0 auto 20px; position:relative; }
+        .ring-stage .spark { display:none; }
+        .ring-stage .ring-svg { position:absolute; inset:0; transform:rotate(-90deg); }
+        .ring-stage .ring-svg circle { stroke:#C9A84C; stroke-width:1.5; fill:none; }
+        .ring-stage .ring-dashed { position:absolute; inset:-7px; border-radius:50%; border:1px dashed rgba(201,168,76,0.35); animation: introSpin 22s linear infinite; }
+        .ring-stage .leaf { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:2.5rem; line-height:1; background:linear-gradient(135deg,#F0E6C8,#C9A84C,#F0E6C8); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation: leafGlowing 4s ease-in-out infinite; }
+        .login-title { font-family:'Cormorant Garamond',serif; font-size:2.8rem; font-weight:600; font-style:italic; letter-spacing:-0.025em; line-height:1.05; margin:0; }
+        .login-title span { display:inline-block; color:#FFFFFF; }
         .login-sub { font-size:0.66rem; color:#C9A84C; letter-spacing:0.36em; text-transform:uppercase; font-weight:700; margin-top:12px; font-family:'Plus Jakarta Sans',sans-serif; }
         .login-rule { width:48px; height:2px; background:linear-gradient(90deg,transparent,#C9A84C,transparent); margin:18px auto 0; }
         .login-tag { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:0.95rem; color:#9DC2B0; margin-top:14px; }
+
+        /* INTRO MODE (first load only): choreographed reveal — ~6s cinematic */
+        body.gc-intro .login-crest { opacity:0; animation: crestBoxIn 1.4s cubic-bezier(0.22,1,0.36,1) 0.1s forwards; }
+        body.gc-intro .ring-stage .spark { display:block; position:absolute; top:50%; left:50%; width:6px; height:6px; border-radius:50%; background:#F0E6C8; transform:translate(-50%,-50%); box-shadow:0 0 22px 7px rgba(201,168,76,0.9); animation: sparkIgnite 1.0s ease 0.6s both, sparkFade 0.7s ease 2.2s forwards; }
+        body.gc-intro .ring-stage .ring-svg { opacity:0; animation: ringShow 0.1s linear 1.6s forwards; }
+        body.gc-intro .ring-stage .ring-svg circle { stroke-dasharray:283; stroke-dashoffset:283; animation: drawRing 1.8s cubic-bezier(0.6,0,0.3,1) 1.6s forwards; }
+        body.gc-intro .ring-stage .ring-dashed { opacity:0; animation: dashIn 0.8s ease 3.2s forwards, introSpin 22s linear 3.2s infinite; }
+        body.gc-intro .ring-stage .leaf { transform:translate(-50%,-50%) scale(0); animation: leafPop 1.0s cubic-bezier(0.34,1.56,0.64,1) 2.5s forwards, leafGlowing 4s ease-in-out 3.8s infinite; }
+        body.gc-intro .login-title span { opacity:0; transform:translateY(14px); animation: letterIn 0.6s cubic-bezier(0.22,1,0.36,1) forwards; }
+        body.gc-intro .login-sub { opacity:0; animation: fadeUp 0.9s ease 4.5s forwards; }
+        body.gc-intro .login-rule { width:0; animation: ruleExpand 1.0s ease 4.2s forwards; }
+        body.gc-intro .login-tag { opacity:0; animation: fadeUp 0.9s ease 4.8s forwards; }
+        body.gc-intro div[data-testid="stTabs"] { opacity:0; animation: fadeUp 1.0s cubic-bezier(0.22,1,0.36,1) 5.1s forwards; }
         </style>
         <div class="login-crest">
-            <div class="monogram-ring"><div class="monogram-leaf">❦</div></div>
-            <div class="login-title">Garden Clinic</div>
+            <div class="ring-stage">
+                <div class="spark"></div>
+                <svg class="ring-svg" viewBox="0 0 92 92"><circle cx="46" cy="46" r="45"/></svg>
+                <div class="ring-dashed"></div>
+                <div class="leaf">&#10086;</div>
+            </div>
+            <div class="login-title"><span style="animation-delay:3.20s">G</span><span style="animation-delay:3.27s">a</span><span style="animation-delay:3.34s">r</span><span style="animation-delay:3.41s">d</span><span style="animation-delay:3.48s">e</span><span style="animation-delay:3.55s">n</span><span style="animation-delay:3.62s">&nbsp;</span><span style="animation-delay:3.69s">C</span><span style="animation-delay:3.76s">l</span><span style="animation-delay:3.83s">i</span><span style="animation-delay:3.90s">n</span><span style="animation-delay:3.97s">i</span><span style="animation-delay:4.04s">c</span></div>
             <div class="login-sub">Management System</div>
             <div class="login-rule"></div>
             <div class="login-tag">Physical Therapy &amp; Rehabilitation</div>
         </div>
         """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
+        components.html("""
+        <script>
+        (function(){
+            try {
+                var pdoc = window.parent.document;
+                if (!sessionStorage.getItem('gc_intro_played')) {
+                    sessionStorage.setItem('gc_intro_played','1');
+                    pdoc.body.classList.add('gc-intro');
+                    setTimeout(function(){ pdoc.body.classList.remove('gc-intro'); }, 7000);
+                }
+            } catch(e) {}
+        })();
+        </script>
+        """, height=0, width=0)
         lt, rt = st.tabs(["Sign In", "Create Account"])
         with lt:
             with st.form("login_form", clear_on_submit=False):
@@ -2531,3 +2543,4 @@ elif selected == "⚙️  Settings":
         st.markdown("**Preview:**")
         preview_rem = new_rem_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{date}", "2026-06-19").replace("{time}", "10:30 AM").replace("{doctor}", "Haryad")
         st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{preview_rem}</div></div>', unsafe_allow_html=True)
+    
