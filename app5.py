@@ -860,18 +860,18 @@ if not st.session_state.logged_in:
         .login-rule { width:48px; height:2px; background:linear-gradient(90deg,transparent,#C9A84C,transparent); margin:18px auto 0; }
         .login-tag { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:0.95rem; color:#9DC2B0; margin-top:14px; }
 
-        /* INTRO MODE (first load only): choreographed reveal */
-        body.gc-intro .login-crest { opacity:0; animation: crestBoxIn 1s cubic-bezier(0.22,1,0.36,1) 0.1s forwards; }
-        body.gc-intro .ring-stage .spark { display:block; position:absolute; top:50%; left:50%; width:6px; height:6px; border-radius:50%; background:#F0E6C8; transform:translate(-50%,-50%); box-shadow:0 0 22px 7px rgba(201,168,76,0.9); animation: sparkIgnite 0.7s ease 0.5s both, sparkFade 0.5s ease 1.4s forwards; }
-        body.gc-intro .ring-stage .ring-svg { opacity:0; animation: ringShow 0.1s linear 1.0s forwards; }
-        body.gc-intro .ring-stage .ring-svg circle { stroke-dasharray:283; stroke-dashoffset:283; animation: drawRing 1.1s cubic-bezier(0.6,0,0.3,1) 1.0s forwards; }
-        body.gc-intro .ring-stage .ring-dashed { opacity:0; animation: dashIn 0.6s ease 2.0s forwards, introSpin 22s linear 2.0s infinite; }
-        body.gc-intro .ring-stage .leaf { transform:translate(-50%,-50%) scale(0); animation: leafPop 0.8s cubic-bezier(0.34,1.56,0.64,1) 1.5s forwards, leafGlowing 4s ease-in-out 2.5s infinite; }
-        body.gc-intro .login-title span { opacity:0; transform:translateY(14px); animation: letterIn 0.5s cubic-bezier(0.22,1,0.36,1) forwards; }
-        body.gc-intro .login-sub { opacity:0; animation: fadeUp 0.7s ease 2.7s forwards; }
-        body.gc-intro .login-rule { width:0; animation: ruleExpand 0.8s ease 2.5s forwards; }
-        body.gc-intro .login-tag { opacity:0; animation: fadeUp 0.7s ease 2.9s forwards; }
-        body.gc-intro div[data-testid="stTabs"] { opacity:0; animation: fadeUp 0.9s cubic-bezier(0.22,1,0.36,1) 3.0s forwards; }
+        /* INTRO MODE (first load only): choreographed reveal — ~6s cinematic */
+        body.gc-intro .login-crest { opacity:0; animation: crestBoxIn 1.4s cubic-bezier(0.22,1,0.36,1) 0.1s forwards; }
+        body.gc-intro .ring-stage .spark { display:block; position:absolute; top:50%; left:50%; width:6px; height:6px; border-radius:50%; background:#F0E6C8; transform:translate(-50%,-50%); box-shadow:0 0 22px 7px rgba(201,168,76,0.9); animation: sparkIgnite 1.0s ease 0.6s both, sparkFade 0.7s ease 2.2s forwards; }
+        body.gc-intro .ring-stage .ring-svg { opacity:0; animation: ringShow 0.1s linear 1.6s forwards; }
+        body.gc-intro .ring-stage .ring-svg circle { stroke-dasharray:283; stroke-dashoffset:283; animation: drawRing 1.8s cubic-bezier(0.6,0,0.3,1) 1.6s forwards; }
+        body.gc-intro .ring-stage .ring-dashed { opacity:0; animation: dashIn 0.8s ease 3.2s forwards, introSpin 22s linear 3.2s infinite; }
+        body.gc-intro .ring-stage .leaf { transform:translate(-50%,-50%) scale(0); animation: leafPop 1.0s cubic-bezier(0.34,1.56,0.64,1) 2.5s forwards, leafGlowing 4s ease-in-out 3.8s infinite; }
+        body.gc-intro .login-title span { opacity:0; transform:translateY(14px); animation: letterIn 0.6s cubic-bezier(0.22,1,0.36,1) forwards; }
+        body.gc-intro .login-sub { opacity:0; animation: fadeUp 0.9s ease 4.5s forwards; }
+        body.gc-intro .login-rule { width:0; animation: ruleExpand 1.0s ease 4.2s forwards; }
+        body.gc-intro .login-tag { opacity:0; animation: fadeUp 0.9s ease 4.8s forwards; }
+        body.gc-intro div[data-testid="stTabs"] { opacity:0; animation: fadeUp 1.0s cubic-bezier(0.22,1,0.36,1) 5.1s forwards; }
         </style>
         <div class="login-crest">
             <div class="ring-stage">
@@ -880,7 +880,7 @@ if not st.session_state.logged_in:
                 <div class="ring-dashed"></div>
                 <div class="leaf">&#10086;</div>
             </div>
-            <div class="login-title"><span style="animation-delay:1.90s">G</span><span style="animation-delay:1.95s">a</span><span style="animation-delay:2.00s">r</span><span style="animation-delay:2.05s">d</span><span style="animation-delay:2.10s">e</span><span style="animation-delay:2.15s">n</span><span style="animation-delay:2.20s">&nbsp;</span><span style="animation-delay:2.25s">C</span><span style="animation-delay:2.30s">l</span><span style="animation-delay:2.35s">i</span><span style="animation-delay:2.40s">n</span><span style="animation-delay:2.45s">i</span><span style="animation-delay:2.50s">c</span></div>
+            <div class="login-title"><span style="animation-delay:3.20s">G</span><span style="animation-delay:3.27s">a</span><span style="animation-delay:3.34s">r</span><span style="animation-delay:3.41s">d</span><span style="animation-delay:3.48s">e</span><span style="animation-delay:3.55s">n</span><span style="animation-delay:3.62s">&nbsp;</span><span style="animation-delay:3.69s">C</span><span style="animation-delay:3.76s">l</span><span style="animation-delay:3.83s">i</span><span style="animation-delay:3.90s">n</span><span style="animation-delay:3.97s">i</span><span style="animation-delay:4.04s">c</span></div>
             <div class="login-sub">Management System</div>
             <div class="login-rule"></div>
             <div class="login-tag">Physical Therapy &amp; Rehabilitation</div>
@@ -895,7 +895,7 @@ if not st.session_state.logged_in:
                 if (!sessionStorage.getItem('gc_intro_played')) {
                     sessionStorage.setItem('gc_intro_played','1');
                     pdoc.body.classList.add('gc-intro');
-                    setTimeout(function(){ pdoc.body.classList.remove('gc-intro'); }, 4500);
+                    setTimeout(function(){ pdoc.body.classList.remove('gc-intro'); }, 7000);
                 }
             } catch(e) {}
         })();
