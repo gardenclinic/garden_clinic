@@ -176,7 +176,7 @@ label, .stRadio label span, .stCheckbox label { color: #EAF2EC !important; }
 .receipt-row { display: flex; justify-content: space-between; align-items: center; margin: 9px 0; font-size: 0.88rem; }
 .receipt-row span:first-child { color: #4A6B52 !important; } .receipt-row span:last-child { color: #0D1F14 !important; font-weight: 700; }
 .receipt-divider { border: none; border-top: 1px dashed #DDE8E1; margin: 18px 0; }
-.receipt-total-box { background: #051811; border-radius: 18px; padding: 18px 22px; margin: 20px 0; position: relative; overflow: hidden; }
+.receipt-total-box { background: #0D3D2B; border-radius: 18px; padding: 18px 22px; margin: 20px 0; position: relative; overflow: hidden; }
 .receipt-total-box::before { content: ''; display: none; }
 .receipt-total-label { font-size: 0.62rem; color: #6FCF97; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2em; }
 .receipt-total-amount { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 500; color: #FFFFFF; margin-top: 4px; }
@@ -730,7 +730,7 @@ def render_receipt(r, cp):
         .receipt-row {{ display:flex; justify-content:space-between; align-items:center; margin:9px 0; font-size:0.88rem; }}
         .receipt-row span:first-child {{ color:#4A6B52; }} .receipt-row span:last-child {{ color:#0D1F14; font-weight:700; }}
         .receipt-divider {{ border:none; border-top:1px dashed #DDE8E1; margin:18px 0; }}
-        .receipt-total-box {{ background:#051811; border-radius:18px; padding:18px 22px; margin:20px 0; }}
+        .receipt-total-box {{ background:#0D3D2B; border-radius:18px; padding:18px 22px; margin:20px 0; }}
         .receipt-total-label {{ font-size:0.62rem; color:#6FCF97; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; }}
         .receipt-total-amount {{ font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:500; color:#FFF; margin-top:4px; }}
         .receipt-discount {{ color:#C0392B !important; }}
@@ -2473,3 +2473,4 @@ elif selected == "⚙️  Settings":
         st.markdown("**Preview:**")
         preview_rem = new_rem_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{date}", "2026-06-19").replace("{time}", "10:30 AM").replace("{doctor}", "Haryad")
         st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{preview_rem}</div></div>', unsafe_allow_html=True)
+        
