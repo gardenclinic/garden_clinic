@@ -163,8 +163,8 @@ label, .stRadio label span, .stCheckbox label { color: #EAF2EC !important; }
 
 /* RECEIPT */
 .receipt-wrap { background: #FFFFFF; border-radius: 24px; padding: 0; max-width: 440px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; color: #0D1F14; box-shadow: 0 20px 60px rgba(13,31,20,0.15); overflow: hidden; border: 1px solid #DDE8E1; }
-.receipt-header { background: linear-gradient(135deg, #07261A 0%, #0D3D2B 60%, #07261A 100%); padding: 40px 28px 28px; text-align: center; position: relative; overflow: hidden; }
-.receipt-header::before { content: ''; position: absolute; top: -40px; right: -40px; width: 160px; height: 160px; background: radial-gradient(circle, rgba(201,168,76,0.2), transparent 70%); }
+.receipt-header { background: #051811; padding: 40px 28px 28px; text-align: center; position: relative; overflow: hidden; }
+.receipt-header::before { content: ''; display: none; }
 .receipt-header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px; background: #FFFFFF; border-radius: 24px 24px 0 0; }
 .receipt-leaf { font-size: 1.2rem; color: #C9A84C; margin-bottom: 8px; }
 .receipt-clinic-name { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 600; color: #FFFFFF; font-style: italic; letter-spacing: -0.01em; margin: 0; }
@@ -176,8 +176,8 @@ label, .stRadio label span, .stCheckbox label { color: #EAF2EC !important; }
 .receipt-row { display: flex; justify-content: space-between; align-items: center; margin: 9px 0; font-size: 0.88rem; }
 .receipt-row span:first-child { color: #6B8A72; } .receipt-row span:last-child { color: #0D1F14; font-weight: 600; }
 .receipt-divider { border: none; border-top: 1px dashed #DDE8E1; margin: 18px 0; }
-.receipt-total-box { background: linear-gradient(135deg, #07261A, #0D3D2B); border-radius: 18px; padding: 18px 22px; margin: 20px 0; position: relative; overflow: hidden; }
-.receipt-total-box::before { content: ''; position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; background: radial-gradient(circle, rgba(201,168,76,0.2), transparent 70%); }
+.receipt-total-box { background: #051811; border-radius: 18px; padding: 18px 22px; margin: 20px 0; position: relative; overflow: hidden; }
+.receipt-total-box::before { content: ''; display: none; }
 .receipt-total-label { font-size: 0.62rem; color: #6FCF97; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2em; }
 .receipt-total-amount { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 500; color: #FFFFFF; margin-top: 4px; }
 .receipt-discount { color: #C0392B !important; }
@@ -719,7 +719,7 @@ def render_receipt(r, cp):
         var styles = `
         body {{ margin:0; padding:20px; display:flex; justify-content:center; background:#FFF; font-family:'Plus Jakarta Sans',sans-serif; }}
         .receipt-wrap {{ background:#FFFFFF; border-radius:24px; max-width:440px; font-size:0.88rem; color:#0D1F14; border:1px solid #DDE8E1; overflow:hidden; }}
-        .receipt-header {{ background:linear-gradient(135deg,#07261A 0%,#0D3D2B 60%,#07261A 100%); padding:40px 28px 28px; text-align:center; }}
+        .receipt-header {{ background:#051811; padding:40px 28px 28px; text-align:center; }}
         .receipt-leaf {{ font-size:1.2rem; color:#C9A84C; margin-bottom:8px; }}
         .receipt-clinic-name {{ font-family:'Cormorant Garamond',serif; font-size:2rem; font-weight:600; color:#FFF; font-style:italic; margin:0; }}
         .receipt-clinic-sub {{ font-size:0.65rem; color:#6FCF97; letter-spacing:0.32em; text-transform:uppercase; margin-top:10px; font-weight:700; }}
@@ -730,7 +730,7 @@ def render_receipt(r, cp):
         .receipt-row {{ display:flex; justify-content:space-between; align-items:center; margin:9px 0; font-size:0.88rem; }}
         .receipt-row span:first-child {{ color:#6B8A72; }} .receipt-row span:last-child {{ color:#0D1F14; font-weight:600; }}
         .receipt-divider {{ border:none; border-top:1px dashed #DDE8E1; margin:18px 0; }}
-        .receipt-total-box {{ background:linear-gradient(135deg,#07261A,#0D3D2B); border-radius:18px; padding:18px 22px; margin:20px 0; }}
+        .receipt-total-box {{ background:#051811; border-radius:18px; padding:18px 22px; margin:20px 0; }}
         .receipt-total-label {{ font-size:0.62rem; color:#6FCF97; font-weight:700; text-transform:uppercase; letter-spacing:0.2em; }}
         .receipt-total-amount {{ font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:500; color:#FFF; margin-top:4px; }}
         .receipt-discount {{ color:#C0392B !important; }}
@@ -2473,3 +2473,4 @@ elif selected == "⚙️  Settings":
         st.markdown("**Preview:**")
         preview_rem = new_rem_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{date}", "2026-06-19").replace("{time}", "10:30 AM").replace("{doctor}", "Haryad")
         st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{preview_rem}</div></div>', unsafe_allow_html=True)
+        
