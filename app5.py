@@ -55,8 +55,10 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #EA
 
 /* PAGE HEADER */
 .page-header { margin-bottom: 32px; padding-top: 8px; }
-.page-header .kicker { font-size: 0.68rem; color: #C9A84C; letter-spacing: 0.28em; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; font-family: 'Plus Jakarta Sans', sans-serif; }
-.page-header h1 { font-family: 'Cormorant Garamond', serif !important; font-size: 3rem !important; font-weight: 600 !important; color: #FFFFFF !important; margin: 0 !important; font-style: italic; letter-spacing: -0.02em !important; line-height: 1.05 !important; text-shadow: 0 2px 20px rgba(201,168,76,0.15); }
+.page-header .kicker { font-size: 0.68rem; color: #C9A84C; letter-spacing: 0.28em; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; font-family: 'Plus Jakarta Sans', sans-serif; display: inline-flex; align-items: center; gap: 10px; }
+.page-header .kicker::before { content: ''; width: 24px; height: 1px; background: linear-gradient(90deg, transparent, #C9A84C); display: inline-block; }
+.page-header h1 { font-family: 'Cormorant Garamond', serif !important; font-size: 3rem !important; font-weight: 600 !important; margin: 0 !important; font-style: italic; letter-spacing: -0.02em !important; line-height: 1.05 !important; text-shadow: 0 2px 24px rgba(201,168,76,0.18);
+    background: linear-gradient(90deg, #FFFFFF 25%, #F0E6C8 45%, #FFFFFF 65%) !important; background-size: 200% auto !important; -webkit-background-clip: text !important; background-clip: text !important; -webkit-text-fill-color: transparent !important; animation: sheen 7s linear infinite; }
 .page-header p { font-size: 0.9rem; color: #9DB5A6; margin: 8px 0 0 0; font-weight: 400; }
 
 /* PULSE BAR — liquid glass */
@@ -70,7 +72,7 @@ h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif !important; color: #EA
 .pulse-divider { width: 1px; background: rgba(201,168,76,0.25); height: 40px; align-self: center; }
 
 /* CARDS — liquid glass */
-.card { background: linear-gradient(135deg, rgba(10,50,38,0.6), rgba(4,22,16,0.5)); backdrop-filter: blur(40px) saturate(170%); -webkit-backdrop-filter: blur(40px) saturate(170%); border: 1px solid rgba(201,168,76,0.28); border-radius: 28px; padding: 24px 28px; margin-bottom: 18px; transition: all 0.45s cubic-bezier(0.22,1,0.36,1); box-shadow: 0 4px 8px rgba(0,0,0,0.25), 0 14px 28px rgba(0,0,0,0.35), 0 32px 56px rgba(0,0,0,0.3), inset 0 1px 2px rgba(120,220,180,0.3), inset 0 -10px 30px rgba(0,0,0,0.25); position: relative; overflow: hidden; animation: cardRise 0.6s cubic-bezier(0.22,1,0.36,1) both; transform-style: preserve-3d; transform: perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0px); will-change: transform; }
+.card { background: linear-gradient(135deg, rgba(10,50,38,0.6), rgba(4,22,16,0.5)); backdrop-filter: blur(40px) saturate(170%); -webkit-backdrop-filter: blur(40px) saturate(170%); border: 1px solid rgba(201,168,76,0.28); border-radius: 28px; padding: 24px 28px; margin-bottom: 18px; transition: all 0.45s cubic-bezier(0.22,1,0.36,1); box-shadow: 0 4px 8px rgba(0,0,0,0.25), 0 14px 28px rgba(0,0,0,0.35), 0 32px 56px rgba(0,0,0,0.3), inset 0 1px 2px rgba(120,220,180,0.3), inset 0 -10px 30px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(201,168,76,0.08); position: relative; overflow: hidden; animation: cardRise 0.6s cubic-bezier(0.22,1,0.36,1) both; transform-style: preserve-3d; transform: perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0px); will-change: transform; }
 @keyframes cardRise { 0% { opacity: 0; transform: perspective(900px) translateY(18px) translateZ(-40px) scale(0.98); } 100% { opacity: 1; transform: perspective(900px) translateY(0) translateZ(0) scale(1); } }
 .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%; background: linear-gradient(180deg, rgba(120,220,180,0.16), transparent); pointer-events: none; border-radius: 28px 28px 50% 50%; }
 .card::after { content: ''; position: absolute; top: -80%; left: -60%; width: 60%; height: 260%; background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.28) 48%, rgba(201,168,76,0.35) 52%, transparent 78%); transform: rotate(8deg); pointer-events: none; animation: cardShine 7s ease-in-out infinite; }
@@ -223,6 +225,47 @@ hr { border: none !important; border-top: 1px solid rgba(201,168,76,0.18) !impor
 }
 @keyframes sporePulse { 0%,100% { opacity:0.15; transform: scale(1);} 50% { opacity:0.5; transform: scale(1.4);} }
 .spore { position:absolute; width:5px; height:5px; border-radius:50%; background: radial-gradient(circle, rgba(201,168,76,0.9), rgba(201,168,76,0)); animation: sporePulse ease-in-out infinite; }
+
+/* ═══ PREMIUM LUXURY LAYER ═══ */
+/* Cinematic gold light rays sweeping from top */
+.lux-rays { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; opacity: 0.5; }
+.lux-rays::before { content: ''; position: absolute; top: -50%; left: 50%; width: 180%; height: 200%; transform: translateX(-50%) rotate(0deg); transform-origin: top center;
+    background: conic-gradient(from 200deg at 50% 0%, transparent 0deg, rgba(201,168,76,0.06) 18deg, transparent 36deg, transparent 50deg, rgba(120,220,180,0.05) 66deg, transparent 84deg, transparent 270deg, rgba(201,168,76,0.05) 300deg, transparent 330deg);
+    animation: rayShift 24s ease-in-out infinite alternate; }
+@keyframes rayShift { 0% { transform: translateX(-50%) rotate(-8deg); } 100% { transform: translateX(-50%) rotate(8deg); } }
+
+/* Fine film grain texture for depth */
+.lux-grain { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.04; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-repeat: repeat; }
+
+/* Gold corner brackets on cards — couture framing detail */
+.card { isolation: isolate; }
+.card > .lux-corner, .card .lux-corner { display: none; }
+.card::after { z-index: 2; }
+
+/* Refined section labels with a drawn-gold underline that shimmers */
+.section-label { position: relative; display: inline-block; }
+.section-label::after { content: ''; position: absolute; left: 0; bottom: -6px; width: 100%; height: 1px; background: linear-gradient(90deg, rgba(201,168,76,0.8), rgba(201,168,76,0.1) 60%, transparent); }
+
+/* Metric numbers get a subtle gold gradient text fill */
+[data-testid="stMetricValue"] { background: linear-gradient(135deg, #FFFFFF 0%, #EAF2EC 40%, #D4B45C 130%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-family: 'JetBrains Mono', monospace !important; letter-spacing: -0.01em; }
+
+/* Tabs: refined underline glow on active */
+.stTabs [data-baseweb="tab-list"] { gap: 4px; }
+.stTabs [aria-selected="true"] { position: relative; }
+
+/* Luxurious scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgba(3,16,11,0.4); }
+::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(201,168,76,0.5), rgba(16,90,66,0.6)); border-radius: 10px; border: 2px solid rgba(3,16,11,0.4); }
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(201,168,76,0.8), rgba(16,90,66,0.9)); }
+
+/* Text selection in gold */
+::selection { background: rgba(201,168,76,0.3); color: #FFFFFF; }
+
+/* Gentle ambient glow pulse on the whole app frame */
+@keyframes frameGlow { 0%,100% { box-shadow: inset 0 0 200px rgba(3,16,11,0.5); } 50% { box-shadow: inset 0 0 240px rgba(3,16,11,0.65); } }
+@keyframes sheen { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
 </style>
 """, unsafe_allow_html=True)
 
@@ -245,6 +288,7 @@ for _i in range(10):
     _left = _rnd.randint(3, 97); _top = _rnd.randint(5, 92); _dur = _rnd.randint(3, 7); _delay = _rnd.randint(0, 6)
     _particles.append(f'<div class="spore" style="left:{_left}%;top:{_top}%;animation-duration:{_dur}s;animation-delay:-{_delay}s;"></div>')
 st.markdown(f'<div class="leaf-field">{"".join(_particles)}</div>', unsafe_allow_html=True)
+st.markdown('<div class="lux-rays"></div><div class="lux-grain"></div>', unsafe_allow_html=True)
 
 # 3D mouse-tracking tilt for cards — reaches into the parent document since Streamlit renders this in an iframe
 components.html("""
@@ -786,15 +830,29 @@ if not st.session_state.logged_in:
     with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("""
-        <div style="background:#FFFFFF;border-radius:28px;overflow:hidden;box-shadow:0 24px 64px rgba(13,31,20,0.14);border:1px solid #DDE8E1;">
-            <div style="background:linear-gradient(135deg,#0D3D2B 0%,#1A5C3E 100%);padding:44px 40px 36px;text-align:center;position:relative;overflow:hidden;">
-                <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(201,168,76,0.2),transparent 70%);"></div>
-                <div style="position:absolute;bottom:-30px;left:-30px;width:120px;height:120px;background:radial-gradient(circle,rgba(111,207,151,0.1),transparent 70%);"></div>
-                <div style="font-size:2.2rem;margin-bottom:12px;">🌿</div>
-                <div style="font-family:'Cormorant Garamond',serif;font-size:2.6rem;font-weight:600;font-style:italic;color:#FFFFFF;letter-spacing:-0.025em;line-height:1.1;">Garden Clinic</div>
-                <div style="font-size:0.68rem;color:#C9A84C;letter-spacing:0.3em;text-transform:uppercase;font-weight:700;margin-top:10px;font-family:'Plus Jakarta Sans',sans-serif;">Management System</div>
-                <div style="width:40px;height:2px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);margin:16px auto 0;"></div>
-            </div>
+        <style>
+        @keyframes crestRise { 0% { opacity:0; transform: translateY(24px) scale(0.96); } 100% { opacity:1; transform: translateY(0) scale(1); } }
+        @keyframes monogramGlow { 0%,100% { filter: drop-shadow(0 0 8px rgba(201,168,76,0.4)); } 50% { filter: drop-shadow(0 0 22px rgba(201,168,76,0.75)); } }
+        @keyframes ringSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes sheen { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+        .login-crest { background: linear-gradient(150deg, #06291C 0%, #0D3D2B 45%, #04190F 100%); border-radius: 30px 30px 0 0; padding: 52px 40px 40px; text-align:center; position:relative; overflow:hidden; border:1px solid rgba(201,168,76,0.3); border-bottom:none; box-shadow: inset 0 1px 2px rgba(120,220,180,0.25); animation: crestRise 0.9s cubic-bezier(0.22,1,0.36,1) both; }
+        .login-crest::before { content:''; position:absolute; top:-60%; left:-30%; width:160%; height:220%; background: conic-gradient(from 0deg, transparent 0deg, rgba(201,168,76,0.10) 40deg, transparent 80deg, transparent 180deg, rgba(120,220,180,0.08) 220deg, transparent 260deg); animation: ringSpin 28s linear infinite; pointer-events:none; }
+        .login-crest > * { position: relative; z-index: 1; }
+        .monogram-ring { width: 92px; height: 92px; margin: 0 auto 20px; border-radius: 50%; border: 1.5px solid rgba(201,168,76,0.6); display:flex; align-items:center; justify-content:center; position:relative; background: radial-gradient(circle, rgba(201,168,76,0.12), transparent 70%); animation: monogramGlow 4s ease-in-out infinite; }
+        .monogram-ring::before { content:''; position:absolute; inset:-7px; border-radius:50%; border:1px dashed rgba(201,168,76,0.35); animation: ringSpin 22s linear infinite; }
+        .monogram-leaf { font-size: 2.5rem; line-height:1; background: linear-gradient(135deg, #F0E6C8, #C9A84C, #F0E6C8); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+        .login-title { font-family:'Cormorant Garamond',serif; font-size:2.8rem; font-weight:600; font-style:italic; letter-spacing:-0.025em; line-height:1.05; margin:0;
+            background: linear-gradient(90deg, #FFFFFF 20%, #F0E6C8 40%, #FFFFFF 60%); background-size: 200% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation: sheen 6s linear infinite; }
+        .login-sub { font-size:0.66rem; color:#C9A84C; letter-spacing:0.36em; text-transform:uppercase; font-weight:700; margin-top:12px; font-family:'Plus Jakarta Sans',sans-serif; }
+        .login-rule { width:48px; height:2px; background:linear-gradient(90deg,transparent,#C9A84C,transparent); margin:18px auto 0; }
+        .login-tag { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:0.95rem; color:#9DC2B0; margin-top:14px; }
+        </style>
+        <div class="login-crest">
+            <div class="monogram-ring"><div class="monogram-leaf">❦</div></div>
+            <div class="login-title">Garden Clinic</div>
+            <div class="login-sub">Management System</div>
+            <div class="login-rule"></div>
+            <div class="login-tag">Physical Therapy &amp; Rehabilitation</div>
         </div>
         """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -2473,4 +2531,3 @@ elif selected == "⚙️  Settings":
         st.markdown("**Preview:**")
         preview_rem = new_rem_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{date}", "2026-06-19").replace("{time}", "10:30 AM").replace("{doctor}", "Haryad")
         st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{preview_rem}</div></div>', unsafe_allow_html=True)
-        
