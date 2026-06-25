@@ -876,8 +876,11 @@ if not st.session_state.logged_in:
                 st.markdown("<br>", unsafe_allow_html=True)
                 signin_clicked = st.form_submit_button("Sign In →", use_container_width=True)
             if signin_clicked:
-                users = sb_all("users", filters={"username": u.strip()})
-                match = [x for x in users if x.get("password_hash") == hash_password(p)]
+                try:
+                    rpc_result = get_sb().rpc("verify_login", {"p_username": u.strip(), "p_password_hash": hash_password(p)}).execute()
+                    match = rpc_result.data or []
+                except Exception:
+                    match = []
                 if match:
                     st.session_state.logged_in = True
                     st.session_state.username = match[0]["username"]
@@ -900,10 +903,10 @@ if not st.session_state.logged_in:
             code = st.text_input("Admin code", type="password", key="reg_code")
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Create Account", use_container_width=True, key="btn_create_acc"):
-                if code != "1011": st.error("Invalid admin code.")
+                if code != st.secrets.get("ADMIN_CODE", "CHANGE_ME_IN_SECRETS"): st.error("Invalid admin code.")
                 elif rs == "Doctor" and not linked_doc_id: st.error("Please link a doctor.")
                 elif ru and rp:
-                    if sb_exists("users","username",ru.strip()): st.error("Username already taken.")
+                    if sb_exists("users_public","username",ru.strip()): st.error("Username already taken.")
                     else:
                         sb_insert("users",{"username":ru.strip(),"password_hash":hash_password(rp),"role":rs,"linked_doctor_id":linked_doc_id})
                         log_action("System","Create Account",f"User: {ru.strip()} | Role: {rs}")
@@ -2285,7 +2288,7 @@ elif selected == "🔬  Research":
 # ═══════════════════════════════════════════════
 elif selected == "👥  Accounts":
     page_header("Users", "Accounts", "Manage user access and review activity logs.")
-    accounts = sb_all("users"); st.metric("Total accounts", len(accounts))
+    accounts = sb_all("users_public"); st.metric("Total accounts", len(accounts))
     at1,at2 = st.tabs(["Profiles","Activity Log"])
     with at1:
         section_label("All Accounts")
@@ -2543,4 +2546,3 @@ elif selected == "⚙️  Settings":
         st.markdown("**Preview:**")
         preview_rem = new_rem_template.replace("{name}", "Ahmed").replace("{clinic}", cp.get("clinic_name","Garden Clinic")).replace("{date}", "2026-06-19").replace("{time}", "10:30 AM").replace("{doctor}", "Haryad")
         st.markdown(f'<div class="card"><div style="font-size:0.9rem;color:#EAF2EC;line-height:1.7;">{preview_rem}</div></div>', unsafe_allow_html=True)
-    
