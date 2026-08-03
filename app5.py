@@ -966,6 +966,30 @@ if selected == "🩺  Clinical Workspace":
     doc_info = sb_one("doctors", filters={"id": linked_doctor_id})
     page_header("Clinical Workspace", f"Dr. {doc_info['name'] if doc_info else 'Unknown'}", doc_info.get("specialty","") if doc_info else "")
 
+    # ── Today's patient queue ──
+    todays_visits_doc = [v for v in sb_all("visits", filters={"doctor_id": linked_doctor_id}) if (v.get("visit_date") or "") == today_str]
+    todays_appts_doc = [a for a in sb_all("appointments", filters={"doctor_id": linked_doctor_id, "appt_date": today_str}) if a.get("status") == "Scheduled"]
+    all_p_queue = {p["id"]: p for p in sb_all("patients")}
+    seen_ids = set()
+    queue_names = []
+    for v in todays_visits_doc:
+        pid = v.get("patient_id")
+        if pid and pid not in seen_ids:
+            seen_ids.add(pid)
+            pat = all_p_queue.get(pid)
+            if pat: queue_names.append(("✅ Checked in", pat["name"], "#2ECC8F"))
+    for a in todays_appts_doc:
+        pid = a.get("patient_id")
+        if pid and pid not in seen_ids:
+            seen_ids.add(pid)
+            pat = all_p_queue.get(pid)
+            if pat: queue_names.append(("🕐 Appointed", pat["name"], "#C9A84C"))
+    if queue_names:
+        chips = "".join([f'<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(10,50,38,0.55);border:1px solid {color};border-radius:50px;padding:8px 18px;margin:4px;font-family:Plus Jakarta Sans,sans-serif;font-size:0.85rem;"><span style="font-size:0.7rem;color:{color};">{status}</span><span style="color:#FFFFFF;font-weight:700;">{name}</span></span>' for status, name, color in queue_names])
+        st.markdown(f'<div style="background:rgba(6,30,22,0.5);border:1px solid rgba(201,168,76,0.25);border-radius:20px;padding:16px 20px;margin-bottom:20px;"><div style="font-size:0.62rem;color:#C9A84C;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:10px;">👥 Today\'s Patients</div><div style="display:flex;flex-wrap:wrap;gap:4px;">{chips}</div></div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div style="background:rgba(6,30,22,0.4);border:1px solid rgba(201,168,76,0.15);border-radius:20px;padding:14px 20px;margin-bottom:20px;font-size:0.85rem;color:#9DC2B0;font-family:Plus Jakarta Sans,sans-serif;">👥 No patients checked in yet today — this list updates automatically when reception checks someone out.</div>', unsafe_allow_html=True)
+
     df_tabs = st.tabs(["Patient Assessment","Past Assessments","🩻 Imaging","📋 Today's Sheet"])
 
     with df_tabs[0]:
