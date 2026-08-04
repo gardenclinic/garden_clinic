@@ -990,6 +990,28 @@ if selected == "🩺  Clinical Workspace":
     else:
         st.markdown(f'<div style="background:rgba(6,30,22,0.4);border:1px solid rgba(201,168,76,0.15);border-radius:20px;padding:14px 20px;margin-bottom:20px;font-size:0.85rem;color:#9DC2B0;font-family:Plus Jakarta Sans,sans-serif;">👥 No patients checked in yet today — this list updates automatically when reception checks someone out.</div>', unsafe_allow_html=True)
 
+    # Auto-refresh the queue every 10 seconds, but ONLY if the doctor is not currently typing
+    components.html("""
+    <script>
+    setInterval(function() {
+        try {
+            var pdoc = window.parent.document;
+            var active = pdoc.activeElement;
+            // Don't reload if doctor is typing in a form field
+            var typing = active && (
+                active.tagName === 'INPUT' ||
+                active.tagName === 'TEXTAREA' ||
+                active.tagName === 'SELECT' ||
+                active.isContentEditable
+            );
+            if (!typing) {
+                window.parent.location.reload();
+            }
+        } catch(e) {}
+    }, 10000);
+    </script>
+    """, height=0, width=0)
+
     df_tabs = st.tabs(["Patient Assessment","Past Assessments","🩻 Imaging","📋 Today's Sheet"])
 
     with df_tabs[0]:
