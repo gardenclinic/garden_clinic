@@ -1017,14 +1017,10 @@ if selected == "🩺  Clinical Workspace":
                 visits_count = sb_count("visits", filters={"patient_id": pid_doc})
                 tier_name, tier_icon, tier_color, tier_sub = get_patient_loyalty(pid_doc, pat_doc.get("created_at"), visits_count)
                 tier_chip_html = f'<span class="patient-chip" style="border-color:{tier_color};color:{tier_color};font-weight:700;" title="{tier_sub}">{tier_icon} {tier_name}</span>' if tier_name else ""
-                st.markdown(f"""<div class="patient-chip-bar">
-                    <div class="patient-chip-name">{pat_doc["name"]}</div>
-                    {tier_chip_html}
-                    <span class="patient-chip">{gender_icon} {pat_doc.get("gender","—")}</span>
-                    <span class="patient-chip">{age_text}</span>
-                    <span class="patient-chip">📞 {pat_doc.get("phone","—")}</span>
-                    <span class="patient-chip accent">{visits_count} visits</span>
-                </div>""", unsafe_allow_html=True)
+                chip_phone = pat_doc.get("phone","—")
+                chip_gender = f'{gender_icon} {pat_doc.get("gender","—")}'
+                chip_bar_html = f'<div class="patient-chip-bar"><div class="patient-chip-name">{pat_doc["name"]}</div>{tier_chip_html}<span class="patient-chip">{chip_gender}</span><span class="patient-chip">{age_text}</span><span class="patient-chip">📞 {chip_phone}</span><span class="patient-chip accent">{visits_count} visits</span></div>'
+                st.markdown(chip_bar_html, unsafe_allow_html=True)
 
                 # Past assessments preview
                 prev_forms = sb_all("doctor_intake_form", filters={"patient_id": pid_doc}, order="id", desc_order=True)
