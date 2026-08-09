@@ -2104,6 +2104,60 @@ elif selected == "📊  Accounting":
                 if not sb_exists("expenses","description",tag):
                     sb_insert("expenses",{"description":tag,"category":"Marketing","amount":total_ref_comm,"date":f"{current_month}-01","added_by":username})
                     play_ding(); st.success(f"Recorded."); st.rerun()
+    section_label("💰 Doctor Commissions")
+    all_visits_comm = sb_all("visits")
+    all_doctors_comm = sb_all("doctors")
+    all_tiers_comm = sb_all("doctor_commission_tiers")
+    all_payments = sb_all("commission_payments")
+    paid_months = set((p.get("doctor_id"), p.get("month")) for p in all_payments)
+    cur_month = date.today().strftime("%Y-%m")
+    cur_month_start = date.today().replace(day=1).isoformat()
+
+    # Find months with visits that have unpaid commissions (excluding current month)
+    all_months = sorted(set(v.get("visit_date","")[:7] for v in all_visits_comm if v.get("visit_date","")[:7] < cur_month), reverse=True)
+    unpaid_months = [m for m in all_months if any((d["id"], m) not in paid_months for d in all_doctors_comm)]
+
+    if unpaid_months:
+        st.warning(f"⚠️ **{len(unpaid_months)} month{'s' if len(unpaid_months)>1 else ''} with unpaid doctor commissions:** {', '.join(unpaid_months)}")
+
+    comm_view_month = st.selectbox("View month", [cur_month] + all_months, key="comm_view_month")
+    comm_m_start = f"{comm_view_month}-01"
+    comm_m_end = f"{comm_view_month}-{31 if comm_view_month[5:] in ['01','03','05','07','08','10','12'] else 30}"
+    visits_for_month = [v for v in all_visits_comm if (v.get("visit_date") or "")[:7] == comm_view_month]
+
+    for d in all_doctors_comm:
+        doc_visits = [v for v in visits_for_month if v.get("doctor_id") == d["id"]]
+        doc_rev = sum(float(v.get("net_paid") or 0) for v in doc_visits)
+        rate = get_doc_commission_rate(d["id"], len(doc_visits), all_tiers_comm)
+        comm_amt = doc_rev * rate
+        is_paid = (d["id"], comm_view_month) in paid_months
+        is_current = comm_view_month == cur_month
+
+        status_color = "#2ECC8F" if is_paid else ("#C9A84C" if is_current else "#FF8A7A")
+        status_text = "✅ Paid" if is_paid else ("🔄 In Progress" if is_current else "❗ Unpaid")
+
+        dc1, dc2 = st.columns([3,1])
+        with dc1:
+            st.markdown(f'<div class="card" style="padding:14px 20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.1rem;color:#EAF2EC;">{d["name"]}</div><div style="font-size:0.78rem;color:#9DC2B0;margin-top:2px;">{len(doc_visits)} visits · {fmt(doc_rev)} revenue · {int(rate*100)}% rate</div></div><div style="text-align:right;"><div style="font-size:1.2rem;color:#D4B45C;font-family:JetBrains Mono,monospace;font-weight:700;">{fmt(comm_amt)}</div><div style="font-size:0.72rem;color:{status_color};font-weight:700;">{status_text}</div></div></div></div>', unsafe_allow_html=True)
+        with dc2:
+            if not is_paid and not is_current and comm_amt > 0:
+                pay_notes = st.text_input(f"Notes", placeholder="e.g. Cash", key=f"pay_note_{d['id']}_{comm_view_month}", label_visibility="collapsed")
+                if st.button(f"✅ Mark Paid", key=f"pay_{d['id']}_{comm_view_month}", use_container_width=True):
+                    sb_insert("commission_payments", {"doctor_id": d["id"], "doctor_name": d["name"], "month": comm_view_month, "visits_count": len(doc_visits), "revenue_amount": doc_rev, "commission_rate": rate*100, "commission_amount": comm_amt, "paid_by": username, "paid_at": today_str, "notes": pay_notes.strip()})
+                    log_action(username, "Commission Paid", f"{d['name']} — {comm_view_month} — {fmt(comm_amt)}")
+                    play_ding(); st.success(f"Marked as paid!"); st.rerun()
+            elif is_paid:
+                pay_rec = next((p for p in all_payments if p.get("doctor_id")==d["id"] and p.get("month")==comm_view_month), None)
+                if pay_rec: st.caption(f"Paid on {pay_rec.get('paid_at','')} by {pay_rec.get('paid_by','')}")
+
+    st.markdown("---")
+    section_label("💳 Payment History")
+    if all_payments:
+        hist_rows = [{"Month":p.get("month",""),"Doctor":p.get("doctor_name",""),"Visits":p.get("visits_count",0),"Revenue":fmt(p.get("revenue_amount",0)),"Rate":f"{p.get('commission_rate',0)}%","Commission":fmt(p.get("commission_amount",0)),"Paid by":p.get("paid_by",""),"Date":p.get("paid_at",""),"Notes":p.get("notes","")} for p in sorted(all_payments, key=lambda x: x.get("month",""), reverse=True)]
+        st.dataframe(pd.DataFrame(hist_rows), use_container_width=True, hide_index=True)
+    else:
+        st.info("No commission payments recorded yet.")
+
     section_label("Export to Excel")
     ex1,ex2,ex3,ex4 = st.columns(4)
     with ex1:
