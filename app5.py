@@ -780,7 +780,9 @@ if "auto_tasks_done" not in st.session_state:
     auto_subscriptions()
     st.session_state.auto_tasks_done = True
 
-gross_income, base_expenses, total_commissions, total_outflows, net_profit, doc_visits = get_financials()
+month_start = date.today().replace(day=1).isoformat()
+month_end = date.today().isoformat()
+gross_income, base_expenses, total_commissions, total_outflows, net_profit, doc_visits = get_financials(start=month_start, end=month_end)
 today_str = date.today().isoformat()
 tomorrow_str = (date.today() + timedelta(days=1)).isoformat()
 today_visits_rows = sb_all("visits", filters={"visit_date": today_str})
