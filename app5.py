@@ -2085,25 +2085,50 @@ elif selected == "📊  Accounting":
                 with cc2:
                     if st.button("Delete", type="primary", key="btn_del_exp"):
                         sb_delete("expenses","id",eid); play_ding(); st.success("Deleted."); st.rerun()
-    section_label("Referral Commissions This Month")
-    current_month = datetime.now().strftime("%Y-%m")
-    all_refs = sb_all("referrers", order="name")
-    if all_refs:
-        all_v_month = [v for v in sb_all("visits") if (v.get("visit_date") or "")[:7]==current_month]
-        ref_rows = []; total_ref_comm = 0.0
-        for ref in all_refs:
-            v_via = [v for v in all_v_month if v.get("referred_by")==ref["name"]]
+    section_label("🤝 Referral Commissions")
+    all_refs_comm = sb_all("referrers", order="name")
+    all_ref_payments = sb_all("referral_commission_payments")
+    ref_paid_months = set((p.get("referrer_id"), p.get("month")) for p in all_ref_payments)
+    cur_month_ref = date.today().strftime("%Y-%m")
+    all_visits_ref = sb_all("visits")
+    all_months_ref = sorted(set(v.get("visit_date","")[:7] for v in all_visits_ref if v.get("visit_date","")[:7] < cur_month_ref), reverse=True)
+    unpaid_ref_months = [m for m in all_months_ref if any((r["id"], m) not in ref_paid_months for r in all_refs_comm if any(v.get("referred_by")==r["name"] and v.get("visit_date","")[:7]==m for v in all_visits_ref))]
+    if unpaid_ref_months:
+        st.warning(f"⚠️ **{len(unpaid_ref_months)} month{'s' if len(unpaid_ref_months)>1 else ''} with unpaid referral commissions:** {', '.join(unpaid_ref_months)}")
+    ref_view_month = st.selectbox("View month", [cur_month_ref] + all_months_ref, key="ref_view_month")
+    visits_for_ref_month = [v for v in all_visits_ref if (v.get("visit_date") or "")[:7] == ref_view_month]
+    if all_refs_comm:
+        for ref in all_refs_comm:
+            v_via = [v for v in visits_for_ref_month if v.get("referred_by")==ref["name"]]
+            if not v_via: continue
             rev = sum(float(v.get("net_paid") or 0) for v in v_via)
-            comm = rev*(float(ref.get("commission_rate") or 0)/100.0); total_ref_comm += comm
-            ref_rows.append({"Referrer":ref["name"],"Rate":f"{ref.get('commission_rate')}%","Visits":len(v_via),"Revenue":fmt(rev),"Due":fmt(comm)})
-        st.dataframe(pd.DataFrame(ref_rows), use_container_width=True, hide_index=True)
-        st.markdown(f"**Total: {fmt(total_ref_comm)}**")
-        if st.button("Mark Paid"):
-            if total_ref_comm > 0:
-                tag = f"Referral Commissions — {current_month}"
-                if not sb_exists("expenses","description",tag):
-                    sb_insert("expenses",{"description":tag,"category":"Marketing","amount":total_ref_comm,"date":f"{current_month}-01","added_by":username})
-                    play_ding(); st.success(f"Recorded."); st.rerun()
+            comm = rev * (float(ref.get("commission_rate") or 0) / 100.0)
+            is_paid_ref = (ref["id"], ref_view_month) in ref_paid_months
+            is_current_ref = ref_view_month == cur_month_ref
+            status_color = "#2ECC8F" if is_paid_ref else ("#C9A84C" if is_current_ref else "#FF8A7A")
+            status_text = "✅ Paid" if is_paid_ref else ("🔄 In Progress" if is_current_ref else "❗ Unpaid")
+            rc1, rc2 = st.columns([3,1])
+            with rc1:
+                st.markdown(f'<div class="card" style="padding:14px 20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-family:Cormorant Garamond,serif;font-style:italic;font-size:1.1rem;color:#EAF2EC;">{ref["name"]}</div><div style="font-size:0.78rem;color:#9DC2B0;margin-top:2px;">{len(v_via)} visits · {fmt(rev)} revenue · {ref.get("commission_rate")}% rate</div></div><div style="text-align:right;"><div style="font-size:1.2rem;color:#D4B45C;font-family:JetBrains Mono,monospace;font-weight:700;">{fmt(comm)}</div><div style="font-size:0.72rem;color:{status_color};font-weight:700;">{status_text}</div></div></div></div>', unsafe_allow_html=True)
+            with rc2:
+                if not is_paid_ref and not is_current_ref and comm > 0:
+                    ref_pay_notes = st.text_input("Notes", placeholder="e.g. Cash", key=f"ref_note_{ref['id']}_{ref_view_month}", label_visibility="collapsed")
+                    if st.button("✅ Mark Paid", key=f"ref_pay_{ref['id']}_{ref_view_month}", use_container_width=True):
+                        sb_insert("referral_commission_payments", {"referrer_id": ref["id"], "referrer_name": ref["name"], "month": ref_view_month, "visits_count": len(v_via), "revenue_amount": rev, "commission_rate": float(ref.get("commission_rate") or 0), "commission_amount": comm, "paid_by": username, "paid_at": today_str, "notes": ref_pay_notes.strip()})
+                        log_action(username, "Referral Commission Paid", f"{ref['name']} — {ref_view_month} — {fmt(comm)}")
+                        play_ding(); st.success("Marked as paid!"); st.rerun()
+                elif is_paid_ref:
+                    pay_rec_ref = next((p for p in all_ref_payments if p.get("referrer_id")==ref["id"] and p.get("month")==ref_view_month), None)
+                    if pay_rec_ref: st.caption(f"Paid on {pay_rec_ref.get('paid_at','')} by {pay_rec_ref.get('paid_by','')}")
+    else:
+        st.info("No referrers set up yet. Add them in Settings → Referrers.")
+    st.markdown("---")
+    section_label("💳 Referral Payment History")
+    if all_ref_payments:
+        ref_hist = [{"Month":p.get("month",""),"Referrer":p.get("referrer_name",""),"Visits":p.get("visits_count",0),"Revenue":fmt(p.get("revenue_amount",0)),"Rate":f"{p.get('commission_rate',0)}%","Commission":fmt(p.get("commission_amount",0)),"Paid by":p.get("paid_by",""),"Date":p.get("paid_at",""),"Notes":p.get("notes","")} for p in sorted(all_ref_payments, key=lambda x: x.get("month",""), reverse=True)]
+        st.dataframe(pd.DataFrame(ref_hist), use_container_width=True, hide_index=True)
+    else:
+        st.info("No referral payments recorded yet.")
     section_label("💰 Doctor Commissions")
     all_visits_comm = sb_all("visits")
     all_doctors_comm = sb_all("doctors")
