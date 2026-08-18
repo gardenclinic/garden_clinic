@@ -1079,7 +1079,6 @@ if selected == "🩺  Clinical Workspace":
                                         st.rerun()
 
                 st.markdown('<div class="editorial-divider"><span>New Assessment</span></div>', unsafe_allow_html=True)
-                st.markdown('<div class="doctor-form-card">', unsafe_allow_html=True)
 
                 # Patient complaint section
                 section_label("Chief Complaint & History")
