@@ -1463,24 +1463,28 @@ elif selected == "🖥️  Reception":
 
     pulse_bar([("Today's Revenue",fmt(today_revenue)),("Visits Today",str(today_visits_count)),("Total Patients",str(patient_count)),("Notifications",str(notif_count))])
 
-    # ── Doctor Orders banner ──
-    if pending_orders_notif:
+    # ── Doctor Orders banner — auto-refreshes every 10 seconds ──
+    @st.fragment(run_every=10)
+    def doctor_orders_banner():
         import json as _json_rec
-        st.markdown(f'<div style="background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.5);border-radius:16px;padding:16px 20px;margin-bottom:12px;"><div style="font-size:0.7rem;color:#C9A84C;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:10px;">💊 {len(pending_orders_notif)} Doctor Order{"s" if len(pending_orders_notif)>1 else ""} Waiting</div>', unsafe_allow_html=True)
-        for order in pending_orders_notif:
-            try:
-                svcs = _json_rec.loads(order.get("services_json") or "[]")
-                svc_names = ", ".join([s.get("name","") for s in svcs])
-                total_price = sum(float(s.get("price",0)) for s in svcs)
-            except: svc_names = "—"; total_price = 0
-            oc1, oc2 = st.columns([4,1])
-            with oc1:
-                st.markdown(f'<div style="padding:8px 0;border-bottom:1px solid rgba(201,168,76,0.15);"><span style="color:#FFFFFF;font-weight:700;">{order.get("patient_name","")}</span> <span style="color:#9DC2B0;font-size:0.85rem;">· Dr. {order.get("doctor_name","")} · {svc_names}</span> <span style="color:#D4B45C;font-family:JetBrains Mono,monospace;font-size:0.85rem;"> · {fmt(total_price)}</span>{("<br/><span style='color:#9DC2B0;font-size:0.78rem;'>📝 " + order.get("notes","") + "</span>") if order.get("notes") else ""}</div>', unsafe_allow_html=True)
-            with oc2:
-                if st.button("✅ Done", key=f"close_order_{order['id']}", help="Mark as completed after checkout"):
-                    sb_update("doctor_orders", {"status": "Completed"}, "id", order["id"])
-                    play_ding(); st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+        fresh_orders = sb_all("doctor_orders", filters={"status": "Pending"})
+        if fresh_orders:
+            st.markdown(f'<div style="background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.5);border-radius:16px;padding:16px 20px;margin-bottom:12px;"><div style="font-size:0.7rem;color:#C9A84C;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:10px;">💊 {len(fresh_orders)} Doctor Order{"s" if len(fresh_orders)>1 else ""} Waiting</div>', unsafe_allow_html=True)
+            for order in fresh_orders:
+                try:
+                    svcs = _json_rec.loads(order.get("services_json") or "[]")
+                    svc_names = ", ".join([s.get("name","") for s in svcs])
+                    total_price = sum(float(s.get("price",0)) for s in svcs)
+                except: svc_names = "—"; total_price = 0
+                oc1, oc2 = st.columns([4,1])
+                with oc1:
+                    st.markdown(f'<div style="padding:8px 0;border-bottom:1px solid rgba(201,168,76,0.15);"><span style="color:#FFFFFF;font-weight:700;">{order.get("patient_name","")}</span> <span style="color:#9DC2B0;font-size:0.85rem;">· Dr. {order.get("doctor_name","")} · {svc_names}</span> <span style="color:#D4B45C;font-family:JetBrains Mono,monospace;font-size:0.85rem;"> · {fmt(total_price)}</span>{("<br/><span style=color:#9DC2B0;font-size:0.78rem;>📝 " + order.get("notes","") + "</span>") if order.get("notes") else ""}</div>', unsafe_allow_html=True)
+                with oc2:
+                    if st.button("✅ Done", key=f"close_order_{order['id']}", help="Mark as completed after checkout"):
+                        sb_update("doctor_orders", {"status": "Completed"}, "id", order["id"])
+                        play_ding(); st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+    doctor_orders_banner()
 
     # ── No-show banner ──
     if noshow_notif:
