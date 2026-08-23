@@ -995,7 +995,7 @@ if selected == "🩺  Clinical Workspace":
             st.markdown(f'<div style="background:rgba(6,30,22,0.4);border:1px solid rgba(201,168,76,0.15);border-radius:20px;padding:14px 20px;margin-bottom:20px;font-size:0.85rem;color:#9DC2B0;font-family:Plus Jakarta Sans,sans-serif;">👥 No patients checked in yet today — updates automatically every 10 seconds.</div>', unsafe_allow_html=True)
     doctor_queue()
 
-    df_tabs = st.tabs(["Patient Assessment","Past Assessments","🩻 Imaging","📋 Today's Sheet"])
+    df_tabs = st.tabs(["Patient Assessment","Past Assessments","🩻 Imaging","📋 Today's Sheet","💊 Service Order"])
 
     with df_tabs[0]:
         section_label("Find Patient")
@@ -1296,6 +1296,62 @@ if selected == "🩺  Clinical Workspace":
         sheet_date_display = date.today().strftime("%A, %B %d, %Y")
         render_doctor_daily_sheet(doc_info['name'] if doc_info else 'Unknown', sheet_rows, sheet_date_display)
 
+    with df_tabs[4]:
+        import json as _json
+        section_label("💊 Service Order")
+        st.caption("Select services for a patient — reception will see this order immediately and can check them out.")
+
+        all_p_order = sb_all("patients", order="name")
+        all_svc_order = [s for s in sb_all("services", order="name") if s.get("active")]
+        order_search = st.text_input("Search patient", placeholder="Type name or phone...", key="order_search")
+        if order_search:
+            all_p_order = [p for p in all_p_order if order_search.lower() in p.get("name","").lower() or order_search in (p.get("phone","") or "")]
+        if all_p_order and all_svc_order:
+            sel_p_order = st.selectbox("Select patient", ["— select —"] + [p["name"] for p in all_p_order], key="order_pat_sel")
+            if sel_p_order != "— select —":
+                pat_order = next(p for p in all_p_order if p["name"] == sel_p_order)
+
+                # Check for existing pending order
+                existing_orders = sb_all("doctor_orders", filters={"patient_id": pat_order["id"], "status": "Pending"})
+                if existing_orders:
+                    st.warning(f"⚠️ There is already a pending order for {sel_p_order}. Reception hasn't checked them out yet.")
+
+                svc_options = {s["name"]: s for s in all_svc_order}
+                selected_svcs = st.multiselect(
+                    "Select services for this patient",
+                    options=list(svc_options.keys()),
+                    key="order_svc_sel"
+                )
+
+                if selected_svcs:
+                    total_order = 0.0
+                    for sname in selected_svcs:
+                        s = svc_options[sname]
+                        price = float(s.get("price") or 0)
+                        total_order += price
+                        st.markdown(f'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(201,168,76,0.1);"><span style="color:#EAF2EC;">{sname}</span><span style="color:#D4B45C;font-family:JetBrains Mono,monospace;">{fmt(price)}</span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="display:flex;justify-content:space-between;padding:10px 0;margin-top:4px;"><span style="color:#C9A84C;font-weight:700;font-size:1rem;">TOTAL</span><span style="color:#C9A84C;font-family:JetBrains Mono,monospace;font-size:1.1rem;font-weight:700;">{fmt(total_order)}</span></div>', unsafe_allow_html=True)
+
+                order_notes = st.text_input("Notes for reception (optional)", placeholder="e.g. Start with laser today", key="order_notes")
+
+                if st.button("📤 Send Order to Reception", use_container_width=True):
+                    svcs_data = [{"id": svc_options[n]["id"], "name": n, "price": float(svc_options[n].get("price") or 0)} for n in selected_svcs]
+                    sb_insert("doctor_orders", {
+                        "patient_id": pat_order["id"],
+                        "doctor_id": linked_doctor_id,
+                        "patient_name": sel_p_order,
+                        "doctor_name": doc_info["name"] if doc_info else "Doctor",
+                        "services_json": _json.dumps(svcs_data),
+                        "notes": order_notes.strip(),
+                        "status": "Pending",
+                        "created_at": today_str
+                    })
+                    log_action(username, "Doctor Order", f"{sel_p_order} — {', '.join(selected_svcs)}")
+                    play_ding()
+                    st.success(f"✅ Order sent to reception for {sel_p_order}!")
+        elif not all_svc_order:
+            st.info("No services set up yet. Ask the Boss to add services in Settings → Services.")
+
 # ═══════════════════════════════════════════════
 # DASHBOARD
 # ═══════════════════════════════════════════════
@@ -1372,7 +1428,8 @@ elif selected == "🖥️  Reception":
     expiring_notif = [s for s in sb_all("patient_subscriptions") if s.get("status")=="Active" and s.get("end_date") in [today_str, tomorrow_str]]
     tomorrow_appts_notif = get_tomorrow_appointments()
     noshow_notif = get_doctor_noshows()
-    notif_count = len(followup_list_notif) + len(overdue_notif) + len(expiring_notif) + len(tomorrow_appts_notif) + len(noshow_notif)
+    pending_orders_notif = sb_all("doctor_orders", filters={"status": "Pending"})
+    notif_count = len(followup_list_notif) + len(overdue_notif) + len(expiring_notif) + len(tomorrow_appts_notif) + len(noshow_notif) + len(pending_orders_notif)
 
     head_l, head_r = st.columns([4, 1])
     with head_l:
@@ -1405,6 +1462,25 @@ elif selected == "🖥️  Reception":
                         st.caption(f"• {pmap_notif.get(s.get('patient_id'),'Unknown')} — '{s.get('plan_name','')}' expires {s.get('end_date','')}")
 
     pulse_bar([("Today's Revenue",fmt(today_revenue)),("Visits Today",str(today_visits_count)),("Total Patients",str(patient_count)),("Notifications",str(notif_count))])
+
+    # ── Doctor Orders banner ──
+    if pending_orders_notif:
+        import json as _json_rec
+        st.markdown(f'<div style="background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.5);border-radius:16px;padding:16px 20px;margin-bottom:12px;"><div style="font-size:0.7rem;color:#C9A84C;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:10px;">💊 {len(pending_orders_notif)} Doctor Order{"s" if len(pending_orders_notif)>1 else ""} Waiting</div>', unsafe_allow_html=True)
+        for order in pending_orders_notif:
+            try:
+                svcs = _json_rec.loads(order.get("services_json") or "[]")
+                svc_names = ", ".join([s.get("name","") for s in svcs])
+                total_price = sum(float(s.get("price",0)) for s in svcs)
+            except: svc_names = "—"; total_price = 0
+            oc1, oc2 = st.columns([4,1])
+            with oc1:
+                st.markdown(f'<div style="padding:8px 0;border-bottom:1px solid rgba(201,168,76,0.15);"><span style="color:#FFFFFF;font-weight:700;">{order.get("patient_name","")}</span> <span style="color:#9DC2B0;font-size:0.85rem;">· Dr. {order.get("doctor_name","")} · {svc_names}</span> <span style="color:#D4B45C;font-family:JetBrains Mono,monospace;font-size:0.85rem;"> · {fmt(total_price)}</span>{("<br/><span style='color:#9DC2B0;font-size:0.78rem;'>📝 " + order.get("notes","") + "</span>") if order.get("notes") else ""}</div>', unsafe_allow_html=True)
+            with oc2:
+                if st.button("✅ Done", key=f"close_order_{order['id']}", help="Mark as completed after checkout"):
+                    sb_update("doctor_orders", {"status": "Completed"}, "id", order["id"])
+                    play_ding(); st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # ── No-show banner ──
     if noshow_notif:
@@ -1509,6 +1585,20 @@ elif selected == "🖥️  Reception":
                 chosen_doc_display = st.selectbox("Doctor", list(doc_display_map.keys()))
                 chosen_doc = doc_display_map[chosen_doc_display]
                 payment_method = st.selectbox("Payment method", ["Cash","Card","Insurance","Transfer"])
+
+                # Show doctor's order hint if patient has a pending order
+                if target_p != "— select —":
+                    import json as _json_co
+                    pat_id_co = p_map.get(target_p)
+                    pending_co = sb_all("doctor_orders", filters={"patient_id": pat_id_co, "status": "Pending"})
+                    if pending_co:
+                        for ord_co in pending_co:
+                            try:
+                                svcs_co = _json_co.loads(ord_co.get("services_json") or "[]")
+                                svc_lines = "".join([f'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(201,168,76,0.1);"><span style="color:#EAF2EC;">{s["name"]}</span><span style="color:#D4B45C;font-family:JetBrains Mono,monospace;">{fmt(s["price"])}</span></div>' for s in svcs_co])
+                                total_co = sum(float(s.get("price",0)) for s in svcs_co)
+                            except: svc_lines = ""; total_co = 0
+                            st.markdown(f'<div style="background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.4);border-radius:14px;padding:14px 18px;margin-top:8px;"><div style="font-size:0.68rem;color:#C9A84C;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:8px;">💊 Doctor\'s Order — Dr. {ord_co.get("doctor_name","")}</div>{svc_lines}<div style="display:flex;justify-content:space-between;padding:8px 0 0;"><span style="color:#C9A84C;font-weight:700;">Total</span><span style="color:#C9A84C;font-family:JetBrains Mono,monospace;font-weight:700;">{fmt(total_co)}</span></div>{("<div style=margin-top:6px;font-size:0.8rem;color:#9DC2B0;>📝 " + ord_co.get("notes","") + "</div>") if ord_co.get("notes") else ""}</div>', unsafe_allow_html=True)
             with c2:
                 item_type = st.radio("Item type", ["Service","Bundle"], horizontal=True)
                 srv_id = bnd_id = None; base_price = 0.0; chosen_item_name = ""
@@ -1551,6 +1641,10 @@ elif selected == "🖥️  Reception":
                     disc_amt = base_price - final_due
                     inv_num = get_invoice_number()
                     sb_insert("visits",{"patient_id":p_map[target_p],"doctor_id":d_map[chosen_doc],"service_id":srv_id,"bundle_id":bnd_id,"visit_date":today_str,"base_price":base_price,"discount_amount":disc_amt,"net_paid":final_due,"payment_method":payment_method,"notes":visit_notes,"referred_by":referred_by_val,"added_by":username})
+                    # Mark any pending doctor orders for this patient as completed
+                    pending_orders_co = sb_all("doctor_orders", filters={"patient_id": p_map[target_p], "status": "Pending"})
+                    for ord_done in pending_orders_co:
+                        sb_update("doctor_orders", {"status": "Completed"}, "id", ord_done["id"])
                     todays_appts = sb_all("appointments", filters={"patient_id": p_map[target_p], "appt_date": today_str, "status": "Scheduled"})
                     for ap in todays_appts: sb_update("appointments", {"status": "Completed"}, "id", ap["id"])
                     sess = sb_one("patient_sessions", filters={"patient_id": p_map[target_p]})
