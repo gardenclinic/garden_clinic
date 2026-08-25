@@ -687,6 +687,9 @@ def page_header(kicker, title, desc=""):
 def render_receipt(r, cp):
     inv = r.get("invoice", "")
     inv_line = f"&nbsp;·&nbsp; {inv}" if inv else ""
+    footer_address_line = f'<div class="receipt-footer-clinic">📍 {cp.get("address","")}</div>' if cp.get("address") else ""
+    footer_phone_line = f'<div class="receipt-footer-clinic">📞 {cp.get("phone","")}</div>' if cp.get("phone") else ""
+    footer_email_line = f'<div class="receipt-footer-clinic">✉ {cp.get("email","")}</div>' if cp.get("email") else ""
     receipt_html = f"""<div class="receipt-wrap" id="printable-receipt">
         <div class="receipt-header">
             <div class="receipt-leaf">❦</div>
@@ -709,12 +712,7 @@ def render_receipt(r, cp):
             <div class="receipt-row"><span>Base Price</span><span>{fmt(r['base'])}</span></div>
             <div class="receipt-row"><span class="receipt-discount">Discount</span><span class="receipt-discount">− {fmt(r['disc'])}</span></div>
             <div class="receipt-total-box"><div class="receipt-total-label">Total Paid</div><div class="receipt-total-amount">{fmt(r['net'])}</div></div>
-            <div class="receipt-footer-area">
-                {'<div class="receipt-footer-clinic">📍 ' + cp.get('address','') + '</div>' if cp.get('address') else ''}
-                {'<div class="receipt-footer-clinic">📞 ' + cp.get('phone','') + '</div>' if cp.get('phone') else ''}
-                {'<div class="receipt-footer-clinic">✉ ' + cp.get('email','') + '</div>' if cp.get('email') else ''}
-                <div class="receipt-footer-text" style="margin-top:14px;">Thank you for choosing {cp.get('clinic_name','Garden Clinic')}</div>
-                <div class="receipt-footer-text">We wish you a speedy recovery</div></div></div></div>"""
+            <div class="receipt-footer-area">{footer_address_line}{footer_phone_line}{footer_email_line}<div class="receipt-footer-text" style="margin-top:14px;">Thank you for choosing {cp.get('clinic_name','Garden Clinic')}</div><div class="receipt-footer-text">We wish you a speedy recovery</div></div></div></div>"""
     st.markdown(receipt_html, unsafe_allow_html=True)
     # Print button — opens a clean print window with ONLY the receipt
     receipt_js = receipt_html.replace("`", "\\`").replace("</div>", "</div>")
@@ -1021,7 +1019,16 @@ if selected == "🩺  Clinical Workspace":
                 tier_chip_html = f'<span class="patient-chip" style="border-color:{tier_color};color:{tier_color};font-weight:700;" title="{tier_sub}">{tier_icon} {tier_name}</span>' if tier_name else ""
                 chip_phone = pat_doc.get("phone","—")
                 chip_gender = f'{gender_icon} {pat_doc.get("gender","—")}'
-                chip_bar_html = f'<div class="patient-chip-bar"><div class="patient-chip-name">{pat_doc["name"]}</div>{tier_chip_html}<span class="patient-chip">{chip_gender}</span><span class="patient-chip">{age_text}</span><span class="patient-chip">📞 {chip_phone}</span><span class="patient-chip accent">{visits_count} visits</span></div>'
+                sess_doc = next((s for s in sb_all("patient_sessions", filters={"patient_id": pid_doc})), None)
+                if sess_doc:
+                    done_s = int(sess_doc.get("sessions_done") or 0)
+                    total_s = int(sess_doc.get("total_sessions") or 0)
+                    remaining_s = max(0, total_s - done_s)
+                    sess_color = "#FF8A7A" if remaining_s == 0 else ("#C9A84C" if remaining_s <= 3 else "#2ECC8F")
+                    sessions_chip = f'<span class="patient-chip" style="border-color:{sess_color};color:{sess_color};font-weight:700;">📋 {remaining_s} sessions left</span>'
+                else:
+                    sessions_chip = ""
+                chip_bar_html = f'<div class="patient-chip-bar"><div class="patient-chip-name">{pat_doc["name"]}</div>{tier_chip_html}<span class="patient-chip">{chip_gender}</span><span class="patient-chip">{age_text}</span><span class="patient-chip">📞 {chip_phone}</span><span class="patient-chip accent">{visits_count} visits</span>{sessions_chip}</div>'
                 st.markdown(chip_bar_html, unsafe_allow_html=True)
 
                 # Past assessments preview
@@ -1084,45 +1091,66 @@ if selected == "🩺  Clinical Workspace":
                 section_label("Chief Complaint & History")
                 c1, c2 = st.columns(2)
                 with c1:
-                    form_complaint = st.text_input("Chief Complaint", placeholder="e.g. Lower back pain", key="df_complaint")
-                    form_duration = st.text_input("Duration", placeholder="e.g. 3 months", key="df_duration")
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">1</span>Chief Complaint</div>', unsafe_allow_html=True)
+                    form_complaint = st.text_input("Chief Complaint", placeholder="e.g. Lower back pain", key="df_complaint", label_visibility="collapsed")
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;margin-top:8px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">3</span>Duration</div>', unsafe_allow_html=True)
+                    form_duration = st.text_input("Duration", placeholder="e.g. 3 months", key="df_duration", label_visibility="collapsed")
                 with c2:
-                    form_body_area = st.selectbox("Affected Body Area", ["— select —","Neck / Cervical","Upper back","Lower back / Lumbar","Shoulder","Elbow","Wrist / Hand","Hip","Knee","Ankle / Foot","Multiple areas","Other"], key="df_body")
-                    form_onset = st.selectbox("Onset", ["— select —","Sudden / Trauma","Gradual","Post-surgery","Repetitive strain","Unknown"], key="df_onset")
-                form_history = st.text_area("History of present illness", height=80, placeholder="Describe what happened, how it started, what makes it better/worse...", key="df_history")
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">2</span>Affected Body Area</div>', unsafe_allow_html=True)
+                    form_body_area = st.selectbox("Affected Body Area", ["— select —","Neck / Cervical","Upper back","Lower back / Lumbar","Shoulder","Elbow","Wrist / Hand","Hip","Knee","Ankle / Foot","Multiple areas","Other"], key="df_body", label_visibility="collapsed")
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;margin-top:8px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">4</span>Onset</div>', unsafe_allow_html=True)
+                    form_onset = st.selectbox("Onset", ["— select —","Sudden / Trauma","Gradual","Post-surgery","Repetitive strain","Unknown"], key="df_onset", label_visibility="collapsed")
+                st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;margin-top:8px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">5</span>History of present illness</div>', unsafe_allow_html=True)
+                form_history = st.text_area("History of present illness", height=80, placeholder="Describe what happened, how it started, what makes it better/worse...", key="df_history", label_visibility="collapsed")
 
                 # Pain assessment
                 section_label("Pain Assessment")
                 pc1, pc2 = st.columns(2)
-                with pc1: form_pain_before = st.slider("Pain level on first visit (0-10)", 0, 10, 5, key="df_pain_before")
-                with pc2: form_pain_after = st.slider("Pain level after sessions (0-10)", 0, 10, 5, key="df_pain_after", help="Update this later as treatment progresses")
+                with pc1:
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">6</span>Pain level on first visit (0-10)</div>', unsafe_allow_html=True)
+                    form_pain_before = st.slider("Pain level on first visit (0-10)", 0, 10, 5, key="df_pain_before", label_visibility="collapsed")
+                with pc2:
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">7</span>Pain level after sessions (0-10)</div>', unsafe_allow_html=True)
+                    form_pain_after = st.slider("Pain level after sessions (0-10)", 0, 10, 5, key="df_pain_after", label_visibility="collapsed")
 
                 # Clinical findings
                 section_label("Clinical Findings")
                 cf1, cf2 = st.columns(2)
                 with cf1:
-                    form_rom = st.text_area("Range of Motion / Movement notes", height=80, placeholder="ROM limitations, stiffness, weakness...", key="df_rom")
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">8</span>Range of Motion / Movement notes</div>', unsafe_allow_html=True)
+                    form_rom = st.text_area("Range of Motion / Movement notes", height=80, placeholder="ROM limitations, stiffness, weakness...", key="df_rom", label_visibility="collapsed")
                 with cf2:
-                    form_red_flags = st.text_area("⚠️ Red Flags (refer to MD if any)", height=80, placeholder="Numbness, weakness, bladder issues, severe pain at night...", key="df_red_flags")
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">9</span>⚠️ Red Flags (refer to MD if any)</div>', unsafe_allow_html=True)
+                    form_red_flags = st.text_area("⚠️ Red Flags (refer to MD if any)", height=80, placeholder="Numbness, weakness, bladder issues, severe pain at night...", key="df_red_flags", label_visibility="collapsed")
 
                 # Diagnosis & plan
                 section_label("Diagnosis & Treatment Plan")
                 dc1, dc2 = st.columns(2)
                 with dc1:
-                    form_problem = st.text_area("Diagnosis / Problem", height=100, placeholder="What is wrong with the patient?", key="df_problem")
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">10</span>Diagnosis / Problem</div>', unsafe_allow_html=True)
+                    form_problem = st.text_area("Diagnosis / Problem", height=100, placeholder="What is wrong with the patient?", key="df_problem", label_visibility="collapsed")
                 with dc2:
-                    form_plan = st.text_area("Treatment Plan & Expected Outcome", height=100, placeholder="What treatment will you provide and what is the expected outcome?", key="df_plan")
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">11</span>Treatment Plan & Expected Outcome</div>', unsafe_allow_html=True)
+                    form_plan = st.text_area("Treatment Plan & Expected Outcome", height=100, placeholder="What treatment will you provide and what is the expected outcome?", key="df_plan", label_visibility="collapsed")
 
                 # Sessions & outcome
                 section_label("Treatment Plan")
                 sc1, sc2, sc3 = st.columns(3)
-                with sc1: form_sessions = st.number_input("Sessions Needed", min_value=1, max_value=200, step=1, value=10, key="df_sessions")
-                with sc2: form_frequency = st.selectbox("Frequency", ["— select —","Daily","3x per week","2x per week","Weekly","Every 2 weeks","As needed"], key="df_freq")
-                with sc3: form_outcome = st.selectbox("Expected Outcome", ["Pending","Full Recovery Expected","Partial Recovery Expected","Long-term Management","Other"], key="df_outcome")
+                with sc1:
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">12</span>Sessions Needed</div>', unsafe_allow_html=True)
+                    form_sessions = st.number_input("Sessions Needed", min_value=1, max_value=200, step=1, value=10, key="df_sessions", label_visibility="collapsed")
+                with sc2:
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">13</span>Frequency</div>', unsafe_allow_html=True)
+                    form_frequency = st.selectbox("Frequency", ["— select —","Daily","3x per week","2x per week","Weekly","Every 2 weeks","As needed"], key="df_freq", label_visibility="collapsed")
+                with sc3:
+                    st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">14</span>Expected Outcome</div>', unsafe_allow_html=True)
+                    form_outcome = st.selectbox("Expected Outcome", ["Pending","Full Recovery Expected","Partial Recovery Expected","Long-term Management","Other"], key="df_outcome", label_visibility="collapsed")
 
                 # Notes
-                form_prev_treatment = st.text_area("Previous treatments tried (if any)", height=70, placeholder="Medications, physiotherapy elsewhere, injections, surgery, home exercises...", key="df_prev")
-                form_notes = st.text_area("Additional clinical notes", height=70, placeholder="Any extra observations...", key="df_notes")
+                st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;margin-top:8px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">15</span>Previous treatments tried (if any)</div>', unsafe_allow_html=True)
+                form_prev_treatment = st.text_area("Previous treatments tried (if any)", height=70, placeholder="Medications, physiotherapy elsewhere, injections, surgery, home exercises...", key="df_prev", label_visibility="collapsed")
+                st.markdown('<div style="font-size:0.78rem;color:#C9A84C;font-weight:700;margin-bottom:4px;margin-top:8px;"><span style="background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;font-size:0.7rem;">16</span>Additional clinical notes</div>', unsafe_allow_html=True)
+                form_notes = st.text_area("Additional clinical notes", height=70, placeholder="Any extra observations...", key="df_notes", label_visibility="collapsed")
 
                 st.markdown("</div>", unsafe_allow_html=True)
 
