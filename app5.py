@@ -792,6 +792,39 @@ patient_count = sb_count("patients")
 # LOGIN
 # ═══════════════════════════════════════════════
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
+
+# Auto-restore login from browser localStorage if session expired
+if not st.session_state.logged_in:
+    params = st.query_params
+    if "alu" in params and "alr" in params:
+        st.session_state.logged_in = True
+        st.session_state.username = params["alu"]
+        st.session_state.role = params["alr"]
+        ldid = params.get("ald", "")
+        st.session_state.linked_doctor_id = int(ldid) if ldid and ldid.isdigit() else None
+        st.query_params.clear()
+        st.rerun()
+    # Ask browser to check localStorage and redirect if session was saved
+    components.html("""
+    <script>
+    (function(){
+        try {
+            var saved = localStorage.getItem('gc_login');
+            if (saved) {
+                var d = JSON.parse(saved);
+                if (d.alu && d.alr) {
+                    var url = window.parent.location.pathname +
+                        '?alu=' + encodeURIComponent(d.alu) +
+                        '&alr=' + encodeURIComponent(d.alr) +
+                        '&ald=' + encodeURIComponent(d.ald || '');
+                    window.parent.location.href = url;
+                }
+            }
+        } catch(e) {}
+    })();
+    </script>
+    """, height=0, width=0)
+
 if not st.session_state.logged_in:
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
@@ -886,6 +919,16 @@ if not st.session_state.logged_in:
                     st.session_state.username = match[0]["username"]
                     st.session_state.role = match[0]["role"]
                     st.session_state.linked_doctor_id = match[0].get("linked_doctor_id")
+                    ldid_save = str(match[0].get("linked_doctor_id") or "")
+                    components.html(f"""<script>
+                    try {{
+                        localStorage.setItem('gc_login', JSON.stringify({{
+                            alu: {repr(match[0]["username"])},
+                            alr: {repr(match[0]["role"])},
+                            ald: '{ldid_save}'
+                        }}));
+                    }} catch(e) {{}}
+                    </script>""", height=0, width=0)
                     st.rerun()
                 else: st.error("Invalid username or password.")
         with rt:
@@ -955,6 +998,7 @@ menus = menu_map.get(role, [])
 selected = st.sidebar.radio("Navigation", menus, label_visibility="collapsed")
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
 if st.sidebar.button("Sign Out", use_container_width=True):
+    components.html("<script>try{localStorage.removeItem('gc_login');}catch(e){}</script>", height=0, width=0)
     st.session_state.logged_in = False; st.rerun()
 
 # ═══════════════════════════════════════════════
